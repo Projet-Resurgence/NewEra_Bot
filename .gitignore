@@ -3,10 +3,12 @@ old
 commands
 datas
 .env
-*db
+*db*
 *log
 *txt
 *json
+*config*
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[codz]
