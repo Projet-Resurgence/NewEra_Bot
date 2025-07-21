@@ -2,14 +2,28 @@ from notion_client import Client
 import discord
 import json
 
+
 class NotionHandler:
-    
+
     def __init__(self, notion_secret, discord_client):
-        self.notion_client = Client(auth=notion_secret)
-        self.discord_client = discord_client
-        self.notion_db_id = "2367e0731d2d80d78352d02edcb5499d"  # Replace with your Notion database ID
-        self.discord_channel_id = 1291471564973281280  # Replace with your Discord channel ID
-        self.cache_file = "notion_cache.json"
+        try:
+            self.notion_client = Client(auth=notion_secret)
+            self.discord_client = discord_client
+            self.notion_db_ids = [
+                "2367e0731d2d80d78352d02edcb5499d",
+                "2367e0731d2d802c84b0f1c0d1b24a67",
+            ]
+            self.discord_channel_id = 1291471564973281280
+            self.cache_file = "notion_cache.json"
+            print("✅ NotionHandler initialized successfully")
+        except Exception as e:
+            print(f"❌ Failed to initialize NotionHandler: {e}")
+            # Set fallback values to prevent crashes
+            self.notion_client = None
+            self.discord_client = discord_client
+            self.notion_db_ids = []
+            self.discord_channel_id = None
+            self.cache_file = "notion_cache.json"
 
     async def send_update_embed(self, action, task_info):
         discord_channel = self.discord_client.get_channel(self.discord_channel_id)
@@ -28,7 +42,9 @@ class NotionHandler:
         color = colors.get(action, 0x2F3136)
         title = titles.get(action, "📋 Tâche")
 
-        tags = ", ".join(task_info.get("tags", [])) if task_info.get("tags") else "Aucun"
+        tags = (
+            ", ".join(task_info.get("tags", [])) if task_info.get("tags") else "Aucun"
+        )
         status = task_info.get("status", "Inconnu")
         task_title = task_info.get("title", "Sans titre")
 
@@ -40,7 +56,11 @@ class NotionHandler:
         await discord_channel.send(embed=embed)
 
     async def get_tasks(self, ctx, req_type="all"):
-        all_tasks = self.notion_client.databases.query(database_id=self.notion_db_id)
+        all_tasks = []
+        for notion_db in self.notion_db_ids:
+            all_tasks += self.notion_client.databases.query(database_id=notion_db)[
+                "results"
+            ]
 
         tasks = {
             "Non commencées": [],
@@ -48,7 +68,7 @@ class NotionHandler:
             "Terminées": [],
         }
 
-        for page in all_tasks["results"]:
+        for page in all_tasks:
             title_prop = page["properties"].get("Name", {}).get("title", [])
             status_prop = page["properties"].get("Status", {}).get("status", {})
             tags_prop = page["properties"].get("Tags", {}).get("multi_select", [])
@@ -62,34 +82,43 @@ class NotionHandler:
             if req_type != "all" and req_type not in [tag.lower() for tag in tags]:
                 continue
 
-            tasks[status].append({
-                "title": title,
-                "tags": tags
-            })
+            tasks[status].append({"title": title, "tags": tags})
 
         embed = discord.Embed(
             title="📋 Tâches Notion",
-            description=f"**Filtrées par tag** : `{req_type}`" if req_type != "all" else "Toutes les tâches",
-            color=0x5865F2
+            description=(
+                f"**Filtrées par tag** : `{req_type}`"
+                if req_type != "all"
+                else "Toutes les tâches"
+            ),
+            color=0x5865F2,
         )
 
-        status_emojis = {
-            "Non commencées": "🕒",
-            "En cours": "🔧",
-            "Terminées": "✅"
-        }
+        status_emojis = {"Non commencées": "🕒", "En cours": "🔧", "Terminées": "✅"}
 
         for status, task_list in tasks.items():
             if not task_list:
-                embed.add_field(name=f"{status_emojis.get(status, '')} {status}", value="*Aucune tâche*", inline=False)
+                embed.add_field(
+                    name=f"{status_emojis.get(status, '')} {status}",
+                    value="*Aucune tâche*",
+                    inline=False,
+                )
                 continue
 
             lines = []
             for task in task_list:
-                tags = ", ".join([f"`{t}`" for t in task["tags"]]) if task["tags"] else "`aucun tag`"
+                tags = (
+                    ", ".join([f"`{t}`" for t in task["tags"]])
+                    if task["tags"]
+                    else "`aucun tag`"
+                )
                 lines.append(f"• **{task['title']}** — {tags}")
 
-            embed.add_field(name=f"{status_emojis.get(status, '')} {status}", value="\n".join(lines), inline=False)
+            embed.add_field(
+                name=f"{status_emojis.get(status, '')} {status}",
+                value="\n".join(lines),
+                inline=False,
+            )
 
         return embed
 
@@ -125,9 +154,9 @@ class NotionHandler:
     def tasks_differ(self, old_task, new_task):
         # Compare titre, status, tags
         return (
-            old_task.get("title") != new_task.get("title") or
-            old_task.get("status") != new_task.get("status") or
-            set(old_task.get("tags", [])) != set(new_task.get("tags", []))
+            old_task.get("title") != new_task.get("title")
+            or old_task.get("status") != new_task.get("status")
+            or set(old_task.get("tags", [])) != set(new_task.get("tags", []))
         )
 
     async def send_update(self, channel, message):
@@ -136,10 +165,14 @@ class NotionHandler:
 
     async def check_for_updates(self):
         cache = self.load_cache()
-        all_tasks = self.notion_client.databases.query(database_id=self.notion_db_id)
+        all_tasks = []
+        for notion_db in self.notion_db_ids:
+            all_tasks += self.notion_client.databases.query(database_id=notion_db)[
+                "results"
+            ]
 
         current_ids = set()
-        for page in all_tasks["results"]:
+        for page in all_tasks:
             task_info = self.extract_task_info(page)
             task_id = task_info["id"]
             current_ids.add(task_id)

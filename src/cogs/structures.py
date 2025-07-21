@@ -21,7 +21,6 @@ from shared_utils import (
     FACTORY_COLOR_INT,
 )
 
-
 class Structures(commands.Cog):
     """Structures management cog"""
 
@@ -46,7 +45,6 @@ class Structures(commands.Cog):
 
     @commands.command(
         name="construct_structure",
-        aliases=["construct_usine"],  # Backward compatibility
         brief="Construit un certain nombre de structures d'un niveau spécifié.",
         usage="construct_structure <amount> <lvl>",
         description="Construit plusieurs structures du niveau indiqué et débite le coût correspondant.",
@@ -55,12 +53,11 @@ class Structures(commands.Cog):
         ARGUMENTS :
         - `<amount>` : Nombre de structures à construire (entier).
         - `<lvl>` : Niveau des structures à construire (entier ou chaîne représentative du niveau).
+        - `<region>` : Id de la région où les structures seront construites
 
         EXEMPLE :
         - `construct_structure 3 1` : Construit 3 structures de niveau 1 si l'utilisateur a suffisamment de fonds pour couvrir le coût.
         """,
-        hidden=False,
-        enabled=True,
         case_insensitive=True,
     )
     async def construct_structure(
@@ -72,10 +69,25 @@ class Structures(commands.Cog):
         lvl=commands.parameter(
             description="Niveau des structures à construire (indique le coût de construction par structure)."
         ),
+        region: int = commands.parameter(
+            description="ID de la région où les structures seront construites.",
+        ),
+        struct_type: str = commands.parameter(
+            description="Type de structure à construire (par exemple, 'usine', 'base', etc.).",
+        ),
     ) -> None:
-        user = ctx.author
-        balance = self.db.get_balance(str(user.id))
+        country = CountryEntity(ctx.author, ctx.guild).to_dict()
+        struct_type = struct_type.lower()
+        if not country or not country.get("id"):
+            embed = discord.Embed(
+                title="Erreur de donation",
+                description=":moneybag: L'utilisateur ou le pays spécifié est invalide.",
+                color=self.error_color_int,
+            )
+            await ctx.send(embed=embed)
+            return
 
+        balance = self.db.get_balance(country.get("id"))
         if not amount_converter(amount, balance):
             embed = discord.Embed(
                 title="Erreur de paiement",
@@ -89,7 +101,7 @@ class Structures(commands.Cog):
             self.production_data[str(lvl)]["cout_construction"]
         )
 
-        if not self.db.has_enough_balance(user.id, payment_amount):
+        if not self.db.has_enough_balance(country.get("id"), payment_amount):
             embed = discord.Embed(
                 title="Erreur de paiement",
                 description=f":moneybag: Vous n'avez pas assez d'argent pour effectuer cette transaction.\nMontant demandé : {payment_amount}. | Vous possédez : {balance}",
@@ -98,8 +110,8 @@ class Structures(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        self.db.take_balance(user.id, payment_amount)
-        self.db.give_usine(user.id, amount, lvl, 0)
+        self.db.take_balance(country.get("id"), payment_amount)
+        self.db.give_usine(country.get("id"), amount, lvl, region)
         embed = discord.Embed(
             title="Opération réussie",
             description=f":factory: Vos {amount} structures de niveau {lvl} auront coûtés **{convert(str(payment_amount))}** et ont été payés au bot.",
@@ -109,7 +121,6 @@ class Structures(commands.Cog):
 
     @commands.command(
         name="sell_structure",
-        aliases=["sell_batiment"],  # Backward compatibility
         brief="Vend des structures.",
         usage="sell_structure <struct_type> <amount> <lvl>",
         description="Vend des structures et récupère de l'argent.",
@@ -155,7 +166,6 @@ class Structures(commands.Cog):
 
     @commands.command(
         name="structures",
-        aliases=["usines"],  # Backward compatibility
         brief="Affiche les structures d'un utilisateur.",
         usage="structures <type> [user]",
         description="Affiche les structures d'un utilisateur par type.",
@@ -181,10 +191,13 @@ class Structures(commands.Cog):
                 description=f"L'utilisateur a **{str(self.db.get_usine(user.id, type, 0))}** structures de type {type}.",
             )
         await ctx.send(embed=embed)
+        
+    @commands.command(
+        name="add_structure",
+        brief="Ajoute des structures à un utilisateur (Staff seulement).",
 
     @commands.command(
         name="remove_structure",
-        aliases=["remove_usine"],  # Backward compatibility
         brief="Retire des structures d'un utilisateur (Staff seulement).",
         usage="remove_structure <user> <amount> <lvl>",
         description="Retire des structures de l'inventaire d'un utilisateur.",
@@ -233,156 +246,6 @@ class Structures(commands.Cog):
             color=self.money_color_int,
         )
         await ctx.send(embed=embed)
-
-    @commands.command(
-        name="set_structure",
-        aliases=["set_usine"],  # Backward compatibility
-        brief="Définit le nombre de structures d'un utilisateur (Staff seulement).",
-        usage="set_structure <user> <amount> <lvl>",
-        description="Définit le nombre de structures pour un utilisateur.",
-        hidden=False,
-        enabled=True,
-        case_insensitive=True,
-    )
-    async def set_structure(self, ctx, user: discord.Member, amount: int, lvl: int):
-        if not self.dUtils.is_authorized(ctx):
-            embed = discord.Embed(
-                title="Vous n'êtes pas autorisé à effectuer cette commande.",
-                description="Il vous faut être staff",
-                color=self.error_color_int,
-            )
-            await ctx.send(embed=embed)
-            return
-
-        self.db.set_usine(user.id, amount, lvl, 0)
-
-        embed = discord.Embed(
-            title="Opération réussie",
-            description=f":factory: **{convert(str(amount))}** structures de niveau {lvl} ont été définis pour l'utilisateur {user.name}.",
-            color=self.money_color_int,
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command(
-        name="set_base",
-        brief="Définit le nombre de bases militaires d'un utilisateur (Staff seulement).",
-        usage="set_base <struct_type> <user> <amount> <lvl>",
-        description="Définit le nombre de bases militaires pour un utilisateur.",
-        hidden=False,
-        enabled=True,
-        case_insensitive=True,
-    )
-    async def set_base(
-        self, ctx, struct_type: int, user: discord.Member, amount: int, lvl: int
-    ):
-        if not self.dUtils.is_authorized(ctx):
-            embed = discord.Embed(
-                title="Vous n'êtes pas autorisé à effectuer cette commande.",
-                description="Il vous faut être staff",
-                color=self.error_color_int,
-            )
-            await ctx.send(embed=embed)
-            return
-        self.db.set_usine(user.id, amount, lvl, struct_type)
-        struct_cat = "bases" if struct_type < 4 else "ecoles"
-        struct_cat += "_militaires"
-        struct_cat = self.base_data[struct_cat][
-            f"{self.bat_types[struct_type][0]}{lvl}"
-        ]["type"]
-        embed = discord.Embed(
-            title="Opération réussie",
-            description=f":factory: **{convert(str(amount))}** {struct_cat} de niveau {lvl} ont été définis pour l'utilisateur {user.name}.",
-            color=self.money_color_int,
-        )
-        await ctx.send(embed=embed)
-
-    @commands.command(
-        name="military_structures",
-        aliases=["batiments"],  # Backward compatibility
-        brief="Affiche les structures militaires d'un utilisateur.",
-        usage="military_structures <struct_type> [user]",
-        description="Affiche les structures militaires d'un utilisateur par type.",
-        hidden=False,
-        enabled=True,
-        case_insensitive=True,
-    )
-    async def military_structures(
-        self, ctx, struct_type: int, user: discord.Member = None
-    ):
-        if user is None:
-            user = ctx.author
-        if not self.dUtils.is_authorized(ctx) and not user.id == ctx.author.id:
-            embed = discord.Embed(
-                title="Vous n'êtes pas autorisé à effectuer cette commande.",
-                description="Il vous faut être staff",
-                color=self.error_color_int,
-            )
-            await ctx.send(embed=embed)
-            return
-        if str(struct_type).lower() == "all":
-            struct_name = "all"
-        elif not isinstance(struct_type, int) or struct_type not in self.bat_types:
-            return await ctx.send(
-                "Type de structure invalide. Veuillez fournir un type valide."
-            )
-        else:
-            struct_name = self.bat_types[struct_type][0]
-
-        # Note: There seems to be some incomplete logic in the original batiments function
-        # I'll implement a basic version for now
-        if str(struct_type).lower() == "all":
-            embed = discord.Embed(
-                title=f"Structures militaires de {user.name}", description=""
-            )
-            for i in range(1, 8):  # Assuming max level 7
-                embed.description += (
-                    f"Type {i} : {str(self.db.get_usine(user.id, i, struct_type))}\n"
-                )
-        else:
-            embed = discord.Embed(
-                title=f"Structures militaires de type {struct_type} de {user.name}",
-                description=f"L'utilisateur a **{str(self.db.get_usine(user.id, 1, struct_type))}** structures militaires de type {struct_type}.",
-            )
-        await ctx.send(embed=embed)
-
-    @commands.command(
-        name="remove_military_structure",
-        aliases=["remove_bat"],  # Backward compatibility
-        brief="Retire une structure militaire spécifique (Staff seulement).",
-        usage="remove_military_structure <struct_id>",
-        description="Retire une structure militaire par son ID.",
-        hidden=False,
-        enabled=True,
-        case_insensitive=True,
-    )
-    async def remove_military_structure(self, ctx, struct_id: int):
-        if not self.dUtils.is_authorized(ctx):
-            embed = discord.Embed(
-                title="Vous n'êtes pas autorisé à effectuer cette commande.",
-                description="Il vous faut être staff",
-                color=self.error_color_int,
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Note: The original remove_bat function was incomplete
-        # Adding basic implementation
-        try:
-            # This would need proper implementation based on the database structure
-            embed = discord.Embed(
-                title="Opération réussie",
-                description=f":factory: Structure militaire {struct_id} a été supprimée.",
-                color=self.money_color_int,
-            )
-            await ctx.send(embed=embed)
-        except Exception as e:
-            embed = discord.Embed(
-                title="Erreur",
-                description=f"Erreur lors de la suppression : {e}",
-                color=self.error_color_int,
-            )
-            await ctx.send(embed=embed)
-
 
 async def setup(bot):
     """Setup function for the cog"""
