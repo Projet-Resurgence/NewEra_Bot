@@ -155,10 +155,21 @@ python3 server.py
 
 ## 🎮 Bot Commands Reference
 
-### **💰 Economic Commands**
-- `.money <user> [amount]` - Check or set user balance
+### **�️ Administrative Commands**
+- `.del_betw <start_msg> <end_msg>` - Bulk delete messages
+- `.send_rules <webhook_url>` - Deploy rules to channels
+- `.reformat_rp_channels` - Standardize channel naming
+- `.reload_cogs` - Reload all cogs (ADMIN ONLY)
+- `.drop_all_except_inventory` - Database maintenance (ADMIN ONLY)
+
+### **💰 Economic Commands** (Economy Cog)
+- `.bal [country]` - Check balance of country or user
+- `.money [country]` - Alias for balance command
+
+### **💵 Financial Management Commands**
 - `.add_money <user> <amount>` - Add funds to user account
 - `.remove_money <user> <amount>` - Deduct funds from user account
+- `.give <country> <amount>` - Transfer money to another country
 - `.set_points <user> <amount>` - Set political points
 - `.points <user>` - Check political points balance
 
@@ -235,6 +246,40 @@ python3 server.py
 ---
 
 ## 🔧 Configuration & Customization
+
+### **Cog System Architecture**
+NewEra Bot uses Discord.py's cog system for modular command organization:
+
+```
+📁 src/cogs/
+├── __init__.py              # Package initialization
+├── economy.py               # Economic commands (bal, money)
+└── example.py               # Template for new cogs
+```
+
+**Creating New Cogs:**
+```python
+# src/cogs/my_cog.py
+import discord
+from discord.ext import commands
+
+class MyCog(commands.Cog):
+    def __init__(self, bot):
+        self.bot = bot
+    
+    @commands.command(name='mycommand')
+    async def my_command(self, ctx):
+        await ctx.send("Hello from my cog!")
+
+async def setup(bot):
+    await bot.add_cog(MyCog(bot))
+```
+
+**Loading Cogs:**
+- Cogs are automatically loaded when the bot starts via `on_ready()` event
+- Use `.reload_cogs` command (admin only) to reload during development
+- Add new cogs to the `load_cogs()` function in `main.py`
+- See [COGS.md](COGS.md) for detailed cog development documentation
 
 ### **Database Schema**
 The system uses SQLite with carefully designed relationships:
