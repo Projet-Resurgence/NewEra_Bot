@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Technologies - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1><i class="bi bi-cpu"></i> Technologies</h1>
+  <a href="/technologies/add" class="btn btn-primary">
+    <i class="bi bi-plus"></i> Add Technology
+  </a>
+</div>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="content-card p-4">
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Developed By</th>
+          <th>Exported</th>
+          <th>Description</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for tech in technologies %}
+        <tr>
+          <td>{{ tech.tech_id }}</td>
+          <td><strong>{{ tech.name }}</strong></td>
+          <td><span class="badge bg-primary">{{ tech.type }}</span></td>
+          <td>
+            {% if tech.developed_by %}
+              {% for country in countries %}
+                {% if country.country_id == tech.developed_by %}
+                  {{ country.name }}
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              <em class="text-muted">Unknown</em>
+            {% endif %}
+          </td>
+          <td>
+            {% if tech.exported %}
+              <span class="badge bg-success">Yes</span>
+            {% else %}
+              <span class="badge bg-secondary">No</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if tech.description %}
+              {{ tech.description[:50] }}{% if tech.description|length > 50 %}...{% endif %}
+            {% else %}
+              <em class="text-muted">No description</em>
+            {% endif %}
+          </td>
+          <td>
+            <a href="#" class="btn btn-outline-warning btn-sm">
+              <i class="bi bi-pencil"></i>
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="7" class="text-center text-muted">No technologies found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

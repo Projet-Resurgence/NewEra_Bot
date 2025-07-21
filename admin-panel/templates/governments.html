@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+
+{% block title %}Governments - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1><i class="bi bi-people"></i> Governments</h1>
+  <a href="/governments/add" class="btn btn-primary">
+    <i class="bi bi-plus"></i> Add Government Position
+  </a>
+</div>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="content-card p-4">
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th>Country</th>
+          <th>Slot</th>
+          <th>Player ID</th>
+          <th>Permissions</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for government in governments %}
+        <tr>
+          <td>
+            {% for country in countries %}
+              {% if country.country_id|string == government.country_id|string %}
+                <strong>{{ country.name }}</strong>
+              {% endif %}
+            {% endfor %}
+          </td>
+          <td><span class="badge bg-primary">Slot {{ government.slot }}</span></td>
+          <td><code>{{ government.player_id }}</code></td>
+          <td>
+            <div class="d-flex flex-wrap gap-1">
+              {% if government.can_spend_money %}<span class="badge bg-success">Money</span>{% endif %}
+              {% if government.can_spend_points %}<span class="badge bg-info">Points</span>{% endif %}
+              {% if government.can_sign_treaties %}<span class="badge bg-warning">Treaties</span>{% endif %}
+              {% if government.can_build %}<span class="badge bg-secondary">Build</span>{% endif %}
+              {% if government.can_recruit %}<span class="badge bg-primary">Recruit</span>{% endif %}
+              {% if government.can_produce %}<span class="badge bg-danger">Produce</span>{% endif %}
+              {% if government.can_declare_war %}<span class="badge bg-dark">War</span>{% endif %}
+            </div>
+          </td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              <a href="/governments/edit/{{ government.country_id }}/{{ government.slot }}" class="btn btn-outline-warning">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="/governments/delete/{{ government.country_id }}/{{ government.slot }}" class="d-inline" 
+                    onsubmit="return confirm('Are you sure you want to delete this government position?')">
+                <button type="submit" class="btn btn-outline-danger">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="5" class="text-center text-muted">No government positions found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+
+{% block title %}Add Doctrine{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-plus"></i> Add New Doctrine</h2>
+    <a href="/doctrines" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Doctrines
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-book"></i> Doctrine Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                        <div class="form-text">The display name of this doctrine.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Category</label>
+                        <select class="form-select" id="category" name="category">
+                            <option value="">Select Category (Optional)</option>
+                            <option value="Régime">Régime</option>
+                            <option value="Idéologie">Idéologie</option>
+                            <option value="Économie">Économie</option>
+                            <option value="Religieux">Religieux</option>
+                        </select>
+                        <div class="form-text">Categorizes the doctrine for organization.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                        <div class="form-text">Detailed explanation of what this doctrine represents.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="discord_role_id" class="form-label">Discord Role ID</label>
+                        <input type="text" class="form-control" id="discord_role_id" name="discord_role_id">
+                        <div class="form-text">Discord role ID associated with this doctrine (optional).</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bonus_json" class="form-label">Bonus JSON</label>
+                        <textarea class="form-control font-monospace" id="bonus_json" name="bonus_json" rows="4" 
+                                  placeholder='{"production_bonus": 0.1, "culture_penalty": -0.05}'></textarea>
+                        <div class="form-text">JSON object defining bonuses/penalties this doctrine provides.</div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <a href="/doctrines" class="btn btn-secondary me-2">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check"></i> Add Doctrine
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h6><i class="bi bi-info-circle"></i> Field Guidelines</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Name:</strong> Required unique identifier</p>
+                <p><strong>Category:</strong> Groups similar doctrines</p>
+                <p><strong>Description:</strong> Explains doctrine purpose</p>
+                <p><strong>Discord Role ID:</strong> Links to Discord server role</p>
+                <p><strong>Bonus JSON:</strong> Game mechanics effects</p>
+            </div>
+        </div>
+        
+        <div class="card border-success mt-3">
+            <div class="card-header bg-success text-white">
+                <h6><i class="bi bi-code"></i> JSON Examples</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Economic Bonus:</strong></p>
+                <code class="d-block mb-2">{"gdp_multiplier": 1.15}</code>
+                
+                <p><strong>Military Focus:</strong></p>
+                <code class="d-block mb-2">{"military_bonus": 0.2, "diplomacy_penalty": -0.1}</code>
+                
+                <p><strong>Cultural:</strong></p>
+                <code class="d-block">{"culture_points": 10, "tech_bonus": 0.05}</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Basic JSON validation
+document.getElementById('bonus_json').addEventListener('blur', function() {
+    const jsonText = this.value.trim();
+    if (jsonText && jsonText !== '') {
+        try {
+            JSON.parse(jsonText);
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } catch (e) {
+            this.classList.remove('is-valid');
+            this.classList.add('is-invalid');
+        }
+    } else {
+        this.classList.remove('is-invalid', 'is-valid');
+    }
+});
+</script>
+{% endblock %}

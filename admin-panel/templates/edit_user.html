@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}Edit User - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-pencil-square"></i> Edit User: {{ user.username }}</h2>
+    <a href="{{ url_for('users') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Users
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-person"></i> User Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username *</label>
+                                <input type="text" class="form-control" id="username" name="username" 
+                                       value="{{ user.username }}" required>
+                                <div class="form-text">Must be unique and used for login.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email *</label>
+                                <input type="email" class="form-control" id="email" name="email" 
+                                       value="{{ user.email }}" required>
+                                <div class="form-text">Must be a valid email address.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="new_password" class="form-label">New Password (Optional)</label>
+                        <input type="password" class="form-control" id="new_password" name="new_password" minlength="6">
+                        <div class="form-text">Leave blank to keep current password. Minimum 6 characters if changing.</div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6><i class="bi bi-shield"></i> Permissions</h6>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin"
+                                       {% if user.is_admin %}checked{% endif %}>
+                                <label class="form-check-label" for="is_admin">
+                                    <strong>Admin</strong>
+                                </label>
+                                <div class="form-text">Legacy admin role identifier.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="can_manage_users" name="can_manage_users"
+                                       {% if user.can_manage_users %}checked{% endif %}
+                                       {% if user.user_id == session.user_id %}onchange="preventSelfDemotion(this)"{% endif %}>
+                                <label class="form-check-label" for="can_manage_users">
+                                    <strong>Can Manage Users</strong>
+                                </label>
+                                <div class="form-text">
+                                    Create, edit, and delete users.
+                                    {% if user.user_id == session.user_id %}
+                                        <br><small class="text-warning">Cannot remove from yourself</small>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_active" name="is_active"
+                                       {% if user.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="is_active">
+                                    <strong>Active</strong>
+                                </label>
+                                <div class="form-text">User can log in to the system.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-end">
+                        <a href="{{ url_for('users') }}" class="btn btn-secondary me-2">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check-circle"></i> Update User
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h6><i class="bi bi-info-circle"></i> User Information</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>User ID:</strong> {{ user.user_id }}</p>
+                <p><strong>Created:</strong> {{ user.created_at or 'N/A' }}</p>
+                <p><strong>Last Login:</strong> {{ user.last_login or 'Never' }}</p>
+                {% if user.user_id == session.user_id %}
+                <p class="text-info"><strong>This is your account</strong></p>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card border-warning mt-3">
+            <div class="card-header bg-warning text-dark">
+                <h6><i class="bi bi-exclamation-triangle"></i> Edit Restrictions</h6>
+            </div>
+            <div class="card-body">
+                {% if user.user_id == session.user_id %}
+                <p><strong>Your Own Account:</strong></p>
+                <ul>
+                    <li>Cannot remove user management privileges</li>
+                    <li>Cannot delete your own account</li>
+                    <li>Can change password and other details</li>
+                </ul>
+                {% else %}
+                <p><strong>Other User Account:</strong></p>
+                <ul>
+                    <li>Can modify all settings</li>
+                    <li>Can reset password</li>
+                    <li>Can activate/deactivate</li>
+                </ul>
+                {% endif %}
+            </div>
+        </div>
+        
+        <div class="card border-success mt-3">
+            <div class="card-header bg-success text-white">
+                <h6><i class="bi bi-shield-check"></i> Security Notes</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Password:</strong></p>
+                <ul>
+                    <li>Leave blank to keep current</li>
+                    <li>Minimum 6 characters if changing</li>
+                    <li>User will need to use new password on next login</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function preventSelfDemotion(checkbox) {
+    if (!checkbox.checked && {{ user.user_id == session.user_id | tojson }}) {
+        checkbox.checked = true;
+        alert('You cannot remove your own user management privileges.');
+    }
+}
+
+// Form validation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const newPassword = document.getElementById('new_password').value;
+    if (newPassword && newPassword.length < 6) {
+        e.preventDefault();
+        alert('New password must be at least 6 characters long.');
+        document.getElementById('new_password').focus();
+    }
+});
+</script>
+{% endblock %}

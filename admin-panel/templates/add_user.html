@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Add User{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-person-plus"></i> Add New User</h2>
+    <a href="{{ url_for('users') }}" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Users
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-person"></i> User Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="username" class="form-label">Username *</label>
+                                <input type="text" class="form-control" id="username" name="username" required>
+                                <div class="form-text">Must be unique and will be used for login.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="email" class="form-label">Email *</label>
+                                <input type="email" class="form-control" id="email" name="email" required>
+                                <div class="form-text">Must be a valid email address.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password *</label>
+                        <input type="password" class="form-control" id="password" name="password" required minlength="6">
+                        <div class="form-text">Minimum 6 characters. User can change this later.</div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <h6><i class="bi bi-shield"></i> Permissions</h6>
+                    
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_admin" name="is_admin">
+                                <label class="form-check-label" for="is_admin">
+                                    <strong>Admin</strong>
+                                </label>
+                                <div class="form-text">Legacy admin role identifier.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="can_manage_users" name="can_manage_users">
+                                <label class="form-check-label" for="can_manage_users">
+                                    <strong>Can Manage Users</strong>
+                                </label>
+                                <div class="form-text">Create, edit, and delete users.</div>
+                            </div>
+                        </div>
+                        
+                        <div class="col-md-4">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="is_active" name="is_active" checked>
+                                <label class="form-check-label" for="is_active">
+                                    <strong>Active</strong>
+                                </label>
+                                <div class="form-text">User can log in to the system.</div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <hr>
+                    
+                    <div class="d-flex justify-content-end">
+                        <a href="{{ url_for('users') }}" class="btn btn-secondary me-2">Cancel</a>
+                        <button type="submit" class="btn btn-success">
+                            <i class="bi bi-check-circle"></i> Create User
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h6><i class="bi bi-info-circle"></i> User Creation Guidelines</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Username:</strong></p>
+                <ul>
+                    <li>Must be unique</li>
+                    <li>Used for login</li>
+                    <li>Cannot be changed later</li>
+                </ul>
+                
+                <p><strong>Email:</strong></p>
+                <ul>
+                    <li>Must be valid format</li>
+                    <li>Used for identification</li>
+                    <li>Can be updated later</li>
+                </ul>
+                
+                <p><strong>Password:</strong></p>
+                <ul>
+                    <li>Minimum 6 characters</li>
+                    <li>User can change later</li>
+                    <li>Securely hashed in database</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card border-warning mt-3">
+            <div class="card-header bg-warning text-dark">
+                <h6><i class="bi bi-exclamation-triangle"></i> Permission Levels</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Standard User:</strong> Can view and manage database records</p>
+                <p><strong>User Manager:</strong> Can also create, edit, and delete other users</p>
+                <p class="mb-0"><small>Grant permissions based on actual needs for security.</small></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Form validation
+document.querySelector('form').addEventListener('submit', function(e) {
+    const password = document.getElementById('password').value;
+    if (password.length < 6) {
+        e.preventDefault();
+        alert('Password must be at least 6 characters long.');
+        document.getElementById('password').focus();
+    }
+});
+</script>
+{% endblock %}

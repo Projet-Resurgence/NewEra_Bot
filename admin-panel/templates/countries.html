@@ -1,0 +1,69 @@
+{% extends "base.html" %}
+
+{% block title %}Countries - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1><i class="bi bi-flag"></i> Countries</h1>
+  <a href="/countries/add" class="btn btn-primary">
+    <i class="bi bi-plus"></i> Add Country
+  </a>
+</div>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="content-card p-4">
+  <div class="table-responsive">
+    <table class="table table-hover">
+      <thead class="table-dark">
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Role ID</th>
+          <th>Public Channel</th>
+          <th>Secret Channel</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for country in countries %}
+        <tr>
+          <td>{{ country.country_id }}</td>
+          <td><strong>{{ country.name }}</strong></td>
+          <td><code>{{ country.role_id }}</code></td>
+          <td><code>{{ country.public_channel_id }}</code></td>
+          <td><code>{{ country.secret_channel_id or 'N/A' }}</code></td>
+          <td>
+            <div class="btn-group btn-group-sm">
+              <a href="/countries/edit/{{ country.country_id }}" class="btn btn-outline-warning">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <form method="post" action="/countries/delete/{{ country.country_id }}" class="d-inline" 
+                    onsubmit="return confirm('Are you sure you want to delete this country?')">
+                <button type="submit" class="btn btn-outline-danger">
+                  <i class="bi bi-trash"></i>
+                </button>
+              </form>
+            </div>
+          </td>
+        </tr>
+        {% else %}
+        <tr>
+          <td colspan="6" class="text-center text-muted">No countries found</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

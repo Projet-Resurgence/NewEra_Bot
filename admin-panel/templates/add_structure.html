@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+
+{% block title %}Add Structure - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1><i class="bi bi-plus"></i> Add Structure</h1>
+  <a href="/structures" class="btn btn-secondary">
+    <i class="bi bi-arrow-left"></i> Back to Structures
+  </a>
+</div>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="content-card p-4">
+  <form method="POST">
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="region_id" class="form-label">Region *</label>
+          <select class="form-select" id="region_id" name="region_id" required>
+            <option value="">Select Region</option>
+            {% for region in regions %}
+            <option value="{{ region.region_id }}">{{ region.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="type" class="form-label">Structure Type *</label>
+          <select class="form-select" id="type" name="type" required>
+            <option value="">Select Type</option>
+            <option value="Usine">Usine (Factory)</option>
+            <option value="Base">Base (Military)</option>
+            <option value="Ecole">Ecole (School)</option>
+            <option value="Logement">Logement (Housing)</option>
+            <option value="Centrale">Centrale (Power Plant)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="specialization" class="form-label">Specialization *</label>
+          <select class="form-select" id="specialization" name="specialization" required>
+            <option value="">Select Specialization</option>
+            <option value="Terrestre">Terrestre (Land)</option>
+            <option value="Aerienne">Aerienne (Air)</option>
+            <option value="Navale">Navale (Naval)</option>
+            <option value="NA">NA (Not Applicable)</option>
+          </select>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="level" class="form-label">Level *</label>
+          <input type="number" class="form-control" id="level" name="level" value="1" min="1" max="7" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="capacity" class="form-label">Capacity</label>
+          <input type="number" class="form-control" id="capacity" name="capacity" value="0" min="0">
+          <div class="form-text">Maximum capacity for housing/schools/bases</div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="population" class="form-label">Current Population</label>
+          <input type="number" class="form-control" id="population" name="population" value="0" min="0">
+          <div class="form-text">Number of people currently assigned</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check"></i> Create Structure
+      </button>
+      <a href="/structures" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

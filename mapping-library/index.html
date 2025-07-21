@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive County Map</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="container">
+        <header>
+            <h1>Interactive County Map</h1>
+            <p>Select a color, then click on counties to paint them</p>
+        </header>
+
+        <div class="controls">
+            <div class="map-selector">
+                <label for="mapSelector">Select Map:</label>
+                <select id="mapSelector">
+                    <option value="countries">Countries Map</option>
+                    <option value="regions">Regions Map</option>
+                </select>
+            </div>
+
+            <div class="color-controls">
+                <label for="colorPicker">Select Color:</label>
+                <input type="color" id="colorPicker" value="#ff0000">
+                <button id="clearSelection">Clear Selection</button>
+                <button id="resetAll">Reset All</button>
+            </div>
+
+            <div class="info-panel">
+                <h3>Selected Counties:</h3>
+                <ul id="selectedCounties"></ul>
+                <div class="county-stats">
+                    <span id="countyCount">0 counties selected</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="map-container">
+            <canvas id="mapCanvas"></canvas>
+            <div id="tooltip"></div>
+        </div>
+
+        <div class="legend">
+            <h3>Colored Counties</h3>
+            <div id="legendContent"></div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+
+</html>

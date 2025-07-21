@@ -1,0 +1,155 @@
+{% extends "base.html" %}
+
+{% block title %}Doctrines{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-book"></i> Doctrines Management</h2>
+    <a href="/doctrines/add" class="btn btn-primary">
+        <i class="bi bi-plus"></i> Add New Doctrine
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5><i class="bi bi-list"></i> All Doctrines ({{ doctrines|length }})</h5>
+    </div>
+    <div class="card-body">
+        {% if doctrines %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Category</th>
+                            <th>Description</th>
+                            <th>Discord Role ID</th>
+                            <th>Bonus JSON</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for doctrine in doctrines %}
+                        <tr>
+                            <td>{{ doctrine.doctrine_id }}</td>
+                            <td><strong>{{ doctrine.name }}</strong></td>
+                            <td>
+                                {% if doctrine.category %}
+                                    <span class="badge bg-info">{{ doctrine.category }}</span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if doctrine.description %}
+                                    <span class="text-truncate d-inline-block" style="max-width: 200px;" 
+                                          title="{{ doctrine.description }}">
+                                        {{ doctrine.description }}
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if doctrine.discord_role_id %}
+                                    <code>{{ doctrine.discord_role_id }}</code>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if doctrine.bonus_json %}
+                                    <span class="text-truncate d-inline-block" style="max-width: 150px;" 
+                                          title="{{ doctrine.bonus_json }}">
+                                        <code>{{ doctrine.bonus_json }}</code>
+                                    </span>
+                                {% else %}
+                                    <span class="text-muted">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <div class="btn-group btn-group-sm" role="group">
+                                    <a href="/doctrines/edit/{{ doctrine.doctrine_id }}" 
+                                       class="btn btn-outline-primary" title="Edit Doctrine">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <form method="POST" action="/doctrines/delete/{{ doctrine.doctrine_id }}" 
+                                          style="display: inline;"
+                                          onsubmit="return confirm('Are you sure you want to delete doctrine {{ doctrine.name }}?');">
+                                        <button type="submit" class="btn btn-outline-danger" title="Delete Doctrine">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    </form>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-4">
+                <i class="bi bi-book display-1 text-muted"></i>
+                <h4 class="text-muted">No doctrines found</h4>
+                <p class="text-muted">Start by adding your first doctrine.</p>
+                <a href="/doctrines/add" class="btn btn-primary">
+                    <i class="bi bi-plus"></i> Add First Doctrine
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h6><i class="bi bi-info-circle"></i> Doctrine Categories</h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li><strong>Régime:</strong> Government system types</li>
+                    <li><strong>Idéologie:</strong> Political ideologies</li>
+                    <li><strong>Économie:</strong> Economic systems</li>
+                    <li><strong>Religieux:</strong> Religious doctrines</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card border-success">
+            <div class="card-header bg-success text-white">
+                <h6><i class="bi bi-gear"></i> Bonus JSON Format</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Example:</strong></p>
+                <code>
+                {<br>
+                &nbsp;&nbsp;"production_bonus": 0.1,<br>
+                &nbsp;&nbsp;"culture_penalty": -0.05,<br>
+                &nbsp;&nbsp;"military_bonus": 0.2<br>
+                }
+                </code>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card border-warning">
+            <div class="card-header bg-warning text-dark">
+                <h6><i class="bi bi-exclamation-triangle"></i> Usage Notes</h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li>Discord Role ID links to server roles</li>
+                    <li>Bonus JSON affects game mechanics</li>
+                    <li>Categories help organize doctrines</li>
+                    <li>Description explains doctrine effects</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

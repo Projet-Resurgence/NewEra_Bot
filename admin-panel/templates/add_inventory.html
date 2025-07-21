@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+
+{% block title %}Add Inventory - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1><i class="bi bi-plus"></i> Add Country Inventory</h1>
+  <a href="/inventory" class="btn btn-secondary">
+    <i class="bi bi-arrow-left"></i> Back to Inventory
+  </a>
+</div>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="content-card p-4">
+  <form method="POST">
+    <div class="mb-3">
+      <label for="country_id" class="form-label">Country *</label>
+      <select class="form-select" id="country_id" name="country_id" required>
+        <option value="">Select Country</option>
+        {% for country in countries %}
+        <option value="{{ country.country_id }}">{{ country.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="balance" class="form-label">Balance</label>
+          <input type="number" class="form-control" id="balance" name="balance" value="0" min="0">
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="pol_points" class="form-label">Political Points</label>
+          <input type="number" class="form-control" id="pol_points" name="pol_points" value="0" min="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="diplo_points" class="form-label">Diplomatic Points</label>
+          <input type="number" class="form-control" id="diplo_points" name="diplo_points" value="0" min="0">
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="soldiers" class="form-label">Soldiers</label>
+          <input type="number" class="form-control" id="soldiers" name="soldiers" value="0" min="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="reserves" class="form-label">Reserves</label>
+      <input type="number" class="form-control" id="reserves" name="reserves" value="0" min="0">
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check"></i> Create Inventory
+      </button>
+      <a href="/inventory" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Doctrine - {{ doctrine.name }}{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-pencil"></i> Edit Doctrine: {{ doctrine.name }}</h2>
+    <a href="/doctrines" class="btn btn-secondary">
+        <i class="bi bi-arrow-left"></i> Back to Doctrines
+    </a>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5><i class="bi bi-book"></i> Doctrine Details</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Name *</label>
+                        <input type="text" class="form-control" id="name" name="name" 
+                               value="{{ doctrine.name }}" required>
+                        <div class="form-text">The display name of this doctrine.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="category" class="form-label">Category</label>
+                        <select class="form-select" id="category" name="category">
+                            <option value="">Select Category (Optional)</option>
+                            <option value="Régime" {% if doctrine.category == "Régime" %}selected{% endif %}>Régime</option>
+                            <option value="Idéologie" {% if doctrine.category == "Idéologie" %}selected{% endif %}>Idéologie</option>
+                            <option value="Économie" {% if doctrine.category == "Économie" %}selected{% endif %}>Économie</option>
+                            <option value="Religieux" {% if doctrine.category == "Religieux" %}selected{% endif %}>Religieux</option>
+                        </select>
+                        <div class="form-text">Categorizes the doctrine for organization.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Description</label>
+                        <textarea class="form-control" id="description" name="description" rows="3">{{ doctrine.description or '' }}</textarea>
+                        <div class="form-text">Detailed explanation of what this doctrine represents.</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="discord_role_id" class="form-label">Discord Role ID</label>
+                        <input type="text" class="form-control" id="discord_role_id" name="discord_role_id" 
+                               value="{{ doctrine.discord_role_id or '' }}">
+                        <div class="form-text">Discord role ID associated with this doctrine (optional).</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="bonus_json" class="form-label">Bonus JSON</label>
+                        <textarea class="form-control font-monospace" id="bonus_json" name="bonus_json" rows="4" 
+                                  placeholder='{"production_bonus": 0.1, "culture_penalty": -0.05}'>{{ doctrine.bonus_json or '' }}</textarea>
+                        <div class="form-text">JSON object defining bonuses/penalties this doctrine provides.</div>
+                    </div>
+
+                    <div class="d-flex justify-content-end">
+                        <a href="/doctrines" class="btn btn-secondary me-2">Cancel</a>
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-check"></i> Update Doctrine
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card border-info">
+            <div class="card-header bg-info text-white">
+                <h6><i class="bi bi-info-circle"></i> Doctrine Information</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>ID:</strong> {{ doctrine.doctrine_id }}</p>
+                <p><strong>Current Category:</strong> {{ doctrine.category or 'None' }}</p>
+                <p><strong>Has Discord Role:</strong> {{ 'Yes' if doctrine.discord_role_id else 'No' }}</p>
+                <p><strong>Has Bonuses:</strong> {{ 'Yes' if doctrine.bonus_json else 'No' }}</p>
+            </div>
+        </div>
+        
+        <div class="card border-warning mt-3">
+            <div class="card-header bg-warning text-dark">
+                <h6><i class="bi bi-exclamation-triangle"></i> Edit Warnings</h6>
+            </div>
+            <div class="card-body">
+                <ul class="mb-0">
+                    <li>Changing bonuses affects active game mechanics</li>
+                    <li>Discord role changes may affect user permissions</li>
+                    <li>Category changes affect organization only</li>
+                </ul>
+            </div>
+        </div>
+        
+        <div class="card border-success mt-3">
+            <div class="card-header bg-success text-white">
+                <h6><i class="bi bi-code"></i> JSON Examples</h6>
+            </div>
+            <div class="card-body">
+                <p><strong>Economic Bonus:</strong></p>
+                <code class="d-block mb-2">{"gdp_multiplier": 1.15}</code>
+                
+                <p><strong>Military Focus:</strong></p>
+                <code class="d-block mb-2">{"military_bonus": 0.2, "diplomacy_penalty": -0.1}</code>
+                
+                <p><strong>Cultural:</strong></p>
+                <code class="d-block">{"culture_points": 10, "tech_bonus": 0.05}</code>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Basic JSON validation
+document.getElementById('bonus_json').addEventListener('blur', function() {
+    const jsonText = this.value.trim();
+    if (jsonText && jsonText !== '') {
+        try {
+            JSON.parse(jsonText);
+            this.classList.remove('is-invalid');
+            this.classList.add('is-valid');
+        } catch (e) {
+            this.classList.remove('is-valid');
+            this.classList.add('is-invalid');
+        }
+    } else {
+        this.classList.remove('is-invalid', 'is-valid');
+    }
+});
+</script>
+{% endblock %}

@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Government - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1><i class="bi bi-pencil"></i> Edit Government Position</h1>
+  <a href="/governments" class="btn btn-secondary">
+    <i class="bi bi-arrow-left"></i> Back to Governments
+  </a>
+</div>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="content-card p-4">
+  <form method="POST">
+    <div class="row">
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label for="country_id" class="form-label">Country</label>
+          <select class="form-select" id="country_id" name="country_id" disabled>
+            {% for country in countries %}
+            <option value="{{ country.country_id }}" {% if country.country_id|string == government.country_id|string %}selected{% endif %}>
+              {{ country.name }}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Country cannot be changed after creation</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label for="slot" class="form-label">Government Slot</label>
+          <input type="text" class="form-control" value="Slot {{ government.slot }}" disabled>
+          <div class="form-text">Slot cannot be changed after creation</div>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label for="player_id" class="form-label">Player Discord ID *</label>
+          <input type="text" class="form-control" id="player_id" name="player_id" value="{{ government.player_id }}" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-4">
+      <label class="form-label"><strong>Permissions</strong></label>
+      <div class="row">
+        <div class="col-md-6">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="can_spend_money" name="can_spend_money" {% if government.can_spend_money %}checked{% endif %}>
+            <label class="form-check-label" for="can_spend_money">
+              Can Spend Money
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="can_spend_points" name="can_spend_points" {% if government.can_spend_points %}checked{% endif %}>
+            <label class="form-check-label" for="can_spend_points">
+              Can Spend Points
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="can_sign_treaties" name="can_sign_treaties" {% if government.can_sign_treaties %}checked{% endif %}>
+            <label class="form-check-label" for="can_sign_treaties">
+              Can Sign Treaties
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="can_build" name="can_build" {% if government.can_build %}checked{% endif %}>
+            <label class="form-check-label" for="can_build">
+              Can Build
+            </label>
+          </div>
+        </div>
+        <div class="col-md-6">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="can_recruit" name="can_recruit" {% if government.can_recruit %}checked{% endif %}>
+            <label class="form-check-label" for="can_recruit">
+              Can Recruit
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="can_produce" name="can_produce" {% if government.can_produce %}checked{% endif %}>
+            <label class="form-check-label" for="can_produce">
+              Can Produce
+            </label>
+          </div>
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="can_declare_war" name="can_declare_war" {% if government.can_declare_war %}checked{% endif %}>
+            <label class="form-check-label" for="can_declare_war">
+              Can Declare War
+            </label>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check"></i> Update Government Position
+      </button>
+      <a href="/governments" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

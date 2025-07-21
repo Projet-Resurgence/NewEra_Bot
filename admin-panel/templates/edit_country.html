@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Country - Admin Panel{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h1><i class="bi bi-pencil"></i> Edit Country: {{ country.name }}</h1>
+  <a href="/countries" class="btn btn-secondary">
+    <i class="bi bi-arrow-left"></i> Back to Countries
+  </a>
+</div>
+
+<!-- Flash Messages -->
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% if messages %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+{% endwith %}
+
+<div class="content-card p-4">
+  <form method="POST">
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="name" class="form-label">Country Name *</label>
+          <input type="text" class="form-control" id="name" name="name" value="{{ country.name }}" required>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="role_id" class="form-label">Discord Role ID *</label>
+          <input type="text" class="form-control" id="role_id" name="role_id" value="{{ country.role_id }}" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="public_channel_id" class="form-label">Public Channel ID *</label>
+          <input type="text" class="form-control" id="public_channel_id" name="public_channel_id" value="{{ country.public_channel_id }}" required>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="secret_channel_id" class="form-label">Secret Channel ID</label>
+          <input type="text" class="form-control" id="secret_channel_id" name="secret_channel_id" value="{{ country.secret_channel_id or '' }}">
+        </div>
+      </div>
+    </div>
+
+    <div class="mb-3">
+      <label for="last_bilan" class="form-label">Last Bilan</label>
+      <textarea class="form-control" id="last_bilan" name="last_bilan" rows="3">{{ country.last_bilan or '' }}</textarea>
+    </div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" class="btn btn-primary">
+        <i class="bi bi-check"></i> Update Country
+      </button>
+      <a href="/countries" class="btn btn-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}
