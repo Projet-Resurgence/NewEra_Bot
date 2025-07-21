@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Country Technology Inventory{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Country Technology Inventory</h2>
+    <a href="/country-tech-inventory/add" class="btn btn-success">Add Inventory</a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Country</th>
+                <th>Technology</th>
+                <th>Quantity</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in inventory %}
+            <tr>
+                <td>
+                    {% for country in countries %}
+                        {% if country.country_id == item.country_id %}
+                            {{ country.name }}
+                        {% endif %}
+                    {% endfor %}
+                </td>
+                <td>
+                    {% for tech in technologies %}
+                        {% if tech.tech_id == item.tech_id %}
+                            {{ tech.name }}
+                        {% endif %}
+                    {% endfor %}
+                </td>
+                <td>{{ item.quantity }}</td>
+                <td>
+                    <form method="POST" action="/country-tech-inventory/delete/{{ item.country_id }}/{{ item.tech_id }}" style="display: inline;" onsubmit="return confirm('Are you sure?')">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

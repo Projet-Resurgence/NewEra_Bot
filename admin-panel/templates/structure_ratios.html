@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+
+{% block title %}Structure Ratios{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Structure Ratios</h2>
+    <a href="/structure-ratios/add" class="btn btn-success">Add Structure Ratio</a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Level</th>
+                <th>Production Ratio</th>
+                <th>Population Ratio</th>
+                <th>Capacity Ratio</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ratio in structure_ratios %}
+            <tr>
+                <td>{{ ratio.id }}</td>
+                <td>{{ ratio.type }}</td>
+                <td>{{ ratio.level }}</td>
+                <td>{{ ratio.ratio_production }}%</td>
+                <td>{{ ratio.ratio_population }}%</td>
+                <td>{{ ratio.ratio_capacity }}%</td>
+                <td>
+                    <a href="/structure-ratios/edit/{{ ratio.id }}" class="btn btn-primary btn-sm">Edit</a>
+                    <form method="POST" action="/structure-ratios/delete/{{ ratio.id }}" style="display: inline;" onsubmit="return confirm('Are you sure?')">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

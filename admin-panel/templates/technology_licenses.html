@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+
+{% block title %}Technology Licenses{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Technology Licenses</h2>
+    <a href="/technology-licenses/add" class="btn btn-success">Add License</a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>License ID</th>
+                <th>Technology</th>
+                <th>Country</th>
+                <th>License Type</th>
+                <th>Granted By</th>
+                <th>Granted At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for license in licenses %}
+            <tr>
+                <td>{{ license.license_id }}</td>
+                <td>
+                    {% for tech in technologies %}
+                        {% if tech.tech_id == license.tech_id %}
+                            {{ tech.name }}
+                        {% endif %}
+                    {% endfor %}
+                </td>
+                <td>
+                    {% for country in countries %}
+                        {% if country.country_id == license.country_id %}
+                            {{ country.name }}
+                        {% endif %}
+                    {% endfor %}
+                </td>
+                <td>{{ license.license_type }}</td>
+                <td>
+                    {% if license.granted_by %}
+                        {% for country in countries %}
+                            {% if country.country_id == license.granted_by %}
+                                {{ country.name }}
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                        N/A
+                    {% endif %}
+                </td>
+                <td>{{ license.granted_at or 'N/A' }}</td>
+                <td>
+                    <form method="POST" action="/technology-licenses/delete/{{ license.license_id }}" style="display: inline;" onsubmit="return confirm('Are you sure?')">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

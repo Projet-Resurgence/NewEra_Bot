@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Structure Data{% endblock %}
+
+{% block content %}
+<h2>Edit Structure Data</h2>
+
+<form method="POST">
+    <div class="mb-3">
+        <label for="type" class="form-label">Type</label>
+        <select class="form-control" id="type" name="type" required>
+            <option value="Usine" {{ 'selected' if structure_data.type == 'Usine' }}>Usine</option>
+            <option value="Base" {{ 'selected' if structure_data.type == 'Base' }}>Base</option>
+            <option value="Ecole" {{ 'selected' if structure_data.type == 'Ecole' }}>Ecole</option>
+            <option value="Logement" {{ 'selected' if structure_data.type == 'Logement' }}>Logement</option>
+            <option value="Centrale" {{ 'selected' if structure_data.type == 'Centrale' }}>Centrale</option>
+            <option value="Technocentre" {{ 'selected' if structure_data.type == 'Technocentre' }}>Technocentre</option>
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label for="capacity" class="form-label">Capacity</label>
+        <input type="number" class="form-control" id="capacity" name="capacity" value="{{ structure_data.capacity }}" required>
+    </div>
+    
+    <div class="mb-3">
+        <label for="population" class="form-label">Population</label>
+        <input type="number" class="form-control" id="population" name="population" value="{{ structure_data.population }}" required>
+    </div>
+    
+    <div class="mb-3">
+        <label for="cout_construction" class="form-label">Construction Cost</label>
+        <input type="number" class="form-control" id="cout_construction" name="cout_construction" value="{{ structure_data.cout_construction }}" required>
+    </div>
+    
+    <button type="submit" class="btn btn-primary">Update Structure Data</button>
+    <a href="/structure-data" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

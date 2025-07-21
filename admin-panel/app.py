@@ -167,6 +167,13 @@ class Technology(db.Model):
 
     tech_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String, nullable=False)
+    cost = db.Column(db.Integer, default=0, nullable=False)
+    specialization = db.Column(db.String, nullable=False)
+    development_time = db.Column(db.Integer, default=0, nullable=False)
+    development_cost = db.Column(db.Integer, default=0, nullable=False)
+    slots_taken = db.Column(db.Float, default=1.0, nullable=False)
+    original_name = db.Column(db.String, nullable=False)
+    technology_level = db.Column(db.Integer, default=1, nullable=False)
     image_url = db.Column(db.String)
     developed_by = db.Column(db.Integer)
     exported = db.Column(db.Boolean, default=False)
@@ -184,6 +191,106 @@ class CountryTechnology(db.Model):
     country_id = db.Column(db.Integer, primary_key=True)
     tech_field = db.Column(db.String, primary_key=True)
     level = db.Column(db.Integer, default=1, nullable=False)
+
+
+class StructureData(db.Model):
+    """Structure Data - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "StructuresDatas"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    type = db.Column(db.String, nullable=False)
+    capacity = db.Column(db.Integer, default=0, nullable=False)
+    population = db.Column(db.Integer, default=0, nullable=False)
+    cout_construction = db.Column(db.Integer, nullable=False)
+
+
+class StructureRatio(db.Model):
+    """Structure Ratios - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "StructuresRatios"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    type = db.Column(db.String, nullable=False)
+    level = db.Column(db.Integer, nullable=False)
+    ratio_production = db.Column(db.Integer, nullable=False)
+    ratio_population = db.Column(db.Integer, nullable=False)
+    ratio_capacity = db.Column(db.Integer, nullable=False)
+
+
+class StructureProduction(db.Model):
+    """Structure Production - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "StructureProduction"
+
+    structure_id = db.Column(db.Integer, primary_key=True)
+    tech_id = db.Column(db.Integer, primary_key=True)
+    quantity = db.Column(db.Integer, nullable=False)
+    days_remaining = db.Column(db.Integer, nullable=False)
+    started_at = db.Column(db.String)
+
+
+class CountryDoctrine(db.Model):
+    """Country Doctrines - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "CountryDoctrines"
+
+    country_id = db.Column(db.Integer, primary_key=True)
+    doctrine_id = db.Column(db.Integer, primary_key=True)
+
+
+class TechnologyAttribute(db.Model):
+    """Technology Attributes - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "TechnologyAttributes"
+
+    tech_id = db.Column(db.Integer, primary_key=True)
+    attribute_name = db.Column(db.String, primary_key=True)
+    attribute_value = db.Column(db.String, nullable=False)
+
+
+class TechnologyLicense(db.Model):
+    """Technology Licenses - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "TechnologyLicenses"
+
+    license_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    tech_id = db.Column(db.Integer, nullable=False)
+    country_id = db.Column(db.Integer, nullable=False)
+    license_type = db.Column(db.String, nullable=False)
+    granted_by = db.Column(db.Integer)
+    granted_at = db.Column(db.String)
+
+
+class CountryTechnologyInventory(db.Model):
+    """Country Technology Inventory - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "CountryTechnologyInventory"
+
+    country_id = db.Column(db.Integer, primary_key=True)
+    tech_id = db.Column(db.Integer, primary_key=True)
+    quantity = db.Column(db.Integer, default=0, nullable=False)
+
+
+class CountryTechnologyProduction(db.Model):
+    """Country Technology Production - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "CountryTechnologyProduction"
+
+    production_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    country_id = db.Column(db.Integer, nullable=False)
+    tech_id = db.Column(db.Integer, nullable=False)
+    quantity = db.Column(db.Integer, nullable=False)
+    days_remaining = db.Column(db.Integer, nullable=False)
+    started_at = db.Column(db.String)
 
 
 # Authentication decorators
@@ -405,6 +512,14 @@ def index():
         "Technologies": Technology.query.count(),
         "CountryTechnologies": CountryTechnology.query.count(),
         "Users": User.query.count(),
+        "StructureData": StructureData.query.count(),
+        "StructureRatios": StructureRatio.query.count(),
+        "StructureProduction": StructureProduction.query.count(),
+        "TechnologyAttributes": TechnologyAttribute.query.count(),
+        "TechnologyLicenses": TechnologyLicense.query.count(),
+        "CountryTechInventory": CountryTechnologyInventory.query.count(),
+        "CountryTechProduction": CountryTechnologyProduction.query.count(),
+        "CountryDoctrines": CountryDoctrine.query.count(),
     }
     current_user = get_current_user()
     return render_template(
@@ -804,6 +919,456 @@ def api_countries():
 def api_regions_by_country(country_id):
     regions = Region.query.filter_by(country_id=country_id).all()
     return jsonify([{"region_id": r.region_id, "name": r.name} for r in regions])
+
+
+# Structure Data Management
+@app.route("/structure-data")
+@login_required
+def structure_data():
+    structure_datas = StructureData.query.all()
+    return render_template("structure_data.html", structure_datas=structure_datas)
+
+
+@app.route("/structure-data/add", methods=["GET", "POST"])
+@login_required
+def add_structure_data():
+    if request.method == "POST":
+        try:
+            structure_data = StructureData(
+                type=request.form["type"],
+                capacity=int(request.form["capacity"]),
+                population=int(request.form["population"]),
+                cout_construction=int(request.form["cout_construction"]),
+            )
+            db.session.add(structure_data)
+            db.session.commit()
+            flash("Structure data added successfully!", "success")
+            return redirect("/structure-data")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    return render_template("add_structure_data.html")
+
+
+@app.route("/structure-data/edit/<int:structure_id>", methods=["GET", "POST"])
+@login_required
+def edit_structure_data(structure_id):
+    structure_data = StructureData.query.get_or_404(structure_id)
+    if request.method == "POST":
+        try:
+            structure_data.type = request.form["type"]
+            structure_data.capacity = int(request.form["capacity"])
+            structure_data.population = int(request.form["population"])
+            structure_data.cout_construction = int(request.form["cout_construction"])
+            db.session.commit()
+            flash("Structure data updated successfully!", "success")
+            return redirect("/structure-data")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    return render_template("edit_structure_data.html", structure_data=structure_data)
+
+
+@app.route("/structure-data/delete/<int:structure_id>", methods=["POST"])
+@login_required
+def delete_structure_data(structure_id):
+    try:
+        structure_data = StructureData.query.get_or_404(structure_id)
+        db.session.delete(structure_data)
+        db.session.commit()
+        flash("Structure data deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/structure-data")
+
+
+# Structure Ratios Management
+@app.route("/structure-ratios")
+@login_required
+def structure_ratios():
+    structure_ratios = StructureRatio.query.all()
+    return render_template("structure_ratios.html", structure_ratios=structure_ratios)
+
+
+@app.route("/structure-ratios/add", methods=["GET", "POST"])
+@login_required
+def add_structure_ratio():
+    if request.method == "POST":
+        try:
+            structure_ratio = StructureRatio(
+                type=request.form["type"],
+                level=int(request.form["level"]),
+                ratio_production=int(request.form["ratio_production"]),
+                ratio_population=int(request.form["ratio_population"]),
+                ratio_capacity=int(request.form["ratio_capacity"]),
+            )
+            db.session.add(structure_ratio)
+            db.session.commit()
+            flash("Structure ratio added successfully!", "success")
+            return redirect("/structure-ratios")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    return render_template("add_structure_ratio.html")
+
+
+@app.route("/structure-ratios/edit/<int:ratio_id>", methods=["GET", "POST"])
+@login_required
+def edit_structure_ratio(ratio_id):
+    structure_ratio = StructureRatio.query.get_or_404(ratio_id)
+    if request.method == "POST":
+        try:
+            structure_ratio.type = request.form["type"]
+            structure_ratio.level = int(request.form["level"])
+            structure_ratio.ratio_production = int(request.form["ratio_production"])
+            structure_ratio.ratio_population = int(request.form["ratio_population"])
+            structure_ratio.ratio_capacity = int(request.form["ratio_capacity"])
+            db.session.commit()
+            flash("Structure ratio updated successfully!", "success")
+            return redirect("/structure-ratios")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    return render_template("edit_structure_ratio.html", structure_ratio=structure_ratio)
+
+
+@app.route("/structure-ratios/delete/<int:ratio_id>", methods=["POST"])
+@login_required
+def delete_structure_ratio(ratio_id):
+    try:
+        structure_ratio = StructureRatio.query.get_or_404(ratio_id)
+        db.session.delete(structure_ratio)
+        db.session.commit()
+        flash("Structure ratio deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/structure-ratios")
+
+
+# Structure Production Management
+@app.route("/structure-production")
+@login_required
+def structure_production():
+    productions = StructureProduction.query.all()
+    structures = Structure.query.all()
+    technologies = Technology.query.all()
+    return render_template(
+        "structure_production.html",
+        productions=productions,
+        structures=structures,
+        technologies=technologies,
+    )
+
+
+@app.route("/structure-production/add", methods=["GET", "POST"])
+@login_required
+def add_structure_production():
+    if request.method == "POST":
+        try:
+            production = StructureProduction(
+                structure_id=int(request.form["structure_id"]),
+                tech_id=int(request.form["tech_id"]),
+                quantity=int(request.form["quantity"]),
+                days_remaining=int(request.form["days_remaining"]),
+                started_at=request.form["started_at"] or None,
+            )
+            db.session.add(production)
+            db.session.commit()
+            flash("Structure production added successfully!", "success")
+            return redirect("/structure-production")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    structures = Structure.query.all()
+    technologies = Technology.query.all()
+    return render_template(
+        "add_structure_production.html",
+        structures=structures,
+        technologies=technologies,
+    )
+
+
+@app.route(
+    "/structure-production/delete/<int:structure_id>/<int:tech_id>", methods=["POST"]
+)
+@login_required
+def delete_structure_production(structure_id, tech_id):
+    try:
+        production = StructureProduction.query.filter_by(
+            structure_id=structure_id, tech_id=tech_id
+        ).first_or_404()
+        db.session.delete(production)
+        db.session.commit()
+        flash("Structure production deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/structure-production")
+
+
+# Technology Attributes Management
+@app.route("/technology-attributes")
+@login_required
+def technology_attributes():
+    attributes = TechnologyAttribute.query.all()
+    technologies = Technology.query.all()
+    return render_template(
+        "technology_attributes.html", attributes=attributes, technologies=technologies
+    )
+
+
+@app.route("/technology-attributes/add", methods=["GET", "POST"])
+@login_required
+def add_technology_attribute():
+    if request.method == "POST":
+        try:
+            attribute = TechnologyAttribute(
+                tech_id=int(request.form["tech_id"]),
+                attribute_name=request.form["attribute_name"],
+                attribute_value=request.form["attribute_value"],
+            )
+            db.session.add(attribute)
+            db.session.commit()
+            flash("Technology attribute added successfully!", "success")
+            return redirect("/technology-attributes")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    technologies = Technology.query.all()
+    return render_template("add_technology_attribute.html", technologies=technologies)
+
+
+@app.route(
+    "/technology-attributes/delete/<int:tech_id>/<attribute_name>", methods=["POST"]
+)
+@login_required
+def delete_technology_attribute(tech_id, attribute_name):
+    try:
+        attribute = TechnologyAttribute.query.filter_by(
+            tech_id=tech_id, attribute_name=attribute_name
+        ).first_or_404()
+        db.session.delete(attribute)
+        db.session.commit()
+        flash("Technology attribute deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/technology-attributes")
+
+
+# Technology Licenses Management
+@app.route("/technology-licenses")
+@login_required
+def technology_licenses():
+    licenses = TechnologyLicense.query.all()
+    technologies = Technology.query.all()
+    countries = Country.query.all()
+    return render_template(
+        "technology_licenses.html",
+        licenses=licenses,
+        technologies=technologies,
+        countries=countries,
+    )
+
+
+@app.route("/technology-licenses/add", methods=["GET", "POST"])
+@login_required
+def add_technology_license():
+    if request.method == "POST":
+        try:
+            license = TechnologyLicense(
+                tech_id=int(request.form["tech_id"]),
+                country_id=int(request.form["country_id"]),
+                license_type=request.form["license_type"],
+                granted_by=(
+                    int(request.form["granted_by"])
+                    if request.form["granted_by"]
+                    else None
+                ),
+                granted_at=request.form["granted_at"] or None,
+            )
+            db.session.add(license)
+            db.session.commit()
+            flash("Technology license added successfully!", "success")
+            return redirect("/technology-licenses")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    technologies = Technology.query.all()
+    countries = Country.query.all()
+    return render_template(
+        "add_technology_license.html", technologies=technologies, countries=countries
+    )
+
+
+@app.route("/technology-licenses/delete/<int:license_id>", methods=["POST"])
+@login_required
+def delete_technology_license(license_id):
+    try:
+        license = TechnologyLicense.query.get_or_404(license_id)
+        db.session.delete(license)
+        db.session.commit()
+        flash("Technology license deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/technology-licenses")
+
+
+# Country Technology Inventory Management
+@app.route("/country-tech-inventory")
+@login_required
+def country_tech_inventory():
+    inventory = CountryTechnologyInventory.query.all()
+    countries = Country.query.all()
+    technologies = Technology.query.all()
+    return render_template(
+        "country_tech_inventory.html",
+        inventory=inventory,
+        countries=countries,
+        technologies=technologies,
+    )
+
+
+@app.route("/country-tech-inventory/add", methods=["GET", "POST"])
+@login_required
+def add_country_tech_inventory():
+    if request.method == "POST":
+        try:
+            inventory = CountryTechnologyInventory(
+                country_id=int(request.form["country_id"]),
+                tech_id=int(request.form["tech_id"]),
+                quantity=int(request.form["quantity"]),
+            )
+            db.session.add(inventory)
+            db.session.commit()
+            flash("Country technology inventory added successfully!", "success")
+            return redirect("/country-tech-inventory")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    countries = Country.query.all()
+    technologies = Technology.query.all()
+    return render_template(
+        "add_country_tech_inventory.html",
+        countries=countries,
+        technologies=technologies,
+    )
+
+
+@app.route(
+    "/country-tech-inventory/delete/<int:country_id>/<int:tech_id>", methods=["POST"]
+)
+@login_required
+def delete_country_tech_inventory(country_id, tech_id):
+    try:
+        inventory = CountryTechnologyInventory.query.filter_by(
+            country_id=country_id, tech_id=tech_id
+        ).first_or_404()
+        db.session.delete(inventory)
+        db.session.commit()
+        flash("Country technology inventory deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/country-tech-inventory")
+
+
+# Country Technology Production Management
+@app.route("/country-tech-production")
+@login_required
+def country_tech_production():
+    productions = CountryTechnologyProduction.query.all()
+    countries = Country.query.all()
+    technologies = Technology.query.all()
+    return render_template(
+        "country_tech_production.html",
+        productions=productions,
+        countries=countries,
+        technologies=technologies,
+    )
+
+
+@app.route("/country-tech-production/add", methods=["GET", "POST"])
+@login_required
+def add_country_tech_production():
+    if request.method == "POST":
+        try:
+            production = CountryTechnologyProduction(
+                country_id=int(request.form["country_id"]),
+                tech_id=int(request.form["tech_id"]),
+                quantity=int(request.form["quantity"]),
+                days_remaining=int(request.form["days_remaining"]),
+                started_at=request.form["started_at"] or None,
+            )
+            db.session.add(production)
+            db.session.commit()
+            flash("Country technology production added successfully!", "success")
+            return redirect("/country-tech-production")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    countries = Country.query.all()
+    technologies = Technology.query.all()
+    return render_template(
+        "add_country_tech_production.html",
+        countries=countries,
+        technologies=technologies,
+    )
+
+
+@app.route("/country-tech-production/delete/<int:production_id>", methods=["POST"])
+@login_required
+def delete_country_tech_production(production_id):
+    try:
+        production = CountryTechnologyProduction.query.get_or_404(production_id)
+        db.session.delete(production)
+        db.session.commit()
+        flash("Country technology production deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/country-tech-production")
+
+
+# Country Doctrines Management
+@app.route("/country-doctrines")
+@login_required
+def country_doctrines():
+    country_doctrines = CountryDoctrine.query.all()
+    countries = Country.query.all()
+    doctrines = Doctrine.query.all()
+    return render_template(
+        "country_doctrines.html",
+        country_doctrines=country_doctrines,
+        countries=countries,
+        doctrines=doctrines,
+    )
+
+
+@app.route("/country-doctrines/add", methods=["GET", "POST"])
+@login_required
+def add_country_doctrine():
+    if request.method == "POST":
+        try:
+            country_doctrine = CountryDoctrine(
+                country_id=int(request.form["country_id"]),
+                doctrine_id=int(request.form["doctrine_id"]),
+            )
+            db.session.add(country_doctrine)
+            db.session.commit()
+            flash("Country doctrine added successfully!", "success")
+            return redirect("/country-doctrines")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    countries = Country.query.all()
+    doctrines = Doctrine.query.all()
+    return render_template(
+        "add_country_doctrine.html", countries=countries, doctrines=doctrines
+    )
+
+
+@app.route(
+    "/country-doctrines/delete/<int:country_id>/<int:doctrine_id>", methods=["POST"]
+)
+@login_required
+def delete_country_doctrine(country_id, doctrine_id):
+    try:
+        country_doctrine = CountryDoctrine.query.filter_by(
+            country_id=country_id, doctrine_id=doctrine_id
+        ).first_or_404()
+        db.session.delete(country_doctrine)
+        db.session.commit()
+        flash("Country doctrine deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/country-doctrines")
 
 
 if __name__ == "__main__":

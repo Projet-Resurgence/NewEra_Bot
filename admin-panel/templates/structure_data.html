@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Structure Data{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Structure Data</h2>
+    <a href="/structure-data/add" class="btn btn-success">Add Structure Data</a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>ID</th>
+                <th>Type</th>
+                <th>Capacity</th>
+                <th>Population</th>
+                <th>Construction Cost</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for structure in structure_datas %}
+            <tr>
+                <td>{{ structure.id }}</td>
+                <td>{{ structure.type }}</td>
+                <td>{{ structure.capacity }}</td>
+                <td>{{ structure.population }}</td>
+                <td>{{ structure.cout_construction }}</td>
+                <td>
+                    <a href="/structure-data/edit/{{ structure.id }}" class="btn btn-primary btn-sm">Edit</a>
+                    <form method="POST" action="/structure-data/delete/{{ structure.id }}" style="display: inline;" onsubmit="return confirm('Are you sure?')">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

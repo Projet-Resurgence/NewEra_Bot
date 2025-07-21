@@ -213,6 +213,130 @@
           </div>
         </div>
 
+        <!-- Structure System Tables -->
+        <div class="row mt-4">
+          <div class="col-12 mb-3">
+            <h4><i class="bi bi-building-gear text-primary"></i> Structure System</h4>
+          </div>
+
+          <div class="col-md-4">
+            <div class="table-card p-4 text-center">
+              <i class="bi bi-building-gear display-4 text-info"></i>
+              <div class="stat-number">{{ tables_info['StructureData'] }}</div>
+              <h5>Structure Data</h5>
+              <a href="/structure-data" class="btn btn-outline-info btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="table-card p-4 text-center">
+              <i class="bi bi-graph-up display-4 text-success"></i>
+              <div class="stat-number">{{ tables_info['StructureRatios'] }}</div>
+              <h5>Structure Ratios</h5>
+              <a href="/structure-ratios" class="btn btn-outline-success btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            </div>
+          </div>
+
+          <div class="col-md-4">
+            <div class="table-card p-4 text-center">
+              <i class="bi bi-gear display-4 text-warning"></i>
+              <div class="stat-number">{{ tables_info['StructureProduction'] }}</div>
+              <h5>Structure Production</h5>
+              <a href="/structure-production" class="btn btn-outline-warning btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Technology System Tables -->
+        <div class="row mt-4">
+          <div class="col-12 mb-3">
+            <h4><i class="bi bi-cpu text-primary"></i> Technology System</h4>
+          </div>
+
+          <div class="col-md-3">
+            <div class="table-card p-4 text-center">
+              <i class="bi bi-list-ul display-4 text-primary"></i>
+              <div class="stat-number">{{ tables_info['TechnologyAttributes'] }}</div>
+              <h5>Tech Attributes</h5>
+              <a href="/technology-attributes" class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <div class="table-card p-4 text-center">
+              <i class="bi bi-file-earmark-check display-4 text-info"></i>
+              <div class="stat-number">{{ tables_info['TechnologyLicenses'] }}</div>
+              <h5>Tech Licenses</h5>
+              <a href="/technology-licenses" class="btn btn-outline-info btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <div class="table-card p-4 text-center">
+              <i class="bi bi-box-seam display-4 text-success"></i>
+              <div class="stat-number">{{ tables_info['CountryTechInventory'] }}</div>
+              <h5>Country Tech Inventory</h5>
+              <a href="/country-tech-inventory" class="btn btn-outline-success btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            </div>
+          </div>
+
+          <div class="col-md-3">
+            <div class="table-card p-4 text-center">
+              <i class="bi bi-arrow-repeat display-4 text-warning"></i>
+              <div class="stat-number">{{ tables_info['CountryTechProduction'] }}</div>
+              <h5>Country Tech Production</h5>
+              <a href="/country-tech-production" class="btn btn-outline-warning btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Relationship Tables -->
+        <div class="row mt-4">
+          <div class="col-12 mb-3">
+            <h4><i class="bi bi-link-45deg text-primary"></i> Relationships</h4>
+          </div>
+
+          <div class="col-md-6">
+            <div class="table-card p-4 text-center">
+              <i class="bi bi-book-half display-4 text-dark"></i>
+              <div class="stat-number">{{ tables_info['CountryDoctrines'] }}</div>
+              <h5>Country Doctrines</h5>
+              <a href="/country-doctrines" class="btn btn-outline-dark btn-sm">
+                <i class="bi bi-pencil"></i> Edit
+              </a>
+            </div>
+          </div>
+
+          <div class="col-md-6">
+            <div class="table-card p-4 text-center">
+              <i class="bi bi-people-fill display-4 text-secondary"></i>
+              <div class="stat-number">{{ tables_info['Users'] }}</div>
+              <h5>Admin Users</h5>
+              {% if current_user.is_admin %}
+              <a href="/users" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-pencil"></i> Manage
+              </a>
+              {% else %}
+              <span class="badge bg-secondary">Admin Only</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+
         <!-- Quick Actions -->
         <div class="row mt-5">
           <div class="col-12">

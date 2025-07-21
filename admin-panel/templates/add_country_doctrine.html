@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+
+{% block title %}Add Country Doctrine{% endblock %}
+
+{% block content %}
+<h2>Add Country Doctrine</h2>
+
+<form method="POST">
+    <div class="mb-3">
+        <label for="country_id" class="form-label">Country</label>
+        <select class="form-control" id="country_id" name="country_id" required>
+            <option value="">Select Country</option>
+            {% for country in countries %}
+            <option value="{{ country.country_id }}">{{ country.name }}</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label for="doctrine_id" class="form-label">Doctrine</label>
+        <select class="form-control" id="doctrine_id" name="doctrine_id" required>
+            <option value="">Select Doctrine</option>
+            {% for doctrine in doctrines %}
+            <option value="{{ doctrine.doctrine_id }}">{{ doctrine.name }} ({{ doctrine.category }})</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <button type="submit" class="btn btn-success">Add Country Doctrine</button>
+    <a href="/country-doctrines" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

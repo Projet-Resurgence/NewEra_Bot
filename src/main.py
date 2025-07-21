@@ -26,6 +26,7 @@ from text_formatting import *
 from typing import Union
 import interactions
 from PIL import Image
+import pytz
 import io
 import string
 
@@ -133,7 +134,7 @@ async def on_ready():
 
     await load_cogs()
     polling_notion.start()
-
+    update_rp_date.start()
 
 rmbg = RemoveBg(removebg_apikey, "error.log")
 
@@ -203,6 +204,16 @@ async def polling_notion():
         await notion_handler.check_for_updates()
     except Exception as e:
         print(f"Erreur lors du polling Notion: {e}")
+
+@tasks.loop(minutes=1)
+async def update_rp_date():
+    now = datetime.now(pytz.timezone("Europe/Paris"))  # ou "UTC"
+    if now.hour == 7 and now.minute == 0:
+        await db.advance_playday()
+
+@update_rp_date.before_loop
+async def before():
+    await bot.wait_until_ready()
 
 
 ###
@@ -320,14 +331,14 @@ async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
         return
     message = reaction.message
     if (
-        message.channel.id != 1122576341582221434
+        message.channel.id != 1396922371121610792
         and message.channel.category.id != 1269295981183369279
     ):
         return
     if (
         message.author == bot.user
         and reaction.emoji in ["🖋️", "🖊️"]
-        and message.channel.id == 1122576341582221434
+        and message.channel.id == 1396922371121610792
     ):
         await handle_treaty(reaction, user)
     elif reaction.emoji == "✅":
@@ -876,5 +887,156 @@ async def ask_rp_questions(ctx, question, user_message: discord.Message):
     except Exception as e:
         await user_message.channel.send(f"Erreur lors de la synthèse : {e}")
 
+@bot.command()
+async def check_for_role_exclusive_overwrites(ctx, role: discord.Role):
+    """Vérifie si le rôle a des permissions définies dans des salons spécifiques."""
+    if not dUtils.is_authorized(ctx):
+        return await ctx.send(embed=dUtils.get_auth_embed())
 
+    exclusive_overwrites = []
+
+    for channel in ctx.guild.channels:
+        overwrites = channel.overwrites_for(role)
+
+        # Vérifie si au moins une permission est explicitement définie
+        for perm_name in dir(overwrites):
+            if perm_name.startswith('_'):
+                continue  # ignore les attributs internes
+
+            value = getattr(overwrites, perm_name)
+            if isinstance(value, bool):  # Permission explicitement définie
+                exclusive_overwrites.append(f"#{channel.name}")
+                break  # On passe au canal suivant dès qu'une permission est définie
+
+    if exclusive_overwrites:
+        embed = discord.Embed(
+            title=f"🔍 Permissions spécifiques pour le rôle {role.name}",
+            description="\n".join(exclusive_overwrites),
+            color=discord.Color.gold()
+        )
+        print(f"Permissions spécifiques trouvées pour le rôle {role.name} dans les salons suivants : {', '.join(exclusive_overwrites)}")
+        await ctx.send(embed=embed)
+    else:
+        await ctx.send(f"✅ Aucune permission spécifique définie pour le rôle {role.name}.")
+        
+@bot.command()
+async def archive_rp_channels(ctx, archive_category: discord.CategoryChannel):
+    """Archive les salons de RP en les déplaçant dans une catégorie d'archive."""
+    if not dUtils.is_authorized(ctx):
+        return await ctx.send(embed=dUtils.get_auth_embed())
+    
+    from config import continents_dict
+    
+    continents_dict["services"] = 1269295981183369279  # ID de la catégorie des services secrets
+
+    # Liste pour stocker tous les salons de RP à archiver
+    rp_channels = []
+
+    for category_id in continents_dict.values():
+        category = bot.get_channel(category_id)
+        if isinstance(category, discord.CategoryChannel):
+            rp_channels.extend(category.text_channels)
+
+    if not rp_channels:
+        return await ctx.send("Aucun salon de RP trouvé dans les catégories spécifiées.")
+
+    for channel in rp_channels:
+        try:
+            await channel.edit(category=archive_category)
+            print(f"Salon {channel.name} archivé dans {archive_category.name}.")
+        except discord.Forbidden:
+            print(f"Permission refusée pour archiver le salon {channel.name}.")
+            await ctx.send(f"❌ Permission refusée pour archiver le salon {channel.name}.")
+        except Exception as e:
+            print(f"Erreur lors de l'archivage du salon {channel.name}: {e}")
+            await ctx.send(f"❌ Erreur lors de l'archivage du salon {channel.name}: {e}")
+
+    await ctx.send("✅ Tous les salons de RP ont été archivés avec succès.")
+    
+async def transfer_messages_from_channel_to_channel(source_channel, target_channel):
+    """Copie les messages d'un salon vers un autre en utilisant des embeds."""
+    async for message in source_channel.history(limit=None, oldest_first=True):
+        if message.author.bot:
+            continue
+        if message.content.startswith(".") or message.content.startswith("!") or message.content.startswith("/"):
+            continue
+
+        try:
+            # Embed personnalisé pour le message
+            embed = discord.Embed(
+                description=message.clean_content,
+                timestamp=message.created_at,
+                color=discord.Color.blue()
+            )
+            embed.set_author(
+                name=f"{message.author.display_name}",
+                icon_url=message.author.display_avatar.url if message.author.display_avatar else discord.Embed.Empty
+            )
+            embed.set_footer(text=f"Envoyé dans #{source_channel.name}")
+
+            files = [await a.to_file() for a in message.attachments]
+
+            # Si le message a déjà des embeds (envoyés par des bots par exemple), les copier aussi
+            embeds_to_send = [embed]
+            if message.embeds:
+                for original_embed in message.embeds:
+                    try:
+                        # Discord ne permet pas de cloner exactement tous les embeds
+                        # mais on peut les inclure tels quels s’ils sont simples
+                        embeds_to_send.append(original_embed)
+                    except Exception as e:
+                        print(f"Erreur lors de la copie d’un embed existant : {e}")
+
+            await target_channel.send(embeds=embeds_to_send, files=files)
+
+        except discord.HTTPException as e:
+            print(f"Erreur HTTP : {e}")
+        except discord.Forbidden:
+            print(f"Permission refusée dans {target_channel.name}")
+            return False
+    return True
+
+@bot.command()
+async def transfer_archives_to_category(ctx):
+    """Copie les salons d'archives vers une autre catégorie (dans le même serveur ou un autre où le bot est)."""
+    if not dUtils.is_authorized(ctx):
+        return await ctx.send(embed=dUtils.get_auth_embed())
+    archive_guild = bot.get_guild(1396923284498415807)
+
+    archive_categories_id = [
+        1231253371902623764,
+        1396920393939419156
+    ]
+    
+    archive_categories = [
+        bot.get_channel(cat_id)
+        for cat_id in archive_categories_id
+        if isinstance(bot.get_channel(cat_id), discord.CategoryChannel)
+    ]
+
+    if not archive_categories:
+        return await ctx.send("Aucune catégorie d'archives trouvée.")
+
+    for category in archive_categories:
+        new_category = await archive_guild.create_category(
+            name=f"Archives de {category.name}",
+            reason="Transfert des salons d'archives"
+        )
+        for channel in category.text_channels:
+            try:
+                new_channel = await archive_guild.create_text_channel(
+                    name=channel.name,
+                    category=new_category,
+                    topic=f"Copie depuis {category.name}"
+                )
+                await ctx.send(f"📤 Transfert de #{channel.name} en cours...")
+                await transfer_messages_from_channel_to_channel(channel, new_channel)
+                await new_channel.send(f"✅ Fin du transfert depuis #{channel.name}")
+                await asyncio.sleep(2)
+            except discord.Forbidden:
+                await ctx.send(f"❌ Permission refusée pour copier le salon {channel.name}")
+            except Exception as e:
+                await ctx.send(f"❌ Erreur pour le salon {channel.name}: {e}")
+                
+                
 bot.run(token)

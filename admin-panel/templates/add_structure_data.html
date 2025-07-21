@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block title %}Add Structure Data{% endblock %}
+
+{% block content %}
+<h2>Add Structure Data</h2>
+
+<form method="POST">
+    <div class="mb-3">
+        <label for="type" class="form-label">Type</label>
+        <select class="form-control" id="type" name="type" required>
+            <option value="Usine">Usine</option>
+            <option value="Base">Base</option>
+            <option value="Ecole">Ecole</option>
+            <option value="Logement">Logement</option>
+            <option value="Centrale">Centrale</option>
+            <option value="Technocentre">Technocentre</option>
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label for="capacity" class="form-label">Capacity</label>
+        <input type="number" class="form-control" id="capacity" name="capacity" required>
+    </div>
+    
+    <div class="mb-3">
+        <label for="population" class="form-label">Population</label>
+        <input type="number" class="form-control" id="population" name="population" required>
+    </div>
+    
+    <div class="mb-3">
+        <label for="cout_construction" class="form-label">Construction Cost</label>
+        <input type="number" class="form-control" id="cout_construction" name="cout_construction" required>
+    </div>
+    
+    <button type="submit" class="btn btn-success">Add Structure Data</button>
+    <a href="/structure-data" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

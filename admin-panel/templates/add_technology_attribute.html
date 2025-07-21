@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+
+{% block title %}Add Technology Attribute{% endblock %}
+
+{% block content %}
+<h2>Add Technology Attribute</h2>
+
+<form method="POST">
+    <div class="mb-3">
+        <label for="tech_id" class="form-label">Technology</label>
+        <select class="form-control" id="tech_id" name="tech_id" required>
+            <option value="">Select Technology</option>
+            {% for tech in technologies %}
+            <option value="{{ tech.tech_id }}">
+                {{ tech.name }} - ID: {{ tech.tech_id }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label for="attribute_name" class="form-label">Attribute Name</label>
+        <input type="text" class="form-control" id="attribute_name" name="attribute_name" required>
+    </div>
+    
+    <div class="mb-3">
+        <label for="attribute_value" class="form-label">Attribute Value</label>
+        <input type="text" class="form-control" id="attribute_value" name="attribute_value" required>
+    </div>
+    
+    <button type="submit" class="btn btn-success">Add Attribute</button>
+    <a href="/technology-attributes" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

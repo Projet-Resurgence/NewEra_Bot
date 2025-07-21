@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+
+{% block title %}Country Doctrines{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Country Doctrines</h2>
+    <a href="/country-doctrines/add" class="btn btn-success">Add Country Doctrine</a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Country</th>
+                <th>Doctrine</th>
+                <th>Category</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for cd in country_doctrines %}
+            <tr>
+                <td>
+                    {% for country in countries %}
+                        {% if country.country_id == cd.country_id %}
+                            {{ country.name }}
+                        {% endif %}
+                    {% endfor %}
+                </td>
+                <td>
+                    {% for doctrine in doctrines %}
+                        {% if doctrine.doctrine_id == cd.doctrine_id %}
+                            {{ doctrine.name }}
+                        {% endif %}
+                    {% endfor %}
+                </td>
+                <td>
+                    {% for doctrine in doctrines %}
+                        {% if doctrine.doctrine_id == cd.doctrine_id %}
+                            {{ doctrine.category }}
+                        {% endif %}
+                    {% endfor %}
+                </td>
+                <td>
+                    <form method="POST" action="/country-doctrines/delete/{{ cd.country_id }}/{{ cd.doctrine_id }}" style="display: inline;" onsubmit="return confirm('Are you sure?')">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Add Structure Production{% endblock %}
+
+{% block content %}
+<h2>Add Structure Production</h2>
+
+<form method="POST">
+    <div class="mb-3">
+        <label for="structure_id" class="form-label">Structure</label>
+        <select class="form-control" id="structure_id" name="structure_id" required>
+            <option value="">Select Structure</option>
+            {% for structure in structures %}
+            <option value="{{ structure.structure_id }}">
+                {{ structure.name }} ({{ structure.type }}) - ID: {{ structure.structure_id }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label for="tech_id" class="form-label">Technology</label>
+        <select class="form-control" id="tech_id" name="tech_id" required>
+            <option value="">Select Technology</option>
+            {% for tech in technologies %}
+            <option value="{{ tech.tech_id }}">
+                {{ tech.name }} - ID: {{ tech.tech_id }}
+            </option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label for="quantity" class="form-label">Quantity</label>
+        <input type="number" class="form-control" id="quantity" name="quantity" min="1" required>
+    </div>
+    
+    <div class="mb-3">
+        <label for="days_remaining" class="form-label">Days Remaining</label>
+        <input type="number" class="form-control" id="days_remaining" name="days_remaining" min="0" required>
+    </div>
+    
+    <div class="mb-3">
+        <label for="started_at" class="form-label">Started At</label>
+        <input type="text" class="form-control" id="started_at" name="started_at" placeholder="Optional">
+    </div>
+    
+    <button type="submit" class="btn btn-success">Add Production</button>
+    <a href="/structure-production" class="btn btn-secondary">Cancel</a>
+</form>
+{% endblock %}

@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Structure Production{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Structure Production</h2>
+    <a href="/structure-production/add" class="btn btn-success">Add Production</a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Structure ID</th>
+                <th>Structure</th>
+                <th>Technology ID</th>
+                <th>Technology</th>
+                <th>Quantity</th>
+                <th>Days Remaining</th>
+                <th>Started At</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for production in productions %}
+            <tr>
+                <td>{{ production.structure_id }}</td>
+                <td>
+                    {% for structure in structures %}
+                        {% if structure.structure_id == production.structure_id %}
+                            {{ structure.name }} ({{ structure.type }})
+                        {% endif %}
+                    {% endfor %}
+                </td>
+                <td>{{ production.tech_id }}</td>
+                <td>
+                    {% for tech in technologies %}
+                        {% if tech.tech_id == production.tech_id %}
+                            {{ tech.name }}
+                        {% endif %}
+                    {% endfor %}
+                </td>
+                <td>{{ production.quantity }}</td>
+                <td>{{ production.days_remaining }}</td>
+                <td>{{ production.started_at or 'N/A' }}</td>
+                <td>
+                    <form method="POST" action="/structure-production/delete/{{ production.structure_id }}/{{ production.tech_id }}" style="display: inline;" onsubmit="return confirm('Are you sure?')">
+                        <button type="submit" class="btn btn-danger btn-sm">Delete</button>
+                    </form>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}
