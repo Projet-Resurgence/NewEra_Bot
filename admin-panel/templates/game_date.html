@@ -77,16 +77,12 @@
               <div class="mb-3">
                 <label class="form-label">Game Status</label>
                 <div class="form-check">
-                  <input class="form-check-input" type="checkbox" id="pause_game" name="pause_game" 
-                         value="1" {% if is_paused %}checked{% endif %}
-                         onchange="togglePauseState(this)">
-                  <label class="form-check-label" for="pause_game">
-                    <span id="pause-label">
-                      {% if is_paused %}Paused{% else %}Active{% endif %}
-                    </span>
+                  <input class="form-check-input" type="checkbox" id="is_paused" name="is_paused" 
+                         value="1" {% if date.is_paused %}checked{% endif %}>
+                  <label class="form-check-label" for="is_paused">
+                    Pause Game
                   </label>
                 </div>
-                <small class="text-muted">This setting affects automatic date advancement</small>
               </div>
             </div>
           </div>
@@ -114,7 +110,7 @@
                 <th>Month</th>
                 <th>Play Day</th>
                 <th>Real Date</th>
-                <th>Current Status</th>
+                <th>Status</th>
                 <th>Actions</th>
               </tr>
             </thead>
@@ -126,14 +122,10 @@
                 <td>{{ date_entry.playday }}</td>
                 <td>{{ date_entry.real_date }}</td>
                 <td>
-                  {% if loop.first %}
-                    {% if is_paused %}
-                      <span class="badge bg-danger">⏸️ Paused</span>
-                    {% else %}
-                      <span class="badge bg-success">▶️ Active</span>
-                    {% endif %}
+                  {% if date_entry.is_paused %}
+                    <span class="badge bg-danger">⏸️ Paused</span>
                   {% else %}
-                    <span class="badge bg-secondary">Historical</span>
+                    <span class="badge bg-success">▶️ Active</span>
                   {% endif %}
                 </td>
                 <td>
@@ -170,10 +162,10 @@
           </button>
         </form>
         
-        {% if is_paused %}
+        {% if date.is_paused %}
         <div class="alert alert-warning">
           <i class="bi bi-exclamation-triangle"></i>
-          <strong>Game Paused:</strong> The game is currently paused. Automatic advancement is disabled.
+          <strong>Game Paused:</strong> The game is currently paused. The next advance will start a new year.
         </div>
         {% endif %}
 
@@ -193,76 +185,9 @@
           <a href="/playdays-per-month" class="btn btn-outline-primary">
             <i class="bi bi-calendar3"></i> Configure Monthly Playdays
           </a>
-          <a href="/settings" class="btn btn-outline-secondary ms-2">
-            <i class="bi bi-gear"></i> Server Settings
-          </a>
         </div>
       </div>
     </div>
   </div>
 </div>
-
-<script>
-function togglePauseState(checkbox) {
-  // Show loading state
-  const label = document.getElementById('pause-label');
-  const originalText = label.textContent;
-  label.textContent = 'Updating...';
-  checkbox.disabled = true;
-  
-  // Send AJAX request to toggle pause state
-  fetch('/settings/pause-toggle', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-  })
-  .then(response => {
-    if (response.ok) {
-      // Update the label based on checkbox state
-      if (checkbox.checked) {
-        label.textContent = 'Paused';
-        // Update other UI elements
-        updatePauseStatus(true);
-      } else {
-        label.textContent = 'Active';
-        // Update other UI elements  
-        updatePauseStatus(false);
-      }
-    } else {
-      // Revert checkbox state on error
-      checkbox.checked = !checkbox.checked;
-      label.textContent = originalText;
-      alert('Error updating pause state. Please try again.');
-    }
-  })
-  .catch(error => {
-    // Revert checkbox state on error
-    checkbox.checked = !checkbox.checked;
-    label.textContent = originalText;
-    alert('Error updating pause state. Please try again.');
-  })
-  .finally(() => {
-    checkbox.disabled = false;
-  });
-}
-
-function updatePauseStatus(isPaused) {
-  // Update the advance date button state
-  const advanceBtn = document.querySelector('button[type="submit"]');
-  const statusBadges = document.querySelectorAll('.badge');
-  
-  statusBadges.forEach(badge => {
-    if (badge.textContent.includes('Paused') || badge.textContent.includes('Active')) {
-      if (isPaused) {
-        badge.className = 'badge bg-danger';
-        badge.innerHTML = '⏸️ Paused';
-      } else {
-        badge.className = 'badge bg-success';
-        badge.innerHTML = '▶️ Active';
-      }
-    }
-  });
-}
-</script>
 {% endblock %}

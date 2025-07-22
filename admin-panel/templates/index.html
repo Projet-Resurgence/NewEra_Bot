@@ -63,11 +63,42 @@
               <small class="text-muted">Doctrines</small>
             </div>
           </div>
-          <!-- Game Management -->
+          <!-- Monthly Playdays Stats -->
           <div class="col-md-3 mb-3">
             <div class="table-card p-3 text-center">
-              <div class="stat-number">{{ current_date.year if current_date else 'N/A' }}</div>
-              <small class="text-muted">Current Game Year</small>
+              <div class="stat-number">{{ total_playdays if total_playdays is defined else 'N/A' }}</div>
+              <small class="text-muted">Total Monthly Playdays</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4">
+          <!-- Inventory Stats -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ tables_info.get('Inventory', 0) }}</div>
+              <small class="text-muted">Country Inventories</small>
+            </div>
+          </div>
+          <!-- Stats Stats -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ tables_info.get('Stats', 0) }}</div>
+              <small class="text-muted">Statistics</small>
+            </div>
+          </div>
+          <!-- Users Stats -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ tables_info.get('Users', 0) }}</div>
+              <small class="text-muted">Admin Users</small>
+            </div>
+          </div>
+          <!-- Game Date Stats -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ tables_info.get('GameDate', 0) }}</div>
+              <small class="text-muted">Game Date Entries</small>
             </div>
           </div>
         </div>
@@ -92,96 +123,73 @@
               <a href="/technologies/add" class="btn btn-info">
                 <i class="bi bi-cpu"></i> Add New Technology
               </a>
-              <a href="/game-date/advance" class="btn btn-warning">
-                <i class="bi bi-skip-forward"></i> Advance Game Date
+              <a href="/game-date" class="btn btn-warning">
+                <i class="bi bi-calendar-day"></i> Manage Game Date
               </a>
             </div>
           </div>
         </div>
-
-        <!-- Quick Actions -->
-        <div class="row mt-5">
-          <div class="col-12">
-            <div class="table-card p-4">
-              <h5><i class="bi bi-lightning"></i> Quick Actions</h5>
-              
-              <div class="row">
-                <!-- Game Management Actions -->
-                <div class="col-md-6">
-                  <h6 class="text-muted">Game Management</h6>
-                  <div class="btn-group-vertical d-grid gap-2" role="group">
-                    <a href="/countries/add" class="btn btn-primary">
-                      <i class="bi bi-plus"></i> Add Country
-                    </a>
-                    <a href="/governments/add" class="btn btn-success">
-                      <i class="bi bi-plus"></i> Add Government Position
-                    </a>
-                    <a href="/doctrines/add" class="btn btn-dark">
-                      <i class="bi bi-plus"></i> Add Doctrine
-                    </a>
-                    <a href="/regions/add" class="btn btn-info">
-                      <i class="bi bi-plus"></i> Add Region
-                    </a>
-                    <a href="/structures/add" class="btn btn-warning">
-                      <i class="bi bi-plus"></i> Add Structure
-                    </a>
-                    <a href="/technologies/add" class="btn btn-danger">
-                      <i class="bi bi-plus"></i> Add Technology
-                    </a>
-                    <a href="/inventory/add" class="btn btn-secondary">
-                      <i class="bi bi-plus"></i> Add Inventory
-                    </a>
-                  </div>
-                </div>
-                
-                <!-- Admin & User Actions -->
-                <div class="col-md-6">
-                  <h6 class="text-muted">Administration & Account</h6>
-                  <div class="btn-group-vertical d-grid gap-2" role="group">
-                    {% if session.is_admin %}
-                    <a href="/users" class="btn btn-outline-primary">
-                      <i class="bi bi-person-gear"></i> Manage Users
-                    </a>
-                    <a href="/users/add" class="btn btn-outline-success">
-                      <i class="bi bi-person-plus"></i> Add New User
-                    </a>
-                    {% endif %}
-                    <a href="/change_password" class="btn btn-outline-dark">
-                      <i class="bi bi-key"></i> Change Password
-                    </a>
-                    <div class="btn-group" role="group">
-                      <a href="#" class="btn btn-outline-info" onclick="location.reload()">
-                        <i class="bi bi-arrow-clockwise"></i> Refresh
-                      </a>
-                      <a href="/logout" class="btn btn-outline-danger">
-                        <i class="bi bi-box-arrow-right"></i> Logout
-                      </a>
-                    </div>
-                  </div>
-                </div>
+      </div>
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-calendar-day"></i> Current Game State</h5>
+          </div>
+          <div class="card-body">
+            {% if current_date %}
+            <div class="row text-center">
+              <div class="col-4">
+                <h4 class="text-primary">{{ current_date.year }}</h4>
+                <small>Year</small>
+              </div>
+              <div class="col-4">
+                <h4 class="text-info">{{ current_date.month }}</h4>
+                <small>Month</small>
+              </div>
+              <div class="col-4">
+                <h4 class="text-success">{{ current_date.playday }}</h4>
+                <small>Playday</small>
               </div>
             </div>
+            <div class="text-center mt-3">
+              <span class="badge {% if is_paused %}bg-danger{% else %}bg-success{% endif %} fs-6">
+                {% if is_paused %}⏸️ PAUSED{% else %}▶️ ACTIVE{% endif %}
+              </span>
+            </div>
+            {% else %}
+            <p class="text-muted">No game date set</p>
+            {% endif %}
           </div>
         </div>
-        
-        <!-- User Info -->
-        <div class="row mt-4">
-          <div class="col-12">
-            <div class="table-card p-3">
-              <div class="d-flex justify-content-between align-items-center">
-                <div>
-                  <small class="text-muted">Logged in as</small>
-                  <h6 class="mb-0">
-                    <i class="bi bi-person-circle"></i> {{ session.username }}
-                    {% if session.is_admin %}
-                    <span class="badge bg-primary ms-2">Administrator</span>
-                    {% endif %}
-                  </h6>
-                </div>
-                <div class="text-end">
-                  <small class="text-muted">Last Activity</small>
-                  <div class="small" id="currentTime"></div>
-                </div>
+      </div>
+    </div>
+
+    <!-- System Information -->
+    <div class="row mt-4">
+      <div class="col-12">
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-clock-history"></i> System Information</h5>
+          </div>
+          <div class="card-body">
+            <div class="row">
+              <div class="col-md-6">
+                <h6>Database Tables</h6>
+                <ul class="list-unstyled">
+                  <li><strong>Core Data:</strong> Countries, Governments, Regions, Inventory</li>
+                  <li><strong>Structures:</strong> Buildings, Productions, Technologies</li>
+                  <li><strong>Military:</strong> Doctrines, Bases, Units</li>
+                  <li><strong>Relations:</strong> Treaties, Signatures, Relations</li>
+                </ul>
+              </div>
+              <div class="col-md-6">
+                <h6>Admin Features</h6>
+                <ul class="list-unstyled">
+                  <li>✅ Full CRUD operations for all entities</li>
+                  <li>✅ Game date management with history</li>
+                  <li>✅ Settings configuration</li>
+                  <li>✅ Multi-user admin panel</li>
+                </ul>
               </div>
             </div>
           </div>
@@ -189,28 +197,45 @@
       </div>
     </div>
   </div>
+</div>
 
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
-  <script>
-    // Update current time
-    function updateTime() {
-      const now = new Date();
-      const timeStr = now.toLocaleString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit'
-      });
-      document.getElementById('currentTime').textContent = timeStr;
-    }
-    
-    // Update time every second
-    updateTime();
-    setInterval(updateTime, 1000);
-    
-    // Add hover effects to statistics cards
+<style>
+  .sidebar {
+    min-height: 100vh;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  }
+  .sidebar a {
+    color: white;
+    text-decoration: none;
+    padding: 10px 15px;
+    display: block;
+    border-radius: 5px;
+    margin: 5px 0;
+    transition: all 0.3s;
+  }
+  .sidebar a:hover {
+    background: rgba(255,255,255,0.2);
+    color: white;
+  }
+  .table-card {
+    background: white;
+    border-radius: 10px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    transition: transform 0.3s;
+  }
+  .table-card:hover {
+    transform: translateY(-2px);
+  }
+  .stat-number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #667eea;
+  }
+</style>
+
+<script>
+  // Add hover effects to statistics cards
+  document.addEventListener('DOMContentLoaded', function() {
     document.querySelectorAll('.table-card').forEach(card => {
       card.addEventListener('mouseenter', function() {
         this.style.transform = 'translateY(-5px)';
@@ -222,6 +247,6 @@
         this.style.boxShadow = '0 4px 6px rgba(0, 0, 0, 0.1)';
       });
     });
-  </script>
-</body>
-</html>
+  });
+</script>
+{% endblock %}

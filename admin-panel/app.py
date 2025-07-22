@@ -302,8 +302,26 @@ class GameDate(db.Model):
     year = db.Column(db.Integer, primary_key=True)
     month = db.Column(db.Integer, primary_key=True)
     playday = db.Column(db.Integer, primary_key=True)
-    real_date = db.Column(db.Date, nullable=False)
-    is_paused = db.Column(db.Boolean, default=False, nullable=False)
+    real_date = db.Column(
+        db.String, nullable=False
+    )  # Changed to String to handle datetime parsing
+
+    @property
+    def real_date_formatted(self):
+        """Return formatted date string for display"""
+        try:
+            if isinstance(self.real_date, str):
+                # Handle datetime strings
+                if "T" in self.real_date:
+                    from datetime import datetime
+
+                    dt = datetime.fromisoformat(self.real_date.replace("+00:00", ""))
+                    return dt.strftime("%Y-%m-%d")
+                else:
+                    return self.real_date
+            return str(self.real_date)
+        except:
+            return str(self.real_date)
 
 
 class PlaydaysPerMonth(db.Model):
@@ -547,7 +565,7 @@ def index():
         "Users": User.query.count(),
         "StructureData": StructureData.query.count(),
         "StructureRatios": StructureRatio.query.count(),
-        "StructureProduction": StructureProduction.query.count(),
+        "Productions": StructureProduction.query.count(),
         "TechnologyAttributes": TechnologyAttribute.query.count(),
         "TechnologyLicenses": TechnologyLicense.query.count(),
         "CountryTechInventory": CountryTechnologyInventory.query.count(),
@@ -556,21 +574,27 @@ def index():
         "GameDate": GameDate.query.count(),
         "PlaydaysPerMonth": PlaydaysPerMonth.query.count(),
     }
-    
+
+    # Calculate total playdays across all months
+    total_playdays = (
+        db.session.query(db.func.sum(PlaydaysPerMonth.playdays)).scalar() or 0
+    )
+
     # Get current game date
     current_date = GameDate.query.order_by(GameDate.real_date.desc()).first()
-    
+
     # Get pause status from ServerSettings
-    is_paused_setting = ServerSettings.query.filter_by(key='is_paused').first()
-    is_paused = is_paused_setting.value == '1' if is_paused_setting else False
-    
+    is_paused_setting = ServerSettings.query.filter_by(key="is_paused").first()
+    is_paused = is_paused_setting.value == "1" if is_paused_setting else False
+
     current_user = get_current_user()
     return render_template(
-        "index.html", 
-        tables_info=tables_info, 
+        "index.html",
+        tables_info=tables_info,
         current_user=current_user,
         current_date=current_date,
-        is_paused=is_paused
+        is_paused=is_paused,
+        total_playdays=total_playdays,
     )
 
 
@@ -1419,6 +1443,7 @@ def delete_country_doctrine(country_id, doctrine_id):
 
 
 # Game Date Management
+# Game Date Management
 @app.route("/game-date")
 @login_required
 def game_date():
@@ -1429,8 +1454,8 @@ def game_date():
     recent_dates = GameDate.query.order_by(GameDate.real_date.desc()).limit(20).all()
 
     # Get the current pause state from ServerSettings
-    is_paused_setting = ServerSettings.query.filter_by(key='is_paused').first()
-    is_paused = is_paused_setting.value == '1' if is_paused_setting else False
+    is_paused_setting = ServerSettings.query.filter_by(key="is_paused").first()
+    is_paused = is_paused_setting.value == "1" if is_paused_setting else False
 
     if not latest_date:
         # Create initial date if none exists
@@ -1438,14 +1463,17 @@ def game_date():
 
         today = date.today()
         latest_date = GameDate(
-            year=2045, month=1, playday=1, real_date=today, is_paused=False
+            year=2045, month=1, playday=1, real_date=today.isoformat()
         )
         db.session.add(latest_date)
         db.session.commit()
         recent_dates = [latest_date]
 
     return render_template(
-        "game_date.html", date=latest_date, recent_dates=recent_dates, is_paused=is_paused
+        "game_date.html",
+        date=latest_date,
+        recent_dates=recent_dates,
+        is_paused=is_paused,
     )
 
 
@@ -1472,8 +1500,7 @@ def add_game_date():
             year=year,
             month=month,
             playday=playday,
-            real_date=real_date,
-            is_paused=False,  # Default value, actual state is in ServerSettings
+            real_date=real_date.isoformat(),
         )
         db.session.add(new_date)
         db.session.commit()
@@ -1495,7 +1522,9 @@ def advance_game_date():
             flash("No game date found!", "error")
             return redirect("/game-date")
 
-        if latest_date.is_paused:
+        # Check if game is paused
+        server_settings = ServerSettings.query.filter_by(key="is_paused").first()
+        if server_settings and server_settings.value == "1":
             flash("Cannot advance date while game is paused!", "warning")
             return redirect("/game-date")
 
@@ -1512,27 +1541,17 @@ def advance_game_date():
 
         # Calculate next date
         year, month, playday = latest_date.year, latest_date.month, latest_date.playday
-        is_paused = False
 
         if playday < month_data.playdays:
             playday += 1
         else:
             playday = 1
             if month == 12:
-                # Pause at year end but don't advance year in this action
-                is_paused = True
-                flash(
-                    "Year completed! Game paused. Advance again to start new year.",
-                    "info",
-                )
+                # Move to next year
+                year += 1
+                month = 1
             else:
                 month += 1
-
-        # If advancing from December pause, start new year
-        if latest_date.month == 12 and latest_date.is_paused and playday == 1:
-            year += 1
-            month = 1
-            is_paused = False
 
         # Check if this date already exists
         existing = GameDate.query.filter_by(
@@ -1549,8 +1568,7 @@ def advance_game_date():
             year=year,
             month=month,
             playday=playday,
-            real_date=date.today(),
-            is_paused=is_paused,
+            real_date=date.today().isoformat(),
         )
         db.session.add(new_date)
         db.session.commit()
@@ -1573,7 +1591,6 @@ def delete_game_date(year, month, playday):
         flash(f"Date {year}-{month:02d}-{playday:02d} deleted successfully!", "success")
     except Exception as e:
         flash(f"Error: {str(e)}", "error")
-    return redirect("/game-date")
     return redirect("/game-date")
 
 
@@ -1627,14 +1644,14 @@ def settings():
         # Get all settings
         settings_data = ServerSettings.query.all()
         settings_dict = {setting.key: setting.value for setting in settings_data}
-        
+
         # Ensure is_paused exists
-        if 'is_paused' not in settings_dict:
+        if "is_paused" not in settings_dict:
             # Create default setting
-            default_paused = ServerSettings(key='is_paused', value='0')
+            default_paused = ServerSettings(key="is_paused", value="0")
             db.session.add(default_paused)
             db.session.commit()
-            settings_dict['is_paused'] = '0'
+            settings_dict["is_paused"] = "0"
 
         return render_template("settings.html", settings=settings_dict)
     except Exception as e:
@@ -1648,20 +1665,20 @@ def update_settings():
     """Update server settings."""
     try:
         # Update is_paused setting
-        is_paused = '1' if request.form.get('is_paused') else '0'
-        
-        setting = ServerSettings.query.filter_by(key='is_paused').first()
+        is_paused = "1" if request.form.get("is_paused") else "0"
+
+        setting = ServerSettings.query.filter_by(key="is_paused").first()
         if setting:
             setting.value = is_paused
         else:
-            setting = ServerSettings(key='is_paused', value=is_paused)
+            setting = ServerSettings(key="is_paused", value=is_paused)
             db.session.add(setting)
-            
+
         db.session.commit()
         flash("Settings updated successfully!", "success")
     except Exception as e:
         flash(f"Error updating settings: {str(e)}", "error")
-        
+
     return redirect("/settings")
 
 
@@ -1670,26 +1687,26 @@ def update_settings():
 def toggle_pause():
     """Toggle the game pause state - can be called from anywhere."""
     try:
-        current_setting = ServerSettings.query.filter_by(key='is_paused').first()
-        
+        current_setting = ServerSettings.query.filter_by(key="is_paused").first()
+
         if current_setting:
             # Toggle current value
             current_value = current_setting.value
-            new_value = '0' if current_value == '1' else '1'
+            new_value = "0" if current_value == "1" else "1"
             current_setting.value = new_value
         else:
             # Create with default paused state
-            current_setting = ServerSettings(key='is_paused', value='1')
+            current_setting = ServerSettings(key="is_paused", value="1")
             db.session.add(current_setting)
-            new_value = '1'
-        
+            new_value = "1"
+
         db.session.commit()
-        status = "paused" if new_value == '1' else "resumed"
+        status = "paused" if new_value == "1" else "resumed"
         flash(f"Game {status} successfully!", "success")
-        
+
     except Exception as e:
         flash(f"Error toggling pause state: {str(e)}", "error")
-    
+
     # Return to the page that called this action
     return redirect(request.referrer or "/")
 
