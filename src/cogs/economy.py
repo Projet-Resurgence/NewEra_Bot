@@ -53,7 +53,8 @@ class Economy(commands.Cog):
     async def eco_logger(self, code, amount, user1, user2=None, type=1):
         """Log economic events to the designated channel."""
         await self.load_code_list()
-        log_channel = self.bot.get_channel(1261064715480862866)
+        log_channel = self.db.get_setting("eco_log_channel_id")
+        log_channel = self.bot.get_channel(log_channel) if log_channel else None
         event = EcoLogEvent(
             code,
             amount,
@@ -160,6 +161,14 @@ class Economy(commands.Cog):
     @commands.command(name="add_money")
     async def add_money(self, ctx, country: CountryConverter, amount: int):
         """Add money to a country (Staff only)."""
+        if not country:
+            embed = discord.Embed(
+                title="Erreur d'ajout d'argent",
+                description=":moneybag: L'utilisateur ou le pays spécifié est invalide.",
+                color=self.error_color_int,
+            )
+            await ctx.send(embed=embed)
+            return
         if not country.get("id"):
             embed = discord.Embed(
                 title="Erreur d'ajout d'argent",

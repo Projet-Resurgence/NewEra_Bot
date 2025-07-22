@@ -63,14 +63,9 @@ removebg_apikey = dotenv_values(".env")["REMOVEBG_API_KEY"]
 groq_api_key = dotenv_values(".env")["GROQ_API_KEY"]
 notion_token = dotenv_values(".env")["NOTION_TOKEN"]
 
-from config import debug, embed_p, continents_dict
-
 _orig_print = print
-
-
 def print(*args, **kwargs):
     _orig_print(*args, flush=True, **kwargs)
-
 
 intents = discord.Intents().all()
 bot = commands.Bot(
@@ -82,7 +77,6 @@ bi_admins_id = []
 usefull_role_ids_dic = {}
 groq_client = Groq(api_key=groq_api_key)
 last_groq_query_time = datetime.now(timezone.utc)
-
 
 async def load_cogs():
     """Load all cogs for the bot."""
@@ -124,7 +118,6 @@ async def load_cogs():
 
         traceback.print_exc()
 
-
 @bot.event
 async def on_ready():
     """Event triggered when the bot is ready."""
@@ -138,11 +131,8 @@ async def on_ready():
 rmbg = RemoveBg(removebg_apikey, "error.log")
 
 duration_in_seconds = 0
-
 starting_amounts = {}
-
 continents_dict = {}
-
 groq_chat_history = []
 
 code_list = []
@@ -153,20 +143,6 @@ POLLING_INTERVAL = 300  # en secondes (ici toutes les 5 minutes)
 # Aerienne = 2
 # Maritime = 3
 # Ecole = 4
-bat_types = {}
-query_types = {}
-buildQuality = {}
-
-wall_prices = {
-    "béton": (60, 150),  # prix par m³
-    "ossature métallique": (1000, 1000),  # prix par m²
-}
-
-# Import utilities (will be called in on_ready)
-db = None
-dUtils = None
-
-notion_handler = NotionHandler(notion_token, bot)
 
 
 with open("datas/usines.json") as f:
@@ -184,11 +160,51 @@ with open("datas/main.json") as f:
     starting_amounts = json_data["starting_amounts"]
     usefull_role_ids_dic = json_data["usefull_role_ids_dic"]
     buildQuality = json_data["buildQuality"]
+    bat_buffs = json_data["bat_buffs"]
+    unit_types = json_data["unit_types"]
+
+usefulDatas = UsefulDatas(bat_types, bat_buffs)
 
 # Initialize utilities early for debug_init
 initialize_utilities(bot)
 db = get_db()
-dUtils = get_discord_utils(bot)
+db.init_settings()
+db.init_inventory_pricings()
+dUtils = get_discord_utils(bot, db)
+notion_handler = NotionHandler(notion_token, bot)
+
+# --- All global variables
+
+debug = db.get_setting("debug")
+continents = ["Europe", "Amerique", "Asie", "Afrique", "Moyen-Orient", "Oceanie"]
+continents_dict = {
+    "europe": db.get_setting("europe_category_id"),
+    "amerique": db.get_setting("america_category_id"),
+    "asie": db.get_setting("asia_category_id"),
+    "afrique": db.get_setting("africa_category_id"),
+    "moyen-orient": db.get_setting("middle_east_category_id"),
+    "oceanie": db.get_setting("oceania_category_id"),
+}
+starting_amounts = {
+    "money": db.get_setting("starting_amount_money"),
+    "pol_points": db.get_setting("starting_amount_pol_points"),
+    "diplo_points": db.get_setting("starting_amount_diplo_points"),
+}
+usefull_role_ids_dic = {"staff": db.get_setting("staff_role_id")}
+Erreurs = {
+    "Erreur 1": "Le salon dans lequel vous effectuez la commande n'est pas le bon\n",
+    "Erreur 2": "Aucun champ de recherche n'a été donné\n",
+    "Erreur 3": "Le champ de recherche donné est invalide\n",
+    "Erreur 3.2": "Le champ de recherche donné est invalide - Le pays n'est pas dans les fichiers\n",
+    "Erreur 4": "La pause est déjà en cours\n",
+    "Erreur 5": "Vous n'avez pas la permission de faire la commande.\n",
+}
+error_color_int = int("FF5733", 16)
+money_color_int = int("FFF005", 16)
+p_points_color_int = int("006AFF", 16)
+d_points_color_int = int("8b1bd1", 16)
+factory_color_int = int("6E472E", 16)
+all_color_int = int("00FF44", 16)
 
 ### DEBUG
 
@@ -212,7 +228,6 @@ async def update_rp_date():
 @update_rp_date.before_loop
 async def before():
     await bot.wait_until_ready()
-
 
 ###
 
@@ -1062,6 +1077,102 @@ async def transfer_archives_to_category(ctx):
                 await ctx.send(f"❌ Permission refusée pour copier le salon {channel.name}")
             except Exception as e:
                 await ctx.send(f"❌ Erreur pour le salon {channel.name}: {e}")
-                
-                
+              
+@bot.command()
+async def get_units(ctx, country: CountryConverter = None, unit_type: str = "all"):
+    """
+    Commande pour obtenir le nombre d'unités d'un pays.
+
+    Args:
+        ctx (commands.Context): Le contexte de la commande.
+        country (CountryConverter): Le pays dont on veut connaître le nombre d'unités.
+        unit_type (str): Le type d'unité à vérifier (par défaut "soldier").
+
+    Returns:
+        None
+    """
+    
+    if not country:
+        country = CountryEntity(ctx.author, ctx.guild).to_dict()
+    if unit_type.lower() not in unit_types.keys() and unit_type.lower() != "all":
+        return await ctx.send("Type d'unité invalide. Utilisez une de ces valeurs : " + ", ".join(unit_types.keys()) + " ou 'all'.")
+
+    is_country = db.get_players_country(ctx.author.id) == country.get("id")
+    is_channel_secret = ctx.channel.id == db.get_country_secret_channel(country.get("id"))
+    units = {}
+    if unit_type.lower() == "all":
+        for utype in unit_types.keys():
+            utype_str = unit_types.get(utype) if is_country and is_channel_secret else f"public_{unit_types.get(utype)}"
+            units[utype] = db.get_units(country.get("id"), utype_str)
+    else:
+        utype_str = unit_types.get(unit_type.lower()) if is_country and is_channel_secret else f"public_{unit_types.get(unit_type.lower())}"
+        units[unit_type.lower()] = db.get_units(country.get("id"), utype_str)
+    if not units:
+        return await ctx.send("Aucune unité trouvée pour ce pays.")
+    embed = discord.Embed(
+        title=f"Unités pour {country.get('name')}",
+        description="\n".join([f"{utype}: {count}" for utype, count in units.items()])
+    )
+    await ctx.send(embed=embed)
+
+@bot.command()
+async def recruit(ctx, country: CountryConverter, note: int, goal: int, unit_type: str = "None"):
+    """
+    Commande pour recruter des membres dans le pays.
+
+    Args:
+        ctx (commands.Context): Le contexte de la commande.
+        note (int): La note de recrutement.
+        goal (int): L'objectif de recrutement.
+        unit_type (str): Le type d'unité à recruter (par défaut "None").
+
+    Returns:
+        None
+    """
+
+    if not country.get("id"):
+        return await ctx.send("Pays non trouvé.")
+    if not dUtils.is_authorized(ctx):
+        return await ctx.send(embed=dUtils.get_auth_embed())
+    if unit_type.lower() not in unit_types.keys():
+        return await ctx.send("Type de recrutement invalide. Utilisez une de ces valeurs : " + ", ".join(unit_types.keys()))
+    if note < 1 or note > 10:
+        return await ctx.send("La note doit être entre 1 et 10.")
+    if goal < 1:
+        return await ctx.send("L'objectif doit être supérieur à 0.")
+    recruited = int(goal * (note / 10) + random.randint(-goal // 4, goal // 10))
+    if recruited < 0:
+        recruited = 0
+    if recruited > goal:
+        recruited = goal
+    if recruited > 1000:
+        recruited = math.ceil(recruited / 10) * 10
+    cost = db.get_pricings(unit_types.get(unit_type.lower())).get("price") * recruited
+    await ctx.send(
+        f"Vous avez recruté {recruited} {unit_type} pour votre pays avec une note de {note}/10 et un objectif de {goal}. \n\
+Le coût total est de {convert(str(cost))}.\n\n"
+    )
+    confirmed = await dUtils.ask_confirmation(
+        ctx,
+        country.get("id"),
+        f"Voulez-vous confirmer le recrutement de {recruited} {unit_type} pour {convert(str(cost))} ?",
+    )
+    if not confirmed:
+        return
+    if not db.has_enough_balance(country.get("id"), cost):
+        return await ctx.send("Fonds insuffisants.")
+    db.take_balance(country.get("id"), cost)
+    confirmed = await dUtils.ask_confirmation(
+        ctx,
+        country.get("id"),
+        f"Voulez-vous ajouter ces recrutements aux chiffres publics de votre pays ?",
+    )
+    db.add_units(country.get("id"), unit_types.get(unit_type.lower()), recruited)
+    if confirmed:
+        db.add_units(country.get("id"), f"public_{unit_types.get(unit_type.lower())}", recruited)
+    return await ctx.send(
+        f"Recrutement de {recruited} {unit_type} confirmé pour {convert(str(cost))}.\n"
+        
+    )
+
 bot.run(token)

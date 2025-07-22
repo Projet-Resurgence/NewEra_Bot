@@ -367,7 +367,7 @@ def admin_required(f):
             flash("Please log in to access this page.", "error")
             return redirect(url_for("login"))
 
-        user = User.query.get(session["user_id"])
+        user = db.session.get(User, session["user_id"])
         if not user or not user.can_manage_users:
             flash("Admin privileges required for this action.", "error")
             return redirect(url_for("index"))
@@ -379,7 +379,7 @@ def admin_required(f):
 def get_current_user():
     """Get current logged in user"""
     if "user_id" in session:
-        return User.query.get(session["user_id"])
+        return db.session.get(User, session["user_id"])
     return None
 
 
@@ -1639,30 +1639,144 @@ def edit_playdays_per_month():
 @app.route("/settings")
 @login_required
 def settings():
-    """Display and manage server settings."""
+    """Display and manage all server settings with full CRUD functionality."""
     try:
         # Get all settings
         settings_data = ServerSettings.query.all()
-        settings_dict = {setting.key: setting.value for setting in settings_data}
 
-        # Ensure is_paused exists
-        if "is_paused" not in settings_dict:
-            # Create default setting
-            default_paused = ServerSettings(key="is_paused", value="0")
-            db.session.add(default_paused)
-            db.session.commit()
-            settings_dict["is_paused"] = "0"
+        # Ensure default settings exist
+        default_settings = {
+            "is_paused": "0",
+            "game_version": "1.0",
+            "maintenance_mode": "0",
+            "max_countries": "50",
+            "daily_income_rate": "1000",
+            "production_speed_multiplier": "1.0",
+        }
 
-        return render_template("settings.html", settings=settings_dict)
+        # Create missing default settings
+        existing_keys = {setting.key for setting in settings_data}
+        for key, default_value in default_settings.items():
+            if key not in existing_keys:
+                new_setting = ServerSettings(key=key, value=default_value)
+                db.session.add(new_setting)
+
+        db.session.commit()
+
+        # Refresh settings data after adding defaults
+        settings_data = ServerSettings.query.order_by(ServerSettings.key).all()
+
+        return render_template("settings.html", settings=settings_data)
     except Exception as e:
         flash(f"Error loading settings: {str(e)}", "error")
         return redirect("/")
 
 
+@app.route("/settings/add", methods=["GET", "POST"])
+@login_required
+def add_setting():
+    """Add a new server setting."""
+    if request.method == "POST":
+        try:
+            key = request.form["key"].strip()
+            value = request.form["value"].strip()
+
+            # Validate key doesn't already exist
+            existing_setting = ServerSettings.query.filter_by(key=key).first()
+            if existing_setting:
+                flash(
+                    f"Setting '{key}' already exists. Use edit to modify it.", "error"
+                )
+                return render_template("add_setting.html")
+
+            # Create new setting
+            new_setting = ServerSettings(key=key, value=value)
+            db.session.add(new_setting)
+            db.session.commit()
+
+            flash(f"Setting '{key}' added successfully!", "success")
+            return redirect("/settings")
+
+        except Exception as e:
+            flash(f"Error adding setting: {str(e)}", "error")
+
+    return render_template("add_setting.html")
+
+
+@app.route("/settings/edit/<setting_key>", methods=["GET", "POST"])
+@login_required
+def edit_setting(setting_key):
+    """Edit an existing server setting."""
+    setting = ServerSettings.query.filter_by(key=setting_key).first_or_404()
+
+    if request.method == "POST":
+        try:
+            # Update setting value
+            setting.value = request.form["value"].strip()
+            db.session.commit()
+
+            flash(f"Setting '{setting_key}' updated successfully!", "success")
+            return redirect("/settings")
+
+        except Exception as e:
+            flash(f"Error updating setting: {str(e)}", "error")
+
+    return render_template("edit_setting.html", setting=setting)
+
+
+@app.route("/settings/delete/<setting_key>", methods=["POST"])
+@login_required
+def delete_setting(setting_key):
+    """Delete a server setting."""
+    try:
+        # Prevent deletion of critical settings
+        protected_settings = ["is_paused"]
+        if setting_key in protected_settings:
+            flash(f"Cannot delete protected setting '{setting_key}'.", "error")
+            return redirect("/settings")
+
+        setting = ServerSettings.query.filter_by(key=setting_key).first_or_404()
+        db.session.delete(setting)
+        db.session.commit()
+
+        flash(f"Setting '{setting_key}' deleted successfully!", "success")
+
+    except Exception as e:
+        flash(f"Error deleting setting: {str(e)}", "error")
+
+    return redirect("/settings")
+
+
+@app.route("/settings/bulk-update", methods=["POST"])
+@login_required
+def bulk_update_settings():
+    """Update multiple settings at once."""
+    try:
+        updated_count = 0
+
+        # Process all form data
+        for key, value in request.form.items():
+            if key.startswith("setting_"):
+                setting_key = key.replace("setting_", "")
+                setting = ServerSettings.query.filter_by(key=setting_key).first()
+
+                if setting and setting.value != value.strip():
+                    setting.value = value.strip()
+                    updated_count += 1
+
+        db.session.commit()
+        flash(f"Updated {updated_count} settings successfully!", "success")
+
+    except Exception as e:
+        flash(f"Error updating settings: {str(e)}", "error")
+
+    return redirect("/settings")
+
+
 @app.route("/settings/update", methods=["POST"])
 @login_required
 def update_settings():
-    """Update server settings."""
+    """Update server settings (legacy route for backward compatibility)."""
     try:
         # Update is_paused setting
         is_paused = "1" if request.form.get("is_paused") else "0"
@@ -1725,4 +1839,9 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"Database initialization error: {e}")
 
-    app.run(debug=False, host="0.0.0.0", port=8080)
+    try:
+        app.run(debug=False, host="0.0.0.0", port=8080)
+    except OSError as e:
+        if e.errno == 98:  # Address already in use
+            print("Port 8080 is already in use, trying port 8081...")
+            app.run(debug=False, host="0.0.0.0", port=8081)

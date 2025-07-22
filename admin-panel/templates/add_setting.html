@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+
+{% block title %}Add Server Setting{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-plus-circle"></i> Add New Server Setting</h2>
+  <a href="/settings" class="btn btn-secondary">
+    <i class="bi bi-arrow-left"></i> Back to Settings
+  </a>
+</div>
+
+<div class="row">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header">
+        <h5><i class="bi bi-gear"></i> Setting Details</h5>
+      </div>
+      <div class="card-body">
+        <form method="POST">
+          <div class="mb-3">
+            <label for="key" class="form-label">Setting Key *</label>
+            <input type="text" class="form-control" id="key" name="key" required 
+                   pattern="[a-zA-Z0-9_-]+" 
+                   title="Only letters, numbers, underscores, and hyphens allowed">
+            <div class="form-text">
+              Unique identifier for the setting. Use underscore_case format (e.g., max_players, game_version)
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label for="value" class="form-label">Setting Value *</label>
+            <input type="text" class="form-control" id="value" name="value" required>
+            <div class="form-text">
+              The value for this setting. Use "0" or "1" for boolean settings.
+            </div>
+          </div>
+          
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success">
+              <i class="bi bi-check"></i> Add Setting
+            </button>
+            <a href="/settings" class="btn btn-secondary">Cancel</a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-4">
+    <div class="card border-info">
+      <div class="card-header bg-info text-white">
+        <h6><i class="bi bi-lightbulb"></i> Setting Key Examples</h6>
+      </div>
+      <div class="card-body">
+        <ul class="mb-0">
+          <li><code>max_players</code></li>
+          <li><code>game_version</code></li>
+          <li><code>maintenance_mode</code></li>
+          <li><code>debug_enabled</code></li>
+          <li><code>auto_backup</code></li>
+          <li><code>rate_limit</code></li>
+        </ul>
+      </div>
+    </div>
+    
+    <div class="card border-warning mt-3">
+      <div class="card-header bg-warning text-dark">
+        <h6><i class="bi bi-exclamation-triangle"></i> Guidelines</h6>
+      </div>
+      <div class="card-body">
+        <ul class="mb-0">
+          <li>Use descriptive, lowercase keys</li>
+          <li>Separate words with underscores</li>
+          <li>Boolean values: use "0" or "1"</li>
+          <li>Avoid spaces and special characters</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

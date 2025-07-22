@@ -8,17 +8,15 @@ import discord
 
 # The bot instance must be set at runtime (e.g. by main.py)
 
-error_color_int = int("FF5733", 16)
-
-
 class discordUtils:
     """
     A utility class for Discord-related functions.
     This class provides methods to check user authorization, send messages, and handle reactions.
     """
 
-    def __init__(self, bot):
+    def __init__(self, bot, db):
         self.bot = bot
+        self.db = db
 
     def is_authorized(self, ctx) -> bool:
         authorized_role_id = 1124057695276773426
@@ -135,4 +133,39 @@ class discordUtils:
 
         return "\n".join(reversed(context_lines))
 
-    
+    async def ask_confirmation(self, ctx, prompted_country: str, question):
+        """
+        Asks the user for confirmation with a yes/no question,
+        Waiting for a whitecheck reaction under the question message.
+
+        Args:
+            ctx (commands.Context): The context of the command.
+            question (str): The question to ask the user.
+
+        Returns:
+            bool: True if the user confirms, False otherwise.
+        """
+        embed = discord.Embed(
+            title="Confirmation",
+            description=question,
+            color=0x00FF00,  # Green color for confirmation
+        )
+        message = await ctx.send(embed=embed)
+        await message.add_reaction("✅")
+        await message.add_reaction("❌")
+
+        def check(reaction, user):
+            return (
+                self.db.has_permission(prompted_country, user.id, "can_recruit")
+                and str(reaction.emoji) in ["✅", "❌"]
+                and reaction.message.id == message.id
+            )
+
+        try:
+            reaction, user = await self.bot.wait_for(
+                "reaction_add", timeout=60.0, check=check
+            )
+            return str(reaction.emoji) == "✅"
+        except asyncio.TimeoutError:
+            await ctx.send("⏰ Temps écoulé pour la confirmation.")
+            return False

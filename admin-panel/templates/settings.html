@@ -1,55 +1,37 @@
 {% extends "base.html" %}
 
-{% block title %}Server Settings{% endblock %}
+{% block title %}Server Settings Management{% endblock %}
 
 {% block content %}
-<div class="row">
-  <div class="col-md-8">
-    <div class="card">
-      <div class="card-header">
-        <h3><i class="bi bi-gear"></i> Server Settings</h3>
-      </div>
-      <div class="card-body">
-        <form method="POST" action="/settings/update">
-          <div class="row">
-            <div class="col-md-12">
-              <div class="mb-4">
-                <h5>Game Control Settings</h5>
-                <div class="form-check form-switch">
-                  <input class="form-check-input" type="checkbox" id="is_paused" name="is_paused" 
-                         value="1" {% if settings.get('is_paused') == '1' %}checked{% endif %}>
-                  <label class="form-check-label" for="is_paused">
-                    <strong>Pause Game</strong>
-                  </label>
-                  <div class="form-text">When enabled, the game date advancement is paused globally</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <div class="d-flex gap-2">
-            <button type="submit" class="btn btn-primary">
-              <i class="bi bi-save"></i> Save Settings
-            </button>
-            <a href="/" class="btn btn-outline-secondary">
-              <i class="bi bi-arrow-left"></i> Back to Dashboard
-            </a>
-          </div>
-        </form>
-      </div>
-    </div>
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <h2><i class="bi bi-gear"></i> Server Settings Management</h2>
+  <div class="btn-group">
+    <a href="/settings/add" class="btn btn-success">
+      <i class="bi bi-plus"></i> Add Setting
+    </a>
+    <button type="button" class="btn btn-warning" onclick="quickTogglePause()">
+      <i class="bi bi-play-pause"></i> Quick Pause Toggle
+    </button>
   </div>
+</div>
 
-  <div class="col-md-4">
+<!-- Current Game Status Card -->
+<div class="row mb-4">
+  <div class="col-md-6">
     <div class="card">
       <div class="card-header">
-        <h4><i class="bi bi-lightning-charge"></i> Quick Controls</h4>
+        <h5><i class="bi bi-info-circle"></i> Current Game Status</h5>
       </div>
       <div class="card-body">
+        {% set is_paused = settings|selectattr('key', 'equalto', 'is_paused')|first %}
+        <div class="alert {% if is_paused and is_paused.value == '1' %}alert-warning{% else %}alert-success{% endif %} py-2">
+          {% if is_paused and is_paused.value == '1' %}
+            <i class="bi bi-pause-circle"></i> Game is Currently <strong>PAUSED</strong>
+          {% else %}
+            <i class="bi bi-play-circle"></i> Game is Currently <strong>ACTIVE</strong>
+          {% endif %}
+        </div>
         <div class="d-grid gap-2">
-          <button type="button" class="btn btn-success" onclick="quickTogglePause()">
-            <i class="bi bi-play-pause"></i> Quick Pause Toggle
-          </button>
           <a href="/game-date" class="btn btn-outline-primary">
             <i class="bi bi-calendar-day"></i> Game Date Management
           </a>
@@ -57,38 +39,197 @@
             <i class="bi bi-calendar3"></i> Monthly Playdays
           </a>
         </div>
-        
-        <div class="mt-4">
-          <h6>Current Status</h6>
-          <div class="alert {% if settings.get('is_paused') == '1' %}alert-warning{% else %}alert-success{% endif %} py-2" id="status_alert">
-            {% if settings.get('is_paused') == '1' %}
-              <i class="bi bi-pause-circle"></i> Game is Currently <strong>PAUSED</strong>
-            {% else %}
-              <i class="bi bi-play-circle"></i> Game is Currently <strong>ACTIVE</strong>
-            {% endif %}
-          </div>
-        </div>
       </div>
     </div>
-
-    <div class="card mt-3">
+  </div>
+  
+  <div class="col-md-6">
+    <div class="card">
       <div class="card-header">
-        <h5><i class="bi bi-info-circle"></i> Information</h5>
+        <h5><i class="bi bi-lightning-charge"></i> Quick Stats</h5>
       </div>
       <div class="card-body">
-        <div class="small text-muted">
-          <h6>Settings Management</h6>
-          <ul class="mb-0">
-            <li>Changes are applied immediately</li>
-            <li>Pause state affects all date advancement</li>
-            <li>Settings are stored persistently</li>
-            <li>Accessible from multiple admin pages</li>
-          </ul>
+        <div class="row text-center">
+          <div class="col-6">
+            <div class="stat-number text-primary">{{ settings|length }}</div>
+            <small class="text-muted">Total Settings</small>
+          </div>
+          <div class="col-6">
+            <div class="stat-number text-success">
+              {% set game_settings = [] %}
+              {% for setting in settings %}
+                {% if setting.key.startswith('game_') %}
+                  {% set _ = game_settings.append(setting) %}
+                {% endif %}
+              {% endfor %}
+              {{ game_settings|length }}
+            </div>
+            <small class="text-muted">Game Settings</small>
+          </div>
         </div>
       </div>
     </div>
   </div>
 </div>
+
+<!-- Bulk Edit Form -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <h4><i class="bi bi-list-ul"></i> All Server Settings</h4>
+    <span class="badge bg-primary">{{ settings|length }} settings</span>
+  </div>
+  <div class="card-body">
+    <form method="POST" action="/settings/bulk-update" id="bulkSettingsForm">
+      <div class="table-responsive">
+        <table class="table table-hover">
+          <thead class="table-dark">
+            <tr>
+              <th style="width: 25%">Setting Key</th>
+              <th style="width: 40%">Value</th>
+              <th style="width: 15%">Type</th>
+              <th style="width: 20%">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for setting in settings %}
+            <tr class="{% if setting.key == 'is_paused' %}table-warning{% endif %}">
+              <td>
+                <strong>{{ setting.key }}</strong>
+                {% if setting.key == 'is_paused' %}
+                  <span class="badge bg-danger ms-2">Critical</span>
+                {% elif setting.key.startswith('game_') %}
+                  <span class="badge bg-info ms-2">Game</span>
+                {% endif %}
+              </td>
+              <td>
+                {% if setting.key == 'is_paused' %}
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" 
+                           name="setting_{{ setting.key }}" 
+                           value="1" 
+                           {% if setting.value == '1' %}checked{% endif %}
+                           onchange="togglePauseDisplay(this)">
+                    <label class="form-check-label">
+                      <span id="pauseLabel">{% if setting.value == '1' %}Paused{% else %}Active{% endif %}</span>
+                    </label>
+                  </div>
+                  <!-- Hidden field for unchecked state -->
+                  <input type="hidden" name="setting_{{ setting.key }}" value="0">
+                {% elif setting.key in ['maintenance_mode', 'debug_enabled', 'auto_backup'] %}
+                  <div class="form-check form-switch">
+                    <input class="form-check-input" type="checkbox" 
+                           name="setting_{{ setting.key }}" 
+                           value="1" 
+                           {% if setting.value == '1' %}checked{% endif %}>
+                    <label class="form-check-label">
+                      {% if setting.value == '1' %}Enabled{% else %}Disabled{% endif %}
+                    </label>
+                  </div>
+                  <input type="hidden" name="setting_{{ setting.key }}" value="0">
+                {% else %}
+                  <input type="text" class="form-control" 
+                         name="setting_{{ setting.key }}" 
+                         value="{{ setting.value }}"
+                         {% if setting.key in ['max_countries', 'daily_income_rate'] %}pattern="[0-9]+"{% endif %}
+                         {% if setting.key in ['production_speed_multiplier'] %}step="0.1" type="number"{% endif %}>
+                {% endif %}
+              </td>
+              <td>
+                {% if setting.key == 'is_paused' or setting.key == 'maintenance_mode' %}
+                  <span class="badge bg-secondary">Boolean</span>
+                {% elif setting.key in ['max_countries', 'daily_income_rate'] %}
+                  <span class="badge bg-primary">Integer</span>
+                {% elif setting.key in ['production_speed_multiplier'] %}
+                  <span class="badge bg-info">Float</span>
+                {% else %}
+                  <span class="badge bg-light text-dark">String</span>
+                {% endif %}
+              </td>
+              <td>
+                <div class="btn-group btn-group-sm">
+                  <a href="/settings/edit/{{ setting.key }}" 
+                     class="btn btn-outline-primary">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  {% if setting.key not in ['is_paused'] %}
+                  <form method="POST" action="/settings/delete/{{ setting.key }}" 
+                        style="display: inline;" 
+                        onsubmit="return confirm('Are you sure you want to delete setting \'{{ setting.key }}\'?')">
+                    <button type="submit" class="btn btn-outline-danger">
+                      <i class="bi bi-trash"></i>
+                    </button>
+                  </form>
+                  {% else %}
+                  <button type="button" class="btn btn-outline-secondary" disabled title="Protected setting">
+                    <i class="bi bi-shield-lock"></i>
+                  </button>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      
+      <div class="d-flex justify-content-between mt-3">
+        <div>
+          <button type="submit" class="btn btn-success btn-lg">
+            <i class="bi bi-save"></i> Save All Changes
+          </button>
+          <button type="button" class="btn btn-outline-secondary btn-lg" onclick="resetForm()">
+            <i class="bi bi-arrow-clockwise"></i> Reset
+          </button>
+        </div>
+        <a href="/" class="btn btn-outline-primary">
+          <i class="bi bi-arrow-left"></i> Back to Dashboard
+        </a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Settings Information -->
+<div class="row mt-4">
+  <div class="col-md-6">
+    <div class="card border-info">
+      <div class="card-header bg-info text-white">
+        <h6><i class="bi bi-info-circle"></i> Setting Types</h6>
+      </div>
+      <div class="card-body">
+        <ul class="mb-0">
+          <li><strong>Boolean:</strong> True/False values (checkboxes)</li>
+          <li><strong>Integer:</strong> Whole numbers only</li>
+          <li><strong>Float:</strong> Decimal numbers</li>
+          <li><strong>String:</strong> Text values</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+  
+  <div class="col-md-6">
+    <div class="card border-warning">
+      <div class="card-header bg-warning text-dark">
+        <h6><i class="bi bi-exclamation-triangle"></i> Important Notes</h6>
+      </div>
+      <div class="card-body">
+        <ul class="mb-0">
+          <li>Critical settings (like <code>is_paused</code>) cannot be deleted</li>
+          <li>Changes take effect immediately after saving</li>
+          <li>Boolean settings use 1 (true) and 0 (false) values</li>
+          <li>Invalid values may cause system errors</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.stat-number {
+  font-size: 2rem;
+  font-weight: bold;
+}
+</style>
 
 <script>
 function quickTogglePause() {
@@ -100,7 +241,6 @@ function quickTogglePause() {
     })
     .then(response => response.text())
     .then(data => {
-        // Reload the page to reflect the changes
         location.reload();
     })
     .catch(error => {
@@ -108,5 +248,45 @@ function quickTogglePause() {
         alert('Error toggling pause state. Please try again.');
     });
 }
+
+function togglePauseDisplay(checkbox) {
+    const label = document.getElementById('pauseLabel');
+    label.textContent = checkbox.checked ? 'Paused' : 'Active';
+}
+
+function resetForm() {
+    if (confirm('Are you sure you want to reset all changes?')) {
+        location.reload();
+    }
+}
+
+// Form validation
+document.getElementById('bulkSettingsForm').addEventListener('submit', function(e) {
+    const numericFields = document.querySelectorAll('input[pattern="[0-9]+"]');
+    
+    for (let field of numericFields) {
+        if (field.value && !/^\d+$/.test(field.value)) {
+            e.preventDefault();
+            alert(`Field "${field.name}" must contain only numbers.`);
+            field.focus();
+            return false;
+        }
+    }
+    
+    return confirm('Are you sure you want to save all settings changes?');
+});
+
+// Auto-save warning on page unload if changes detected
+let formChanged = false;
+document.getElementById('bulkSettingsForm').addEventListener('change', function() {
+    formChanged = true;
+});
+
+window.addEventListener('beforeunload', function(e) {
+    if (formChanged) {
+        e.preventDefault();
+        e.returnValue = 'You have unsaved changes. Are you sure you want to leave?';
+    }
+});
 </script>
 {% endblock %}

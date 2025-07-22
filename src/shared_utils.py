@@ -21,7 +21,7 @@ def initialize_utilities(bot):
     """Initialize all utility instances with the bot instance."""
     global db, dUtils
     db = Database()
-    dUtils = discordUtils(bot)
+    dUtils = discordUtils(bot, db)
 
 
 def get_db():
@@ -32,11 +32,11 @@ def get_db():
     return db
 
 
-def get_discord_utils(bot=None):
+def get_discord_utils(bot=None, db=None):
     """Get the global discord utils instance."""
     global dUtils
     if dUtils is None and bot is not None:
-        dUtils = discordUtils(bot)
+        dUtils = discordUtils(bot, db)
     return dUtils
 
 
