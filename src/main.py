@@ -63,7 +63,7 @@ removebg_apikey = dotenv_values(".env")["REMOVEBG_API_KEY"]
 groq_api_key = dotenv_values(".env")["GROQ_API_KEY"]
 notion_token = dotenv_values(".env")["NOTION_TOKEN"]
 
-from config import debug, embed_p
+from config import debug, embed_p, continents_dict
 
 _orig_print = print
 
@@ -951,7 +951,6 @@ async def archive_rp_channels(ctx, archive_category: discord.CategoryChannel):
     if not dUtils.is_authorized(ctx):
         return await ctx.send(embed=dUtils.get_auth_embed())
     
-    from config import continents_dict
     
     continents_dict["services"] = 1269295981183369279  # ID de la catégorie des services secrets
 
