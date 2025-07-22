@@ -29,6 +29,7 @@ from PIL import Image
 import pytz
 import io
 import string
+import locale
 
 # Import centralized utilities
 from shared_utils import (
@@ -62,9 +63,7 @@ removebg_apikey = dotenv_values(".env")["REMOVEBG_API_KEY"]
 groq_api_key = dotenv_values(".env")["GROQ_API_KEY"]
 notion_token = dotenv_values(".env")["NOTION_TOKEN"]
 
-debug = False
-embed_p = ""
-
+from config import debug, embed_p
 
 _orig_print = print
 
@@ -197,7 +196,6 @@ db.debug_init()
 
 # --- Task de polling ---
 
-
 @tasks.loop(seconds=POLLING_INTERVAL)
 async def polling_notion():
     try:
@@ -208,7 +206,7 @@ async def polling_notion():
 @tasks.loop(minutes=1)
 async def update_rp_date():
     now = datetime.now(pytz.timezone("Europe/Paris"))  # ou "UTC"
-    if now.hour == 7 and now.minute == 0:
+    if (now.hour == 7 and now.minute == 0):
         await db.advance_playday()
 
 @update_rp_date.before_loop
@@ -218,6 +216,35 @@ async def before():
 
 ###
 
+@bot.command()
+@commands.has_permissions(administrator=True)
+async def resume_rp(ctx):
+    db.set_paused(False)
+    await ctx.send("✅ Le temps RP a été relancé !")
+    
+@bot.command()
+async def date(ctx):
+    """Affiche la date actuelle du jeu."""
+    if db.is_paused():
+        await ctx.send("Le temps RP est actuellement en pause.")
+        return
+
+    date_dict = db.get_current_date()
+    year, month, playday = date_dict.get("year", 1), date_dict.get("month", 1), date_dict.get("playday", 1)
+
+    try:
+        locale.setlocale(locale.LC_TIME, 'fr_FR.UTF-8')  # Système Unix/Linux
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_TIME, 'fr_FR')  # Windows
+        except locale.Error as e:
+            await ctx.send(f"⚠️ Impossible de définir la locale française. {e}")
+            return
+
+    month_name = datetime(year, month, 1).strftime("%B")
+    max_playdays = db.get_playdays_in_month(month)
+
+    await ctx.send(f"📅 Date actuelle : {month_name.capitalize()} {year} - {playday}/{max_playdays}")
 
 @bot.event
 async def on_message(message):
@@ -755,7 +782,6 @@ async def create_country(
     await user.add_roles(player_role, reason=f"Création du pays {country_name}")
     await user.remove_roles(non_player_role, reason=f"Création du pays {country_name}")
     await ctx.send(f"Le pays {country_name} a été créé avec succès.")
-
 
 @bot.command(
     name="create_secret",

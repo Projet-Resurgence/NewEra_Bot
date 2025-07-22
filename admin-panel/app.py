@@ -293,6 +293,39 @@ class CountryTechnologyProduction(db.Model):
     started_at = db.Column(db.String)
 
 
+class GameDate(db.Model):
+    """Game Dates - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "Dates"
+
+    year = db.Column(db.Integer, primary_key=True)
+    month = db.Column(db.Integer, primary_key=True)
+    playday = db.Column(db.Integer, primary_key=True)
+    real_date = db.Column(db.Date, nullable=False)
+    is_paused = db.Column(db.Boolean, default=False, nullable=False)
+
+
+class PlaydaysPerMonth(db.Model):
+    """Playdays Per Month - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "PlaydaysPerMonth"
+
+    month_number = db.Column(db.Integer, primary_key=True)
+    playdays = db.Column(db.Integer, nullable=False)
+
+
+class ServerSettings(db.Model):
+    """Server Settings - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "ServerSettings"
+
+    key = db.Column(db.String(100), primary_key=True)
+    value = db.Column(db.String(500), nullable=False)
+
+
 # Authentication decorators
 def login_required(f):
     """Decorator to require login for routes"""
@@ -520,10 +553,24 @@ def index():
         "CountryTechInventory": CountryTechnologyInventory.query.count(),
         "CountryTechProduction": CountryTechnologyProduction.query.count(),
         "CountryDoctrines": CountryDoctrine.query.count(),
+        "GameDate": GameDate.query.count(),
+        "PlaydaysPerMonth": PlaydaysPerMonth.query.count(),
     }
+    
+    # Get current game date
+    current_date = GameDate.query.order_by(GameDate.real_date.desc()).first()
+    
+    # Get pause status from ServerSettings
+    is_paused_setting = ServerSettings.query.filter_by(key='is_paused').first()
+    is_paused = is_paused_setting.value == '1' if is_paused_setting else False
+    
     current_user = get_current_user()
     return render_template(
-        "index.html", tables_info=tables_info, current_user=current_user
+        "index.html", 
+        tables_info=tables_info, 
+        current_user=current_user,
+        current_date=current_date,
+        is_paused=is_paused
     )
 
 
@@ -1369,6 +1416,282 @@ def delete_country_doctrine(country_id, doctrine_id):
     except Exception as e:
         flash(f"Error: {str(e)}", "error")
     return redirect("/country-doctrines")
+
+
+# Game Date Management
+@app.route("/game-date")
+@login_required
+def game_date():
+    # Get the latest date
+    latest_date = GameDate.query.order_by(GameDate.real_date.desc()).first()
+
+    # Get recent dates for history (show more entries)
+    recent_dates = GameDate.query.order_by(GameDate.real_date.desc()).limit(20).all()
+
+    # Get the current pause state from ServerSettings
+    is_paused_setting = ServerSettings.query.filter_by(key='is_paused').first()
+    is_paused = is_paused_setting.value == '1' if is_paused_setting else False
+
+    if not latest_date:
+        # Create initial date if none exists
+        from datetime import date
+
+        today = date.today()
+        latest_date = GameDate(
+            year=2045, month=1, playday=1, real_date=today, is_paused=False
+        )
+        db.session.add(latest_date)
+        db.session.commit()
+        recent_dates = [latest_date]
+
+    return render_template(
+        "game_date.html", date=latest_date, recent_dates=recent_dates, is_paused=is_paused
+    )
+
+
+@app.route("/game-date/add", methods=["POST"])
+@login_required
+def add_game_date():
+    try:
+        from datetime import date
+
+        year = int(request.form["year"])
+        month = int(request.form["month"])
+        playday = int(request.form["playday"])
+        real_date = date.today()
+
+        # Check if this combination already exists
+        existing = GameDate.query.filter_by(
+            year=year, month=month, playday=playday
+        ).first()
+        if existing:
+            flash(f"Date {year}-{month}-{playday} already exists!", "error")
+            return redirect("/game-date")
+
+        new_date = GameDate(
+            year=year,
+            month=month,
+            playday=playday,
+            real_date=real_date,
+            is_paused=False,  # Default value, actual state is in ServerSettings
+        )
+        db.session.add(new_date)
+        db.session.commit()
+        flash("New game date added successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/game-date")
+
+
+@app.route("/game-date/advance", methods=["POST"])
+@login_required
+def advance_game_date():
+    try:
+        from datetime import date
+
+        # Get the latest date
+        latest_date = GameDate.query.order_by(GameDate.real_date.desc()).first()
+        if not latest_date:
+            flash("No game date found!", "error")
+            return redirect("/game-date")
+
+        if latest_date.is_paused:
+            flash("Cannot advance date while game is paused!", "warning")
+            return redirect("/game-date")
+
+        # Get playdays for current month
+        month_data = PlaydaysPerMonth.query.filter_by(
+            month_number=latest_date.month
+        ).first()
+        if not month_data:
+            flash(
+                f"Playdays configuration not found for month {latest_date.month}!",
+                "error",
+            )
+            return redirect("/game-date")
+
+        # Calculate next date
+        year, month, playday = latest_date.year, latest_date.month, latest_date.playday
+        is_paused = False
+
+        if playday < month_data.playdays:
+            playday += 1
+        else:
+            playday = 1
+            if month == 12:
+                # Pause at year end but don't advance year in this action
+                is_paused = True
+                flash(
+                    "Year completed! Game paused. Advance again to start new year.",
+                    "info",
+                )
+            else:
+                month += 1
+
+        # If advancing from December pause, start new year
+        if latest_date.month == 12 and latest_date.is_paused and playday == 1:
+            year += 1
+            month = 1
+            is_paused = False
+
+        # Check if this date already exists
+        existing = GameDate.query.filter_by(
+            year=year, month=month, playday=playday
+        ).first()
+        if existing:
+            flash(
+                f"Date {year}-{month}-{playday} already exists in history!", "warning"
+            )
+            return redirect("/game-date")
+
+        # Add new date entry
+        new_date = GameDate(
+            year=year,
+            month=month,
+            playday=playday,
+            real_date=date.today(),
+            is_paused=is_paused,
+        )
+        db.session.add(new_date)
+        db.session.commit()
+
+        flash(f"Advanced to {year}-{month:02d}-{playday:02d}!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/game-date")
+
+
+@app.route("/game-date/delete/<int:year>/<int:month>/<int:playday>", methods=["POST"])
+@login_required
+def delete_game_date(year, month, playday):
+    try:
+        date_entry = GameDate.query.filter_by(
+            year=year, month=month, playday=playday
+        ).first_or_404()
+        db.session.delete(date_entry)
+        db.session.commit()
+        flash(f"Date {year}-{month:02d}-{playday:02d} deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/game-date")
+    return redirect("/game-date")
+
+
+# Playdays Per Month Management
+@app.route("/playdays-per-month")
+@login_required
+def playdays_per_month():
+    playdays = PlaydaysPerMonth.query.order_by(PlaydaysPerMonth.month_number).all()
+    # Ensure all 12 months exist
+    if len(playdays) < 12:
+        existing_months = {p.month_number for p in playdays}
+        for month_num in range(1, 13):
+            if month_num not in existing_months:
+                new_month = PlaydaysPerMonth(month_number=month_num, playdays=30)
+                db.session.add(new_month)
+        db.session.commit()
+        playdays = PlaydaysPerMonth.query.order_by(PlaydaysPerMonth.month_number).all()
+
+    return render_template("playdays_per_month.html", playdays=playdays)
+
+
+@app.route("/playdays-per-month/edit", methods=["POST"])
+@login_required
+def edit_playdays_per_month():
+    try:
+        for month_num in range(1, 13):
+            month_data = PlaydaysPerMonth.query.filter_by(
+                month_number=month_num
+            ).first()
+            if not month_data:
+                month_data = PlaydaysPerMonth(month_number=month_num)
+                db.session.add(month_data)
+
+            playdays_value = request.form.get(f"month_{month_num}")
+            if playdays_value:
+                month_data.playdays = int(playdays_value)
+
+        db.session.commit()
+        flash("Playdays per month updated successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/playdays-per-month")
+
+
+# Settings Routes
+@app.route("/settings")
+@login_required
+def settings():
+    """Display and manage server settings."""
+    try:
+        # Get all settings
+        settings_data = ServerSettings.query.all()
+        settings_dict = {setting.key: setting.value for setting in settings_data}
+        
+        # Ensure is_paused exists
+        if 'is_paused' not in settings_dict:
+            # Create default setting
+            default_paused = ServerSettings(key='is_paused', value='0')
+            db.session.add(default_paused)
+            db.session.commit()
+            settings_dict['is_paused'] = '0'
+
+        return render_template("settings.html", settings=settings_dict)
+    except Exception as e:
+        flash(f"Error loading settings: {str(e)}", "error")
+        return redirect("/")
+
+
+@app.route("/settings/update", methods=["POST"])
+@login_required
+def update_settings():
+    """Update server settings."""
+    try:
+        # Update is_paused setting
+        is_paused = '1' if request.form.get('is_paused') else '0'
+        
+        setting = ServerSettings.query.filter_by(key='is_paused').first()
+        if setting:
+            setting.value = is_paused
+        else:
+            setting = ServerSettings(key='is_paused', value=is_paused)
+            db.session.add(setting)
+            
+        db.session.commit()
+        flash("Settings updated successfully!", "success")
+    except Exception as e:
+        flash(f"Error updating settings: {str(e)}", "error")
+        
+    return redirect("/settings")
+
+
+@app.route("/settings/pause-toggle", methods=["POST"])
+@login_required
+def toggle_pause():
+    """Toggle the game pause state - can be called from anywhere."""
+    try:
+        current_setting = ServerSettings.query.filter_by(key='is_paused').first()
+        
+        if current_setting:
+            # Toggle current value
+            current_value = current_setting.value
+            new_value = '0' if current_value == '1' else '1'
+            current_setting.value = new_value
+        else:
+            # Create with default paused state
+            current_setting = ServerSettings(key='is_paused', value='1')
+            db.session.add(current_setting)
+            new_value = '1'
+        
+        db.session.commit()
+        status = "paused" if new_value == '1' else "resumed"
+        flash(f"Game {status} successfully!", "success")
+        
+    except Exception as e:
+        flash(f"Error toggling pause state: {str(e)}", "error")
+    
+    # Return to the page that called this action
+    return redirect(request.referrer or "/")
 
 
 if __name__ == "__main__":

@@ -1,338 +1,100 @@
-<!doctype html>
-<html lang="fr">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NewEra Bot - Admin Panel</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css" rel="stylesheet">
-  <style>
-    .sidebar {
-      min-height: 100vh;
-      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    }
-    .sidebar a {
-      color: white;
-      text-decoration: none;
-      padding: 10px 15px;
-      display: block;
-      border-radius: 5px;
-      margin: 5px 0;
-      transition: all 0.3s;
-    }
-    .sidebar a:hover {
-      background: rgba(255,255,255,0.2);
-      color: white;
-    }
-    .table-card {
-      background: white;
-      border-radius: 10px;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      transition: transform 0.3s;
-    }
-    .table-card:hover {
-      transform: translateY(-2px);
-    }
-    .stat-number {
-      font-size: 2rem;
-      font-weight: bold;
-      color: #667eea;
-    }
-  </style>
-</head>
-<body class="bg-light">
-  <div class="container-fluid">
-    <div class="row">
-      <!-- Sidebar -->
-      <div class="col-md-3 col-lg-2 sidebar p-3">
-        <h4 class="text-white mb-4">
-          <i class="bi bi-robot"></i> NewEra Admin
-        </h4>
-        
-        <div class="nav flex-column">
-          <a href="/" class="nav-link">
-            <i class="bi bi-house-door"></i> Dashboard
-          </a>
-          
-          <!-- Game Data Management -->
-          <small class="text-white-50 mt-3 mb-1 px-2">GAME DATA</small>
-          <a href="/countries" class="nav-link">
-            <i class="bi bi-flag"></i> Countries ({{ tables_info['Countries'] }})
-          </a>
-          <a href="/governments" class="nav-link">
-            <i class="bi bi-people"></i> Governments ({{ tables_info['Governments'] }})
-          </a>
-          <a href="/doctrines" class="nav-link">
-            <i class="bi bi-book"></i> Doctrines ({{ tables_info['Doctrines'] }})
-          </a>
-          <a href="/inventory" class="nav-link">
-            <i class="bi bi-bag"></i> Inventory ({{ tables_info['Inventory'] }})
-          </a>
-          <a href="/regions" class="nav-link">
-            <i class="bi bi-map"></i> Regions ({{ tables_info['Regions'] }})
-          </a>
-          <a href="/structures" class="nav-link">
-            <i class="bi bi-building"></i> Structures ({{ tables_info['Structures'] }})
-          </a>
-          <a href="/technologies" class="nav-link">
-            <i class="bi bi-cpu"></i> Technologies ({{ tables_info['Technologies'] }})
-          </a>
-          
-          <!-- Admin Panel -->
-          {% if session.is_admin %}
-          <small class="text-white-50 mt-3 mb-1 px-2">ADMINISTRATION</small>
-          <a href="/users" class="nav-link">
-            <i class="bi bi-person-gear"></i> Users ({{ tables_info['Users'] }})
-          </a>
-          {% endif %}
-          
-          <!-- User Account -->
-          <small class="text-white-50 mt-3 mb-1 px-2">ACCOUNT</small>
-          <a href="/change_password" class="nav-link">
-            <i class="bi bi-key"></i> Change Password
-          </a>
-          <a href="/logout" class="nav-link">
-            <i class="bi bi-box-arrow-right"></i> Logout
-          </a>
+{% extends "base.html" %}
+
+{% block title %}Dashboard - NewEra Bot Admin Panel{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-12">
+    <div class="card mb-4">
+      <div class="card-header">
+        <h3><i class="bi bi-speedometer2"></i> Dashboard Overview</h3>
+      </div>
+      <div class="card-body">
+        <div class="row">
+          <!-- Countries Stats -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ tables_info.get('Countries', 0) }}</div>
+              <small class="text-muted">Countries</small>
+            </div>
+          </div>
+          <!-- Governments Stats -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ tables_info.get('Governments', 0) }}</div>
+              <small class="text-muted">Government Positions</small>
+            </div>
+          </div>
+          <!-- Structures Stats -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ tables_info.get('Structures', 0) }}</div>
+              <small class="text-muted">Structures</small>
+            </div>
+          </div>
+          <!-- Regions Stats -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ tables_info.get('Regions', 0) }}</div>
+              <small class="text-muted">Regions</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4">
+          <!-- Technologies Stats -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ tables_info.get('Technologies', 0) }}</div>
+              <small class="text-muted">Technologies</small>
+            </div>
+          </div>
+          <!-- Productions Stats -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ tables_info.get('Productions', 0) }}</div>
+              <small class="text-muted">Active Productions</small>
+            </div>
+          </div>
+          <!-- Doctrines Stats -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ tables_info.get('Doctrines', 0) }}</div>
+              <small class="text-muted">Doctrines</small>
+            </div>
+          </div>
+          <!-- Game Management -->
+          <div class="col-md-3 mb-3">
+            <div class="table-card p-3 text-center">
+              <div class="stat-number">{{ current_date.year if current_date else 'N/A' }}</div>
+              <small class="text-muted">Current Game Year</small>
+            </div>
+          </div>
         </div>
       </div>
+    </div>
 
-      <!-- Main Content -->
-      <div class="col-md-9 col-lg-10 p-4">
-        <h1 class="mb-4">
-          <i class="bi bi-speedometer2"></i> Dashboard
-        </h1>
-
-        <!-- Flash Messages -->
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            {% for category, message in messages %}
-              <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
-                {{ message }}
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-              </div>
-            {% endfor %}
-          {% endif %}
-        {% endwith %}
-
-        <!-- Statistics Cards -->
-        <div class="row g-4">
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-flag display-4 text-primary"></i>
-              <div class="stat-number">{{ tables_info['Countries'] }}</div>
-              <h5>Countries</h5>
-              <a href="/countries" class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-eye"></i> View
+    <!-- Quick Actions -->
+    <div class="row">
+      <div class="col-md-6">
+        <div class="card">
+          <div class="card-header">
+            <h5><i class="bi bi-lightning-charge"></i> Quick Actions</h5>
+          </div>
+          <div class="card-body">
+            <div class="d-grid gap-2">
+              <a href="/countries/add" class="btn btn-primary">
+                <i class="bi bi-plus-lg"></i> Add New Country
               </a>
-            </div>
-          </div>
-
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-people display-4 text-success"></i>
-              <div class="stat-number">{{ tables_info['Governments'] }}</div>
-              <h5>Government Positions</h5>
-              <a href="/governments" class="btn btn-outline-success btn-sm">
-                <i class="bi bi-eye"></i> View
+              <a href="/structures/add" class="btn btn-success">
+                <i class="bi bi-building"></i> Add New Structure
               </a>
-            </div>
-          </div>
-
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-book display-4 text-purple"></i>
-              <div class="stat-number">{{ tables_info['Doctrines'] }}</div>
-              <h5>Doctrines</h5>
-              <a href="/doctrines" class="btn btn-outline-dark btn-sm">
-                <i class="bi bi-eye"></i> View
+              <a href="/technologies/add" class="btn btn-info">
+                <i class="bi bi-cpu"></i> Add New Technology
               </a>
-            </div>
-          </div>
-
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-map display-4 text-info"></i>
-              <div class="stat-number">{{ tables_info['Regions'] }}</div>
-              <h5>Regions</h5>
-              <a href="/regions" class="btn btn-outline-info btn-sm">
-                <i class="bi bi-eye"></i> View
+              <a href="/game-date/advance" class="btn btn-warning">
+                <i class="bi bi-skip-forward"></i> Advance Game Date
               </a>
-            </div>
-          </div>
-
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-building display-4 text-warning"></i>
-              <div class="stat-number">{{ tables_info['Structures'] }}</div>
-              <h5>Structures</h5>
-              <a href="/structures" class="btn btn-outline-warning btn-sm">
-                <i class="bi bi-eye"></i> View
-              </a>
-            </div>
-          </div>
-
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-cpu display-4 text-danger"></i>
-              <div class="stat-number">{{ tables_info['Technologies'] }}</div>
-              <h5>Technologies</h5>
-              <a href="/technologies" class="btn btn-outline-danger btn-sm">
-                <i class="bi bi-eye"></i> View
-              </a>
-            </div>
-          </div>
-
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-bag display-4 text-secondary"></i>
-              <div class="stat-number">{{ tables_info['Inventory'] }}</div>
-              <h5>Country Inventories</h5>
-              <a href="/inventory" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-eye"></i> View
-              </a>
-            </div>
-          </div>
-
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-graph-up display-4 text-muted"></i>
-              <div class="stat-number">{{ tables_info['Stats'] }}</div>
-              <h5>Statistics</h5>
-              <span class="badge bg-secondary">View Only</span>
-            </div>
-          </div>
-
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-link-45deg display-4 text-dark"></i>
-              <div class="stat-number">{{ tables_info['CountryTechnologies'] }}</div>
-              <h5>Country Tech Links</h5>
-              <span class="badge bg-secondary">View Only</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Structure System Tables -->
-        <div class="row mt-4">
-          <div class="col-12 mb-3">
-            <h4><i class="bi bi-building-gear text-primary"></i> Structure System</h4>
-          </div>
-
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-building-gear display-4 text-info"></i>
-              <div class="stat-number">{{ tables_info['StructureData'] }}</div>
-              <h5>Structure Data</h5>
-              <a href="/structure-data" class="btn btn-outline-info btn-sm">
-                <i class="bi bi-pencil"></i> Edit
-              </a>
-            </div>
-          </div>
-
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-graph-up display-4 text-success"></i>
-              <div class="stat-number">{{ tables_info['StructureRatios'] }}</div>
-              <h5>Structure Ratios</h5>
-              <a href="/structure-ratios" class="btn btn-outline-success btn-sm">
-                <i class="bi bi-pencil"></i> Edit
-              </a>
-            </div>
-          </div>
-
-          <div class="col-md-4">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-gear display-4 text-warning"></i>
-              <div class="stat-number">{{ tables_info['StructureProduction'] }}</div>
-              <h5>Structure Production</h5>
-              <a href="/structure-production" class="btn btn-outline-warning btn-sm">
-                <i class="bi bi-pencil"></i> Edit
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <!-- Technology System Tables -->
-        <div class="row mt-4">
-          <div class="col-12 mb-3">
-            <h4><i class="bi bi-cpu text-primary"></i> Technology System</h4>
-          </div>
-
-          <div class="col-md-3">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-list-ul display-4 text-primary"></i>
-              <div class="stat-number">{{ tables_info['TechnologyAttributes'] }}</div>
-              <h5>Tech Attributes</h5>
-              <a href="/technology-attributes" class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-pencil"></i> Edit
-              </a>
-            </div>
-          </div>
-
-          <div class="col-md-3">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-file-earmark-check display-4 text-info"></i>
-              <div class="stat-number">{{ tables_info['TechnologyLicenses'] }}</div>
-              <h5>Tech Licenses</h5>
-              <a href="/technology-licenses" class="btn btn-outline-info btn-sm">
-                <i class="bi bi-pencil"></i> Edit
-              </a>
-            </div>
-          </div>
-
-          <div class="col-md-3">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-box-seam display-4 text-success"></i>
-              <div class="stat-number">{{ tables_info['CountryTechInventory'] }}</div>
-              <h5>Country Tech Inventory</h5>
-              <a href="/country-tech-inventory" class="btn btn-outline-success btn-sm">
-                <i class="bi bi-pencil"></i> Edit
-              </a>
-            </div>
-          </div>
-
-          <div class="col-md-3">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-arrow-repeat display-4 text-warning"></i>
-              <div class="stat-number">{{ tables_info['CountryTechProduction'] }}</div>
-              <h5>Country Tech Production</h5>
-              <a href="/country-tech-production" class="btn btn-outline-warning btn-sm">
-                <i class="bi bi-pencil"></i> Edit
-              </a>
-            </div>
-          </div>
-        </div>
-
-        <!-- Relationship Tables -->
-        <div class="row mt-4">
-          <div class="col-12 mb-3">
-            <h4><i class="bi bi-link-45deg text-primary"></i> Relationships</h4>
-          </div>
-
-          <div class="col-md-6">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-book-half display-4 text-dark"></i>
-              <div class="stat-number">{{ tables_info['CountryDoctrines'] }}</div>
-              <h5>Country Doctrines</h5>
-              <a href="/country-doctrines" class="btn btn-outline-dark btn-sm">
-                <i class="bi bi-pencil"></i> Edit
-              </a>
-            </div>
-          </div>
-
-          <div class="col-md-6">
-            <div class="table-card p-4 text-center">
-              <i class="bi bi-people-fill display-4 text-secondary"></i>
-              <div class="stat-number">{{ tables_info['Users'] }}</div>
-              <h5>Admin Users</h5>
-              {% if current_user.is_admin %}
-              <a href="/users" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-pencil"></i> Manage
-              </a>
-              {% else %}
-              <span class="badge bg-secondary">Admin Only</span>
-              {% endif %}
             </div>
           </div>
         </div>
