@@ -190,7 +190,12 @@ starting_amounts = {
     "pol_points": db.get_setting("starting_amount_pol_points"),
     "diplo_points": db.get_setting("starting_amount_diplo_points"),
 }
-usefull_role_ids_dic = {"staff": db.get_setting("staff_role_id")}
+usefull_role_ids_dic = {
+    "staff": db.get_setting("staff_role_id"), 
+    "admin": db.get_setting("admin_role_id"),
+    "military_admin": 1260960074403151895
+}
+
 Erreurs = {
     "Erreur 1": "Le salon dans lequel vous effectuez la commande n'est pas le bon\n",
     "Erreur 2": "Aucun champ de recherche n'a été donné\n",
@@ -205,6 +210,9 @@ p_points_color_int = int("006AFF", 16)
 d_points_color_int = int("8b1bd1", 16)
 factory_color_int = int("6E472E", 16)
 all_color_int = int("00FF44", 16)
+
+# tech_channel_id = db.get_setting("tech_channel_id")
+tech_channel_id = 1397693210310213672 # Waiting to move it into settings db table
 
 ### DEBUG
 
@@ -1643,7 +1651,7 @@ class MultiFormView(discord.ui.View):
         # Create buttons in a single row
         for i in range(self.num_forms):
             button = discord.ui.Button(
-                label=f"Formulaire {i + 1}",
+                label=f"Partie {i + 1} / {self.num_forms}",
                 style=discord.ButtonStyle.green,
                 custom_id=f"form_{i}",
                 row=0,
@@ -1680,7 +1688,6 @@ class MultiFormView(discord.ui.View):
                 self.send_summary()
             )  # Utiliser create_task car on n'est pas dans async
 
-
     def all_forms_completed(self) -> bool:
         """Check if all forms have been completed."""
         return len(self.completed_forms) == self.num_forms
@@ -1695,25 +1702,66 @@ class MultiFormView(discord.ui.View):
 
         # Combine common and tech-specific fields for summary
         all_fields = self.common_config["forms"] + self.config["forms"]
+        dev_cost = db.get_tech_datas("dev_cost", "Non renseigné")
+        dev_time = db.get_tech_datas("dev_time", "Non renseigné")
+        prod_cost = db.get_tech_datas("prod_cost", "Non renseigné")
+        slots_taken = db.get_tech_datas("slots_taken", "Non renseigné")
 
         for key, value in self.form_data.items():
             label = next((f["label"] for f in all_fields if f["key"] == key), key)
             summary_lines.append(f"• **{label}** : {value or '*Non renseigné*'}")
 
+        summary_lines.append(f"**Coût de développement** : entre {dev_cost[0]} et {dev_cost[1]}")  # Assuming dev_cost is a tuple
+        summary_lines.append(f"**Temps de développement** : entre {dev_time[0]} et {dev_time[1]}")  # Assuming dev_time is a tuple
+        summary_lines.append(f"**Coût de production** : entre {prod_cost[0]} et {prod_cost[1]}")  # Assuming prod_cost is a tuple
+        summary_lines.append(f"**Slots occupés** : {slots_taken}")
+
         embed = discord.Embed(
-            title="🧪 Création terminée",
+            title="🧪 Résumé de votre technologie",
             description="\n".join(summary_lines),
             color=discord.Color.green(),
         )
         embed.set_image(url=self.image_url)
 
         await self.ctx.send(embed=embed)
+        
+        confirmed = await dUtils.ask_confirmation(self.ctx, self.ctx.author.id, "Souhaitez-vous créer cette technologie ?")
+        if confirmed:
+            await handle_new_tech(
+                self.ctx, self.tech_type, self.form_data, self.image_url
+            )
 
     async def on_timeout(self):
         """Disable all buttons when view times out."""
         for item in self.children:
             item.disabled = True
 
+async def handle_new_tech(ctx, tech_type: str, tech_datas: dict, image_url: str):
+    """Handle the creation of a new technology with the provided data."""
+
+    # Validate tech type
+    if tech_type not in TechFormData.TECH_CONFIGS:
+        valid_types = ", ".join(TechFormData.TECH_CONFIGS.keys())
+        return await ctx.send(f"Type de technologie invalide. Choisissez parmi : {valid_types}")
+    
+    country = CountryEntity(ctx.author, ctx.guild).to_dict()
+    if not country.get("id"):
+        return await ctx.send("Vous devez être dans un pays pour créer une technologie.")
+
+
+    # Prepare the technology data
+    tech_data = {
+        "type": tech_type,
+        "name": tech_datas.get("name"),
+        "level": int(tech_datas.get("level", 1)),
+        "inspiration": tech_datas.get("inspiration", ""),
+        "image_url": image_url,
+    }
+
+    # Save to database (pseudo-code, replace with actual DB logic)
+    # db.save_technology(tech_data)
+
+    await ctx.send(f"Technologie `{tech_data['name']}` de type `{tech_type}` créée avec succès!")
 
 @bot.command(
     name="test_multi_form",
@@ -1837,7 +1885,6 @@ async def create_tech(
             ctx,
             f"Bienvenue dans le programme de création de technologies!\nQuel type de technologie voulez-vous créer? ({'/'.join(valid_types)})",
         )
-
     image_url_finale = None
     if ctx.message.attachments:
         image_url_finale = ctx.message.attachments[0].url
