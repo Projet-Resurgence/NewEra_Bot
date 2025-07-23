@@ -178,11 +178,40 @@ class Structures(commands.Cog):
         brief="Vend une structure spécifique.",
         usage="sell_structure <structure_id>",
         description="Vend une structure par son ID et récupère de l'argent.",
+        help="""Vend une structure appartenant à votre pays et récupère 50% de sa valeur de construction.
+
+        FONCTIONNALITÉ :
+        - Vend une structure spécifique par son ID
+        - Récupère 50% du coût de construction original
+        - Supprime définitivement la structure de votre inventaire
+        - Libère l'espace dans la région
+
+        RESTRICTIONS :
+        - La structure doit vous appartenir
+        - Vous devez connaître l'ID exact de la structure
+        - Les structures en production pourraient être affectées
+
+        ARGUMENTS :
+        - `<structure_id>` : ID numérique de la structure à vendre
+
+        EXEMPLE :
+        - `sell_structure 1234` : Vend la structure avec l'ID 1234
+        
+        CONSEIL :
+        - Utilisez `structure_info <id>` pour vérifier les détails avant la vente
+        - Utilisez `structures` pour voir toutes vos structures et leurs IDs
+        """,
         hidden=False,
         enabled=True,
         case_insensitive=True,
     )
-    async def sell_structure(self, ctx, structure_id: int):
+    async def sell_structure(
+        self,
+        ctx,
+        structure_id: int = commands.parameter(
+            description="ID de la structure à vendre"
+        ),
+    ):
         country = CountryEntity(ctx.author, ctx.guild).to_dict()
 
         if not country or not country.get("id"):
@@ -235,12 +264,46 @@ class Structures(commands.Cog):
         brief="Affiche les structures d'un utilisateur.",
         usage="structures [type] [user]",
         description="Affiche les structures d'un utilisateur par type.",
+        help="""Affiche un résumé détaillé de toutes les structures ou d'un type spécifique.
+
+        FONCTIONNALITÉ :
+        - Affiche toutes les structures ou filtré par type
+        - Groupe par type, spécialisation et niveau
+        - Montre les quantités, capacités totales et régions
+        - Permet de consulter les structures d'autres utilisateurs
+
+        TYPES DE STRUCTURES :
+        - `Usine` : Production industrielle
+        - `Base` : Infrastructure militaire
+        - `Ecole` : Formation et éducation
+        - `Logement` : Capacité de population
+        - `Centrale` : Production d'énergie
+        - `Technocentre` : Recherche et développement
+
+        ARGUMENTS :
+        - `[type]` : Optionnel. Type de structure spécifique ou 'all' (par défaut)
+        - `[user]` : Optionnel. Utilisateur dont voir les structures (vous par défaut)
+
+        EXEMPLE :
+        - `structures` : Affiche toutes vos structures
+        - `structures Usine` : Affiche seulement vos usines
+        - `structures all @utilisateur` : Affiche toutes les structures de l'utilisateur
+        """,
         hidden=False,
         enabled=True,
         case_insensitive=True,
     )
     async def structures(
-        self, ctx, structure_type: str = "all", user: discord.Member = None
+        self,
+        ctx,
+        structure_type: str = commands.parameter(
+            default="all",
+            description="Type de structure à afficher (Usine, Base, Ecole, Logement, Centrale, Technocentre, ou 'all')",
+        ),
+        user: discord.Member = commands.parameter(
+            default=None,
+            description="Utilisateur dont afficher les structures (optionnel, vous par défaut)",
+        ),
     ):
         if user is None:
             user = ctx.author
@@ -346,9 +409,43 @@ class Structures(commands.Cog):
         brief="Affiche les détails d'une structure spécifique.",
         usage="structure_info <structure_id>",
         description="Affiche les informations détaillées d'une structure incluant la capacité de production.",
+        help="""Affiche les informations complètes d'une structure spécifique.
+
+        FONCTIONNALITÉ :
+        - Montre tous les détails de la structure (type, spécialisation, niveau)
+        - Affiche l'emplacement (région) de la structure
+        - Indique la capacité et la population actuelle
+        - Pour les usines : détails des slots de production utilisés/disponibles
+
+        INFORMATIONS AFFICHÉES :
+        - Type et spécialisation de la structure
+        - Niveau de la structure (1-7)
+        - Région d'implantation
+        - Capacité maximale et population actuelle
+        - Slots de production (pour les usines uniquement)
+
+        RESTRICTIONS :
+        - La structure doit vous appartenir
+        - Vous devez fournir l'ID exact de la structure
+
+        ARGUMENTS :
+        - `<structure_id>` : ID numérique de la structure à examiner
+
+        EXEMPLE :
+        - `structure_info 1234` : Affiche les détails de la structure ID 1234
+        
+        CONSEIL :
+        - Utilisez `structures` pour obtenir les IDs de vos structures
+        """,
         case_insensitive=True,
     )
-    async def structure_info(self, ctx, structure_id: int):
+    async def structure_info(
+        self,
+        ctx,
+        structure_id: int = commands.parameter(
+            description="ID de la structure dont afficher les informations"
+        ),
+    ):
         country = CountryEntity(ctx.author, ctx.guild).to_dict()
 
         if not country or not country.get("id"):
@@ -415,6 +512,45 @@ class Structures(commands.Cog):
         brief="Ajoute des structures à un pays (Staff seulement).",
         usage="add_structure <country> <type> <specialization> <level> <amount> <region_id>",
         description="Ajoute des structures à l'inventaire d'un pays.",
+        help="""Ajoute des structures à un pays sans frais de construction (commande staff).
+
+        FONCTIONNALITÉ :
+        - Ajoute instantanément des structures à un pays
+        - Aucun coût de construction appliqué
+        - Validations automatiques des paramètres
+        - Enregistrement automatique dans la base de données
+
+        TYPES DISPONIBLES :
+        - `Usine` : Production industrielle
+        - `Base` : Infrastructure militaire  
+        - `Ecole` : Formation et éducation
+        - `Logement` : Capacité de population
+        - `Centrale` : Production d'énergie
+        - `Technocentre` : Recherche et développement
+
+        SPÉCIALISATIONS :
+        - `Terrestre` : Opérations terrestres
+        - `Aerienne` : Opérations aériennes
+        - `Navale` : Opérations navales
+        - `NA` : Non applicable / générique
+
+        RESTRICTIONS :
+        - Réservé aux membres du staff uniquement
+        - Niveau doit être entre 1 et 7
+        - Quantité doit être positive
+        - La région doit exister
+
+        ARGUMENTS :
+        - `<country>` : Pays destinataire (mention, nom ou ID)
+        - `<type>` : Type de structure
+        - `<specialization>` : Spécialisation de la structure
+        - `<level>` : Niveau des structures (1-7)
+        - `<amount>` : Nombre de structures à ajouter
+        - `<region_id>` : ID de la région où placer les structures
+
+        EXEMPLE :
+        - `add_structure @France Usine Terrestre 5 3 42` : Ajoute 3 usines terrestres niveau 5 à la France dans la région 42
+        """,
         hidden=False,
         enabled=True,
         case_insensitive=True,
@@ -422,12 +558,20 @@ class Structures(commands.Cog):
     async def add_structure(
         self,
         ctx,
-        target_country: CountryConverter,
-        structure_type: str,
-        specialization: str,
-        level: int,
-        amount: int,
-        region_id: int,
+        target_country: CountryConverter = commands.parameter(
+            description="Pays destinataire des structures"
+        ),
+        structure_type: str = commands.parameter(
+            description="Type de structure (Usine, Base, Ecole, Logement, Centrale, Technocentre)"
+        ),
+        specialization: str = commands.parameter(
+            description="Spécialisation (Terrestre, Aerienne, Navale, NA)"
+        ),
+        level: int = commands.parameter(description="Niveau des structures (1-7)"),
+        amount: int = commands.parameter(description="Nombre de structures à ajouter"),
+        region_id: int = commands.parameter(
+            description="ID de la région où placer les structures"
+        ),
     ):
         if not self.dUtils.is_authorized(ctx):
             embed = discord.Embed(
@@ -503,11 +647,47 @@ class Structures(commands.Cog):
         brief="Retire une structure par son ID (Staff seulement).",
         usage="remove_structure <structure_id>",
         description="Retire une structure spécifique par son ID.",
+        help="""Supprime définitivement une structure par son ID (commande staff).
+
+        FONCTIONNALITÉ :
+        - Supprime instantanément une structure du jeu
+        - Suppression permanente et irréversible
+        - Recherche automatique de la structure dans toutes les régions
+        - Confirmation des détails avant suppression
+
+        UTILISATION :
+        - Correction d'erreurs de construction
+        - Équilibrage du jeu
+        - Maintenance administrative
+        - Résolution de problèmes techniques
+
+        RESTRICTIONS :
+        - Réservé aux membres du staff uniquement
+        - Suppression définitive (aucun remboursement)
+        - L'ID doit correspondre à une structure existante
+
+        ARGUMENTS :
+        - `<structure_id>` : ID numérique de la structure à supprimer
+
+        EXEMPLE :
+        - `remove_structure 1234` : Supprime la structure avec l'ID 1234
+        
+        ATTENTION :
+        - Cette action est irréversible
+        - Vérifiez l'ID avant d'exécuter la commande
+        - Les productions en cours peuvent être affectées
+        """,
         hidden=False,
         enabled=True,
         case_insensitive=True,
     )
-    async def remove_structure(self, ctx, structure_id: int):
+    async def remove_structure(
+        self,
+        ctx,
+        structure_id: int = commands.parameter(
+            description="ID de la structure à supprimer"
+        ),
+    ):
         if not self.dUtils.is_authorized(ctx):
             embed = discord.Embed(
                 title="❌ Non autorisé",
@@ -574,9 +754,45 @@ class Structures(commands.Cog):
         brief="Affiche les coûts de construction des structures.",
         usage="structure_costs [type]",
         description="Affiche les coûts de construction pour tous les types de structures ou un type spécifique.",
+        help="""Affiche un tableau détaillé des coûts de construction pour les structures.
+
+        FONCTIONNALITÉ :
+        - Affiche les coûts par niveau pour chaque type de structure
+        - Permet de consulter tous les types ou un type spécifique
+        - Aide à planifier les budgets de construction
+        - Référence complète des prix du jeu
+
+        INFORMATIONS AFFICHÉES :
+        - Coût par niveau (1-7) pour chaque type
+        - Progression des prix selon le niveau
+        - Formatage monétaire pour faciliter la lecture
+
+        TYPES DISPONIBLES :
+        - `Usine` : Structures de production industrielle
+        - `Base` : Infrastructure militaire
+        - `Ecole` : Établissements d'éducation
+        - `Logement` : Structures résidentielles
+        - `Centrale` : Centrales électriques
+        - `Technocentre` : Centres de recherche
+
+        ARGUMENTS :
+        - `[type]` : Optionnel. Type spécifique ou 'all' pour tous les types
+
+        EXEMPLE :
+        - `structure_costs` : Affiche tous les coûts de construction
+        - `structure_costs Usine` : Affiche uniquement les coûts des usines
+        - `structure_costs Base` : Affiche uniquement les coûts des bases
+        """,
         case_insensitive=True,
     )
-    async def structure_costs(self, ctx, structure_type: str = "all"):
+    async def structure_costs(
+        self,
+        ctx,
+        structure_type: str = commands.parameter(
+            default="all",
+            description="Type de structure dont afficher les coûts (ou 'all' pour tous)",
+        ),
+    ):
         valid_types = ["Usine", "Base", "Ecole", "Logement", "Centrale", "Technocentre"]
 
         if structure_type != "all" and structure_type not in valid_types:

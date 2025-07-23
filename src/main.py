@@ -235,14 +235,78 @@ async def before():
 ###
 
 
-@bot.command()
+@bot.command(
+    name="resume_rp",
+    brief="Relance le temps RP après une pause (Admin uniquement).",
+    usage="resume_rp",
+    description="Relance le compteur de temps du roleplay après une pause administrative.",
+    help="""Relance le système de temps du roleplay après une pause.
+
+    FONCTIONNALITÉ :
+    - Réactive le compteur de temps RP
+    - Met fin à l'état de pause du jeu
+    - Permet la reprise des activités temporelles
+    - Confirme la réactivation via un message
+
+    UTILISATION :
+    - Reprise après maintenance
+    - Fin d'une pause administrative
+    - Résolution de problèmes techniques
+
+    RESTRICTIONS :
+    - Réservé aux administrateurs uniquement
+    - Ne fonctionne que si le jeu est en pause
+
+    ARGUMENTS :
+    - Aucun argument requis
+
+    EXEMPLE :
+    - `resume_rp` : Relance le temps RP
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
 @commands.has_permissions(administrator=True)
 async def resume_rp(ctx):
     db.set_paused(False)
     await ctx.send("✅ Le temps RP a été relancé !")
 
 
-@bot.command()
+@bot.command(
+    name="date",
+    brief="Affiche la date actuelle du jeu RP.",
+    usage="date",
+    description="Consulte la date et le temps actuel dans l'univers du roleplay.",
+    help="""Affiche la date actuelle du roleplay avec les informations temporelles complètes.
+
+    FONCTIONNALITÉ :
+    - Affiche l'année, le mois et le jour RP actuels
+    - Indique l'état du système de temps (actif/en pause)
+    - Utilise le calendrier français pour l'affichage
+    - Montre la progression dans le mois actuel
+
+    INFORMATIONS AFFICHÉES :
+    - Année en cours du RP
+    - Mois en français (avec accentuation)
+    - Jour du mois (playday)
+    - État du système temporel
+
+    UTILISATION :
+    - Vérification du timing pour les actions
+    - Planification d'événements RP
+    - Synchronisation des joueurs
+
+    ARGUMENTS :
+    - Aucun argument requis
+
+    EXEMPLE :
+    - `date` : Affiche "Nous sommes le 15 Mars 2045"
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
 async def date(ctx):
     """Affiche la date actuelle du jeu."""
     if db.is_paused():
@@ -901,8 +965,46 @@ def get_query_level(user_id):
     return "user"
 
 
-@bot.command()
-async def brief_chat_til(ctx, user_message: discord.Message):
+@bot.command(
+    name="brief_chat_til",
+    brief="Résume la situation RP actuelle d'un salon (Staff uniquement).",
+    usage="brief_chat_til <message>",
+    description="Génère un résumé IA de la situation géopolitique dans un salon Discord.",
+    help="""Utilise l'IA pour résumer la situation géopolitique actuelle dans un salon.
+
+    FONCTIONNALITÉ :
+    - Analyse les messages récents du salon spécifié
+    - Génère un résumé intelligent avec l'IA Groq
+    - Se concentre sur les aspects géopolitiques et RP
+    - Fournit un contexte synthétique de la situation
+
+    UTILISATION :
+    - Mise à jour rapide sur une situation
+    - Briefing pour nouveaux participants
+    - Synthèse d'événements complexes
+    - Support administratif pour le suivi RP
+
+    RESTRICTIONS :
+    - Réservé aux membres du staff uniquement
+    - Nécessite l'accès aux API externes
+    - Limité par la disponibilité de l'IA
+
+    ARGUMENTS :
+    - `<message>` : Message du salon à analyser pour le contexte
+
+    EXEMPLE :
+    - `brief_chat_til <ID_message>` : Résume la situation à partir de ce message
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
+async def brief_chat_til(
+    ctx,
+    user_message: discord.Message = commands.parameter(
+        description="Message du salon à analyser pour générer le résumé"
+    ),
+):
     """Résumer la situation actuelle du RP dans un salon."""
     if not dUtils.is_authorized(ctx):
         return await ctx.send(embed=dUtils.get_auth_embed())
@@ -930,8 +1032,50 @@ async def brief_chat_til(ctx, user_message: discord.Message):
         await user_message.channel.send(f"Erreur lors de la synthèse : {e}")
 
 
-@bot.command()
-async def ask_rp_questions(ctx, question, user_message: discord.Message):
+@bot.command(
+    name="ask_rp_questions",
+    brief="Pose une question IA sur la situation RP d'un salon (Staff uniquement).",
+    usage="ask_rp_questions <question> <message>",
+    description="Utilise l'IA pour répondre à une question spécifique sur la situation géopolitique.",
+    help="""Pose une question spécifique à l'IA sur la situation géopolitique d'un salon.
+
+    FONCTIONNALITÉ :
+    - Analyse le contexte du salon spécifié
+    - Répond à votre question avec l'IA Groq
+    - Se base sur les messages récents pour le contexte
+    - Fournit des réponses ciblées et pertinentes
+
+    TYPES DE QUESTIONS POSSIBLES :
+    - "Quels sont les principaux enjeux actuels ?"
+    - "Qui sont les acteurs clés dans cette situation ?"
+    - "Quelle est la position de [pays] ?"
+    - "Y a-t-il des tensions diplomatiques ?"
+
+    RESTRICTIONS :
+    - Réservé aux membres du staff uniquement
+    - Nécessite l'accès aux API externes
+    - Qualité dépendante du contexte disponible
+
+    ARGUMENTS :
+    - `<question>` : Votre question sur la situation RP
+    - `<message>` : Message du salon pour le contexte
+
+    EXEMPLE :
+    - `ask_rp_questions "Quelle est la situation militaire ?" <ID_message>`
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
+async def ask_rp_questions(
+    ctx,
+    question: str = commands.parameter(
+        description="Question à poser sur la situation RP"
+    ),
+    user_message: discord.Message = commands.parameter(
+        description="Message du salon pour fournir le contexte"
+    ),
+):
     """Résumer la situation actuelle du RP dans un salon."""
     if not dUtils.is_authorized(ctx):
         return await ctx.send(embed=dUtils.get_auth_embed())
@@ -965,8 +1109,50 @@ async def ask_rp_questions(ctx, question, user_message: discord.Message):
         await user_message.channel.send(f"Erreur lors de la synthèse : {e}")
 
 
-@bot.command()
-async def check_for_role_exclusive_overwrites(ctx, role: discord.Role):
+@bot.command(
+    name="check_for_role_exclusive_overwrites",
+    brief="Vérifie les permissions spécifiques d'un rôle (Staff uniquement).",
+    usage="check_for_role_exclusive_overwrites <role>",
+    description="Analyse les permissions spécifiques d'un rôle dans tous les salons du serveur.",
+    help="""Vérifie où un rôle a des permissions spécifiquement définies dans le serveur.
+
+    FONCTIONNALITÉ :
+    - Scanne tous les salons du serveur
+    - Identifie les permissions explicitement définies pour le rôle
+    - Liste les salons avec des overrides de permissions
+    - Aide au diagnostic des problèmes de permissions
+
+    UTILISATION :
+    - Audit de sécurité des permissions
+    - Diagnostic de problèmes d'accès
+    - Vérification de la configuration des rôles
+    - Maintenance administrative
+
+    INFORMATIONS AFFICHÉES :
+    - Liste des salons avec permissions spécifiques
+    - Indication des overrides existants
+    - Récapitulatif des permissions personnalisées
+
+    RESTRICTIONS :
+    - Réservé aux membres du staff uniquement
+    - Nécessite les permissions d'administration
+
+    ARGUMENTS :
+    - `<role>` : Rôle à analyser (mention ou nom)
+
+    EXEMPLE :
+    - `check_for_role_exclusive_overwrites @Moderateur`
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
+async def check_for_role_exclusive_overwrites(
+    ctx,
+    role: discord.Role = commands.parameter(
+        description="Rôle dont vérifier les permissions spécifiques"
+    ),
+):
     """Vérifie si le rôle a des permissions définies dans des salons spécifiques."""
     if not dUtils.is_authorized(ctx):
         return await ctx.send(embed=dUtils.get_auth_embed())
@@ -1294,5 +1480,53 @@ async def set_public_units(ctx, country: CountryConverter, unit_type: str, qty: 
         f"Les unités publiques de {country.get('name')} pour {unit_type} ont été définies à {qty}."
     )
 
+@bot.command()
+async def program_ghostping(ctx, target: Union[discord.Member, discord.Role], waiting : int = 5):
+    """
+    Programme un ghost ping sur un membre ou un rôle.
+
+    Args:
+        ctx (commands.Context): Le contexte de la commande.
+        target (Union[discord.Member, discord.Role]): Le membre ou le rôle à ghost pinger.
+        waiting (int): Temps d'attente en secondes avant le ghost ping (par défaut 5).
+
+    Returns:
+        None
+    """
+    if not dUtils.is_authorized(ctx):
+        return await ctx.send(embed=dUtils.get_auth_embed())
+    
+    await ctx.message.delete()  # Supprimer la commande pour éviter le spam
+    message = await ctx.send(f"Ghost ping programmé pour {target.name} dans {waiting} secondes.")
+    await asyncio.sleep(2)  # Laisser le temps à l'utilisateur de lire le message
+    await message.delete()  # Supprimer le message de confirmation
+    await asyncio.sleep(waiting)
+    message = await ctx.send(f"{target.mention}")
+    await asyncio.sleep(2)
+    await message.delete()  # Supprimer le message de ghost ping
+
+@bot.command()
+async def annex(ctx, region_id):
+    return
+
+@bot.command()
+async def add_player_to_country(ctx, user: discord.Member, country: CountryConverter):
+    return
+
+@bot.command()
+async def remove_player_from_country(ctx, user: discord.Member, country: CountryConverter):
+    return
+
+@bot.command()
+async def add_region(ctx, region_name: str, map_name: str, population: int, country: CountryConverter = None):
+    return
+
+@bot.command()
+async def remove_region(ctx, region_id: int):
+    return
+
+@bot.command()
+async def set_region_data(ctx, region_id: int, key: str, value: str):
+    return
 
 bot.run(token)

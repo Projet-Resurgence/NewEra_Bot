@@ -103,12 +103,12 @@ class Economy(commands.Cog):
         case_insensitive=True,
     )
     async def balance(
-        self, 
-        ctx, 
+        self,
+        ctx,
         country: CountryConverter = commands.parameter(
             default=None,
-            description="Pays dont afficher le solde (optionnel, votre pays par défaut)"
-        )
+            description="Pays dont afficher le solde (optionnel, votre pays par défaut)",
+        ),
     ):
         """Check the balance of a country or user."""
         if not country:
@@ -163,12 +163,12 @@ class Economy(commands.Cog):
         case_insensitive=True,
     )
     async def money_alias(
-        self, 
-        ctx, 
+        self,
+        ctx,
         country: CountryConverter = commands.parameter(
             default=None,
-            description="Pays dont afficher le solde (optionnel, votre pays par défaut)"
-        )
+            description="Pays dont afficher le solde (optionnel, votre pays par défaut)",
+        ),
     ):
         """Alias for the balance command."""
         await self.balance(ctx, country)
@@ -209,14 +209,14 @@ class Economy(commands.Cog):
         case_insensitive=True,
     )
     async def give_money(
-        self, 
-        ctx, 
+        self,
+        ctx,
         country: CountryConverter = commands.parameter(
             description="Pays qui recevra l'argent (mention, nom ou ID)"
-        ), 
+        ),
         amount: Union[int, str] = commands.parameter(
             description="Montant à transférer (nombre, pourcentage comme '50%', ou 'all'/'half')"
-        )
+        ),
     ):
         """Give money to another country."""
         author = CountryEntity(ctx.author, ctx.guild).to_dict()
@@ -290,14 +290,14 @@ class Economy(commands.Cog):
         case_insensitive=True,
     )
     async def add_money(
-        self, 
-        ctx, 
+        self,
+        ctx,
         country: CountryConverter = commands.parameter(
             description="Pays qui recevra l'argent (mention, nom ou ID)"
-        ), 
+        ),
         amount: int = commands.parameter(
             description="Montant d'argent à ajouter (nombre positif)"
-        )
+        ),
     ):
         """Add money to a country (Staff only)."""
         if not country:
@@ -372,14 +372,14 @@ class Economy(commands.Cog):
         case_insensitive=True,
     )
     async def remove_money(
-        self, 
-        ctx, 
+        self,
+        ctx,
         country: CountryConverter = commands.parameter(
             description="Pays dont retirer l'argent (mention, nom ou ID)"
-        ), 
+        ),
         amount: Union[int, str] = commands.parameter(
             description="Montant à retirer (nombre, pourcentage comme '25%', ou 'all'/'half')"
-        )
+        ),
     ):
         """Remove money from a country (Staff only)."""
         if not self.dUtils.is_authorized(ctx):
@@ -462,14 +462,14 @@ class Economy(commands.Cog):
         case_insensitive=True,
     )
     async def set_money(
-        self, 
-        ctx, 
+        self,
+        ctx,
         country: CountryConverter = commands.parameter(
             description="Pays dont définir le solde (mention, nom ou ID)"
-        ), 
+        ),
         amount: int = commands.parameter(
             description="Nouveau solde à définir (nombre positif)"
-        )
+        ),
     ):
         """Set money for a country (Staff only)."""
         if not self.dUtils.is_authorized(ctx):
@@ -536,11 +536,11 @@ class Economy(commands.Cog):
         case_insensitive=True,
     )
     async def pay(
-        self, 
-        ctx, 
+        self,
+        ctx,
         amount: Union[int, str] = commands.parameter(
             description="Montant à payer au bot (nombre, pourcentage comme '15%', ou 'all'/'half')"
-        )
+        ),
     ):
         """Pay money to the bot."""
         country = CountryEntity(ctx.author, ctx.guild).to_dict()

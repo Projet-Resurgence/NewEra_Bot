@@ -12,7 +12,7 @@ from shared_utils import (
     amount_converter,
     ERROR_COLOR_INT,
     P_POINTS_COLOR_INT,
-    D_POINTS_COLOR_INT
+    D_POINTS_COLOR_INT,
 )
 
 
@@ -283,7 +283,9 @@ class Points(commands.Cog):
                 description=f"{emoji} {cible_nom} a **{balance} points**.",
                 color=color,
             )
-            embed.set_footer(text=f"Classement: {self.db.get_leads(lead_type, cible_id)}")
+            embed.set_footer(
+                text=f"Classement: {self.db.get_leads(lead_type, cible_id)}"
+            )
 
         await ctx.send(embed=embed)
 
@@ -385,14 +387,14 @@ class Points(commands.Cog):
         case_insensitive=True,
     )
     async def remove_pp(
-        self, 
-        ctx, 
+        self,
+        ctx,
         cible: CountryConverter = commands.parameter(
             description="Pays dont retirer les points politiques (mention, nom ou ID)"
-        ), 
+        ),
         amount: Union[int, str] = commands.parameter(
             description="Montant à retirer (nombre, pourcentage comme '25%', ou 'all'/'half')"
-        )
+        ),
     ):
         """Remove political points from a country (Staff only)."""
         await self._remove_points_generic(
@@ -436,14 +438,14 @@ class Points(commands.Cog):
         case_insensitive=True,
     )
     async def remove_pd(
-        self, 
-        ctx, 
+        self,
+        ctx,
         cible: CountryConverter = commands.parameter(
             description="Pays dont retirer les points diplomatiques (mention, nom ou ID)"
-        ), 
+        ),
         amount: Union[int, str] = commands.parameter(
             description="Montant à retirer (nombre, pourcentage comme '30%', ou 'all'/'half')"
-        )
+        ),
     ):
         """Remove diplomatic points from a country (Staff only)."""
         await self._remove_points_generic(
@@ -480,12 +482,12 @@ class Points(commands.Cog):
         case_insensitive=True,
     )
     async def points_p(
-        self, 
-        ctx, 
+        self,
+        ctx,
         cible: CountryConverter = commands.parameter(
             default=None,
-            description="Pays dont afficher les points politiques (optionnel, votre pays par défaut)"
-        )
+            description="Pays dont afficher les points politiques (optionnel, votre pays par défaut)",
+        ),
     ):
         """Check political points of a country or user."""
         if cible is None:
@@ -525,12 +527,12 @@ class Points(commands.Cog):
         case_insensitive=True,
     )
     async def points_d(
-        self, 
-        ctx, 
+        self,
+        ctx,
         cible: CountryConverter = commands.parameter(
             default=None,
-            description="Pays dont afficher les points diplomatiques (optionnel, votre pays par défaut)"
-        )
+            description="Pays dont afficher les points diplomatiques (optionnel, votre pays par défaut)",
+        ),
     ):
         """Check diplomatic points of a country or user."""
         if cible is None:
@@ -570,14 +572,14 @@ class Points(commands.Cog):
         case_insensitive=True,
     )
     async def set_pp(
-        self, 
-        ctx, 
+        self,
+        ctx,
         cible: CountryConverter = commands.parameter(
             description="Pays dont définir les points politiques (mention, nom ou ID)"
-        ), 
+        ),
         amount: int = commands.parameter(
             description="Nouveaux points politiques à définir (nombre positif)"
-        )
+        ),
     ):
         """Set political points for a country (Staff only)."""
         await self._set_points_generic(
@@ -615,14 +617,14 @@ class Points(commands.Cog):
         case_insensitive=True,
     )
     async def set_pd(
-        self, 
-        ctx, 
+        self,
+        ctx,
         cible: CountryConverter = commands.parameter(
             description="Pays dont définir les points diplomatiques (mention, nom ou ID)"
-        ), 
+        ),
         amount: int = commands.parameter(
             description="Nouveaux points diplomatiques à définir (nombre positif)"
-        )
+        ),
     ):
         """Set diplomatic points for a country (Staff only)."""
         await self._set_points_generic(
@@ -663,14 +665,14 @@ class Points(commands.Cog):
         case_insensitive=True,
     )
     async def add_pp(
-        self, 
-        ctx, 
+        self,
+        ctx,
         cible: CountryConverter = commands.parameter(
             description="Pays qui recevra les points politiques (mention, nom ou ID)"
-        ), 
+        ),
         amount: int = commands.parameter(
             description="Montant de points politiques à ajouter (nombre positif)"
-        )
+        ),
     ):
         """Add political points to a country (Staff only)."""
         await self._add_points_generic(
@@ -711,14 +713,14 @@ class Points(commands.Cog):
         case_insensitive=True,
     )
     async def add_pd(
-        self, 
-        ctx, 
+        self,
+        ctx,
         cible: CountryConverter = commands.parameter(
             description="Pays qui recevra les points diplomatiques (mention, nom ou ID)"
-        ), 
+        ),
         amount: int = commands.parameter(
             description="Montant de points diplomatiques à ajouter (nombre positif)"
-        )
+        ),
     ):
         """Add diplomatic points to a country (Staff only)."""
         await self._add_points_generic(
@@ -761,12 +763,11 @@ class Points(commands.Cog):
         case_insensitive=True,
     )
     async def use_pp(
-        self, 
-        ctx, 
+        self,
+        ctx,
         amount: int = commands.parameter(
-            default=1,
-            description="Nombre de points politiques à utiliser (défaut : 1)"
-        )
+            default=1, description="Nombre de points politiques à utiliser (défaut : 1)"
+        ),
     ):
         """Use political points."""
         country = CountryEntity(ctx.author, ctx.guild).to_dict()
@@ -849,12 +850,12 @@ class Points(commands.Cog):
         case_insensitive=True,
     )
     async def use_pd(
-        self, 
-        ctx, 
+        self,
+        ctx,
         amount: int = commands.parameter(
             default=1,
-            description="Nombre de points diplomatiques à utiliser (défaut : 1)"
-        )
+            description="Nombre de points diplomatiques à utiliser (défaut : 1)",
+        ),
     ):
         """Use diplomatic points."""
         country = CountryEntity(ctx.author, ctx.guild).to_dict()
