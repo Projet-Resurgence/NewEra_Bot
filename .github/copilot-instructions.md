@@ -25,7 +25,7 @@ from shared_utils import (
 def __init__(self, bot):
     self.bot = bot
     self.db = get_db()
-    self.dUtils = get_discord_utils(bot)
+    self.dUtils = get_discord_utils(bot, self.db)
 ```
 
 **Never** import `db` or `discord_utils` directly. Always use the centralized getter functions.
@@ -49,7 +49,7 @@ class NewCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = get_db()
-        self.dUtils = get_discord_utils(bot)
+        self.dUtils = get_discord_utils(bot, self.db)
     
     @commands.command()
     async def example_command(self, ctx):

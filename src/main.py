@@ -64,8 +64,11 @@ groq_api_key = dotenv_values(".env")["GROQ_API_KEY"]
 notion_token = dotenv_values(".env")["NOTION_TOKEN"]
 
 _orig_print = print
+
+
 def print(*args, **kwargs):
     _orig_print(*args, flush=True, **kwargs)
+
 
 intents = discord.Intents().all()
 bot = commands.Bot(
@@ -73,10 +76,10 @@ bot = commands.Bot(
     activity=discord.Game(name="Aider le staff!"),
     command_prefix=[".", "/"],
 )
-bi_admins_id = []
 usefull_role_ids_dic = {}
 groq_client = Groq(api_key=groq_api_key)
 last_groq_query_time = datetime.now(timezone.utc)
+
 
 async def load_cogs():
     """Load all cogs for the bot."""
@@ -118,6 +121,7 @@ async def load_cogs():
 
         traceback.print_exc()
 
+
 @bot.event
 async def on_ready():
     """Event triggered when the bot is ready."""
@@ -128,11 +132,10 @@ async def on_ready():
     polling_notion.start()
     update_rp_date.start()
 
+
 rmbg = RemoveBg(removebg_apikey, "error.log")
 
 duration_in_seconds = 0
-starting_amounts = {}
-continents_dict = {}
 groq_chat_history = []
 
 code_list = []
@@ -154,11 +157,7 @@ with open("datas/main.json") as f:
     bat_types = json_data["bat_types"]
     query_types = json_data["query_types"]
     bi_admins_id = json_data["bi_admins_id"]
-    Erreurs = json_data["Erreurs"]
-    continents_dict = json_data["continents_dict"]
     code_list = json_data["code_list"]
-    starting_amounts = json_data["starting_amounts"]
-    usefull_role_ids_dic = json_data["usefull_role_ids_dic"]
     buildQuality = json_data["buildQuality"]
     bat_buffs = json_data["bat_buffs"]
     unit_types = json_data["unit_types"]
@@ -166,7 +165,7 @@ with open("datas/main.json") as f:
 usefulDatas = UsefulDatas(bat_types, bat_buffs)
 
 # Initialize utilities early for debug_init
-initialize_utilities(bot)
+initialize_utilities(bot, bat_types, bat_buffs)
 db = get_db()
 db.init_settings()
 db.init_inventory_pricings()
@@ -212,6 +211,7 @@ db.debug_init()
 
 # --- Task de polling ---
 
+
 @tasks.loop(seconds=POLLING_INTERVAL)
 async def polling_notion():
     try:
@@ -219,24 +219,29 @@ async def polling_notion():
     except Exception as e:
         print(f"Erreur lors du polling Notion: {e}")
 
+
 @tasks.loop(minutes=1)
 async def update_rp_date():
     now = datetime.now(pytz.timezone("Europe/Paris"))  # ou "UTC"
-    if (now.hour == 7 and now.minute == 0):
+    if now.hour == 7 and now.minute == 0:
         await db.advance_playday()
+
 
 @update_rp_date.before_loop
 async def before():
     await bot.wait_until_ready()
 
+
 ###
+
 
 @bot.command()
 @commands.has_permissions(administrator=True)
 async def resume_rp(ctx):
     db.set_paused(False)
     await ctx.send("✅ Le temps RP a été relancé !")
-    
+
+
 @bot.command()
 async def date(ctx):
     """Affiche la date actuelle du jeu."""
@@ -245,13 +250,17 @@ async def date(ctx):
         return
 
     date_dict = db.get_current_date()
-    year, month, playday = date_dict.get("year", 1), date_dict.get("month", 1), date_dict.get("playday", 1)
+    year, month, playday = (
+        date_dict.get("year", 1),
+        date_dict.get("month", 1),
+        date_dict.get("playday", 1),
+    )
 
     try:
-        locale.setlocale(locale.LC_TIME, 'fr_FR.UTF-8')  # Système Unix/Linux
+        locale.setlocale(locale.LC_TIME, "fr_FR.UTF-8")  # Système Unix/Linux
     except locale.Error:
         try:
-            locale.setlocale(locale.LC_TIME, 'fr_FR')  # Windows
+            locale.setlocale(locale.LC_TIME, "fr_FR")  # Windows
         except locale.Error as e:
             await ctx.send(f"⚠️ Impossible de définir la locale française. {e}")
             return
@@ -259,7 +268,10 @@ async def date(ctx):
     month_name = datetime(year, month, 1).strftime("%B")
     max_playdays = db.get_playdays_in_month(month)
 
-    await ctx.send(f"📅 Date actuelle : {month_name.capitalize()} {year} - {playday}/{max_playdays}")
+    await ctx.send(
+        f"📅 Date actuelle : {month_name.capitalize()} {year} - {playday}/{max_playdays}"
+    )
+
 
 @bot.event
 async def on_message(message):
@@ -268,7 +280,9 @@ async def on_message(message):
         and message.author.id == 293869524091142144
         and message.content.startswith("!")
     ):
-        await bot.get_channel(873645606214721536).send(message.content[1:])
+        await bot.get_channel(db.get_setting("tchat_channel_id")).send(
+            message.content[1:]
+        )
     if (message.author == bot.user) or (not message.content):
         return
     if message.author.id == 292953664492929025:
@@ -392,13 +406,16 @@ async def notion(ctx, req_type: str = "all"):
     await ctx.defer()
     req_type = req_type.lower()
     try:
-        embed = await notion_handler.get_tasks(ctx, req_type)
-        if embed is None:
+        embeds = await notion_handler.get_tasks(ctx, req_type)
+        if not embeds:
             await ctx.send(
                 "❌ Aucune tâche trouvée ou erreur lors de la récupération des données Notion."
             )
             return
-        await ctx.send(embed=embed)
+
+        # Send each embed separately for better space management
+        for embed in embeds:
+            await ctx.send(embed=embed)
     except Exception as e:
         await ctx.send(f"❌ Erreur lors de la récupération des données Notion : {e}")
 
@@ -463,9 +480,27 @@ async def sign_user_to_treaty(
         return
 
 
+import traceback
+
+
 @bot.event
 async def on_command_error(ctx, error):
-    return await ctx.send(error)
+    tb = "".join(traceback.format_exception(type(error), error, error.__traceback__))
+    # Only show first line and line number for users, full traceback for admins
+    error_msg = f"**Error:** {error}\n"
+    if error.__traceback__:
+        tb_lines = tb.splitlines()
+        # Find the most recent call line
+        for line in reversed(tb_lines):
+            error_msg += f"`{line.strip()}`\n"
+    embed = discord.Embed(
+        title="Une erreur s'est produite en exécutant la commande",
+        description="**Message d'erreur:** " + str(error),
+        color=discord.Color.red(),
+    )
+    await ctx.send(embed=embed)
+    print(f"❌ Error in command {ctx.command}: {error}")
+    print(f"Full traceback:\n{tb}")
 
 
 class ConstructionForm(discord.ui.Modal, title="Données de construction"):
@@ -798,6 +833,7 @@ async def create_country(
     await user.remove_roles(non_player_role, reason=f"Création du pays {country_name}")
     await ctx.send(f"Le pays {country_name} a été créé avec succès.")
 
+
 @bot.command(
     name="create_secret",
     brief="Crée un service secret, en attribuant les permissions correctes pour le pays à qui il appartient.",
@@ -928,6 +964,7 @@ async def ask_rp_questions(ctx, question, user_message: discord.Message):
     except Exception as e:
         await user_message.channel.send(f"Erreur lors de la synthèse : {e}")
 
+
 @bot.command()
 async def check_for_role_exclusive_overwrites(ctx, role: discord.Role):
     """Vérifie si le rôle a des permissions définies dans des salons spécifiques."""
@@ -941,7 +978,7 @@ async def check_for_role_exclusive_overwrites(ctx, role: discord.Role):
 
         # Vérifie si au moins une permission est explicitement définie
         for perm_name in dir(overwrites):
-            if perm_name.startswith('_'):
+            if perm_name.startswith("_"):
                 continue  # ignore les attributs internes
 
             value = getattr(overwrites, perm_name)
@@ -953,21 +990,27 @@ async def check_for_role_exclusive_overwrites(ctx, role: discord.Role):
         embed = discord.Embed(
             title=f"🔍 Permissions spécifiques pour le rôle {role.name}",
             description="\n".join(exclusive_overwrites),
-            color=discord.Color.gold()
+            color=discord.Color.gold(),
         )
-        print(f"Permissions spécifiques trouvées pour le rôle {role.name} dans les salons suivants : {', '.join(exclusive_overwrites)}")
+        print(
+            f"Permissions spécifiques trouvées pour le rôle {role.name} dans les salons suivants : {', '.join(exclusive_overwrites)}"
+        )
         await ctx.send(embed=embed)
     else:
-        await ctx.send(f"✅ Aucune permission spécifique définie pour le rôle {role.name}.")
-        
+        await ctx.send(
+            f"✅ Aucune permission spécifique définie pour le rôle {role.name}."
+        )
+
+
 @bot.command()
 async def archive_rp_channels(ctx, archive_category: discord.CategoryChannel):
     """Archive les salons de RP en les déplaçant dans une catégorie d'archive."""
     if not dUtils.is_authorized(ctx):
         return await ctx.send(embed=dUtils.get_auth_embed())
-    
-    
-    continents_dict["services"] = 1269295981183369279  # ID de la catégorie des services secrets
+
+    continents_dict["services"] = (
+        1269295981183369279  # ID de la catégorie des services secrets
+    )
 
     # Liste pour stocker tous les salons de RP à archiver
     rp_channels = []
@@ -978,7 +1021,9 @@ async def archive_rp_channels(ctx, archive_category: discord.CategoryChannel):
             rp_channels.extend(category.text_channels)
 
     if not rp_channels:
-        return await ctx.send("Aucun salon de RP trouvé dans les catégories spécifiées.")
+        return await ctx.send(
+            "Aucun salon de RP trouvé dans les catégories spécifiées."
+        )
 
     for channel in rp_channels:
         try:
@@ -986,19 +1031,28 @@ async def archive_rp_channels(ctx, archive_category: discord.CategoryChannel):
             print(f"Salon {channel.name} archivé dans {archive_category.name}.")
         except discord.Forbidden:
             print(f"Permission refusée pour archiver le salon {channel.name}.")
-            await ctx.send(f"❌ Permission refusée pour archiver le salon {channel.name}.")
+            await ctx.send(
+                f"❌ Permission refusée pour archiver le salon {channel.name}."
+            )
         except Exception as e:
             print(f"Erreur lors de l'archivage du salon {channel.name}: {e}")
-            await ctx.send(f"❌ Erreur lors de l'archivage du salon {channel.name}: {e}")
+            await ctx.send(
+                f"❌ Erreur lors de l'archivage du salon {channel.name}: {e}"
+            )
 
     await ctx.send("✅ Tous les salons de RP ont été archivés avec succès.")
-    
+
+
 async def transfer_messages_from_channel_to_channel(source_channel, target_channel):
     """Copie les messages d'un salon vers un autre en utilisant des embeds."""
     async for message in source_channel.history(limit=None, oldest_first=True):
         if message.author.bot:
             continue
-        if message.content.startswith(".") or message.content.startswith("!") or message.content.startswith("/"):
+        if (
+            message.content.startswith(".")
+            or message.content.startswith("!")
+            or message.content.startswith("/")
+        ):
             continue
 
         try:
@@ -1006,11 +1060,15 @@ async def transfer_messages_from_channel_to_channel(source_channel, target_chann
             embed = discord.Embed(
                 description=message.clean_content,
                 timestamp=message.created_at,
-                color=discord.Color.blue()
+                color=discord.Color.blue(),
             )
             embed.set_author(
                 name=f"{message.author.display_name}",
-                icon_url=message.author.display_avatar.url if message.author.display_avatar else discord.Embed.Empty
+                icon_url=(
+                    message.author.display_avatar.url
+                    if message.author.display_avatar
+                    else discord.Embed.Empty
+                ),
             )
             embed.set_footer(text=f"Envoyé dans #{source_channel.name}")
 
@@ -1036,6 +1094,7 @@ async def transfer_messages_from_channel_to_channel(source_channel, target_chann
             return False
     return True
 
+
 @bot.command()
 async def transfer_archives_to_category(ctx):
     """Copie les salons d'archives vers une autre catégorie (dans le même serveur ou un autre où le bot est)."""
@@ -1043,11 +1102,8 @@ async def transfer_archives_to_category(ctx):
         return await ctx.send(embed=dUtils.get_auth_embed())
     archive_guild = bot.get_guild(1396923284498415807)
 
-    archive_categories_id = [
-        1231253371902623764,
-        1396920393939419156
-    ]
-    
+    archive_categories_id = [1231253371902623764, 1396920393939419156]
+
     archive_categories = [
         bot.get_channel(cat_id)
         for cat_id in archive_categories_id
@@ -1060,24 +1116,27 @@ async def transfer_archives_to_category(ctx):
     for category in archive_categories:
         new_category = await archive_guild.create_category(
             name=f"Archives de {category.name}",
-            reason="Transfert des salons d'archives"
+            reason="Transfert des salons d'archives",
         )
         for channel in category.text_channels:
             try:
                 new_channel = await archive_guild.create_text_channel(
                     name=channel.name,
                     category=new_category,
-                    topic=f"Copie depuis {category.name}"
+                    topic=f"Copie depuis {category.name}",
                 )
                 await ctx.send(f"📤 Transfert de #{channel.name} en cours...")
                 await transfer_messages_from_channel_to_channel(channel, new_channel)
                 await new_channel.send(f"✅ Fin du transfert depuis #{channel.name}")
                 await asyncio.sleep(2)
             except discord.Forbidden:
-                await ctx.send(f"❌ Permission refusée pour copier le salon {channel.name}")
+                await ctx.send(
+                    f"❌ Permission refusée pour copier le salon {channel.name}"
+                )
             except Exception as e:
                 await ctx.send(f"❌ Erreur pour le salon {channel.name}: {e}")
-              
+
+
 @bot.command()
 async def get_units(ctx, country: CountryConverter = None, unit_type: str = "all"):
     """
@@ -1091,32 +1150,55 @@ async def get_units(ctx, country: CountryConverter = None, unit_type: str = "all
     Returns:
         None
     """
-    
+
     if not country:
         country = CountryEntity(ctx.author, ctx.guild).to_dict()
     if unit_type.lower() not in unit_types.keys() and unit_type.lower() != "all":
-        return await ctx.send("Type d'unité invalide. Utilisez une de ces valeurs : " + ", ".join(unit_types.keys()) + " ou 'all'.")
+        return await ctx.send(
+            "Type d'unité invalide. Utilisez une de ces valeurs : "
+            + ", ".join(unit_types.keys())
+            + " ou 'all'."
+        )
 
     is_country = db.get_players_country(ctx.author.id) == country.get("id")
-    is_channel_secret = ctx.channel.id == db.get_country_secret_channel(country.get("id"))
+    is_channel_secret = ctx.channel.id == int(
+        db.get_country_secret_channel(country.get("id"))
+    )
+
+    title_str = f"Récupération des unités {'privées & publiques' if is_country and is_channel_secret else 'publiques'} pour {country.get('name')}"
+
     units = {}
     if unit_type.lower() == "all":
         for utype in unit_types.keys():
-            utype_str = unit_types.get(utype) if is_country and is_channel_secret else f"public_{unit_types.get(utype)}"
-            units[utype] = db.get_units(country.get("id"), utype_str)
+            if is_country and is_channel_secret:
+                units[utype] = db.get_units(country.get("id"), unit_types.get(utype))
+            units[f"public_{utype}"] = db.get_units(
+                country.get("id"), f"public_{unit_types.get(utype)}"
+            )
     else:
-        utype_str = unit_types.get(unit_type.lower()) if is_country and is_channel_secret else f"public_{unit_types.get(unit_type.lower())}"
-        units[unit_type.lower()] = db.get_units(country.get("id"), utype_str)
+        if is_country and is_channel_secret:
+            units[f"public_{unit_type.lower()}"] = db.get_units(
+                country.get("id"), f"public_{unit_types.get(unit_type.lower())}"
+            )
+        units[unit_type.lower()] = db.get_units(
+            country.get("id"), unit_types.get(unit_type.lower())
+        )
     if not units:
         return await ctx.send("Aucune unité trouvée pour ce pays.")
+    result_text = ""
+    for utype, count in units.items():
+        if count is not None:
+            result_text += f"{utype.replace('public_', '(chiffre public) ')}: {count}\n"
     embed = discord.Embed(
-        title=f"Unités pour {country.get('name')}",
-        description="\n".join([f"{utype}: {count}" for utype, count in units.items()])
+        title=title_str, color=discord.Color.blue(), description=result_text
     )
     await ctx.send(embed=embed)
 
+
 @bot.command()
-async def recruit(ctx, country: CountryConverter, note: int, goal: int, unit_type: str = "None"):
+async def recruit(
+    ctx, country: CountryConverter, note: int, goal: int, unit_type: str = "None"
+):
     """
     Commande pour recruter des membres dans le pays.
 
@@ -1135,7 +1217,10 @@ async def recruit(ctx, country: CountryConverter, note: int, goal: int, unit_typ
     if not dUtils.is_authorized(ctx):
         return await ctx.send(embed=dUtils.get_auth_embed())
     if unit_type.lower() not in unit_types.keys():
-        return await ctx.send("Type de recrutement invalide. Utilisez une de ces valeurs : " + ", ".join(unit_types.keys()))
+        return await ctx.send(
+            "Type de recrutement invalide. Utilisez une de ces valeurs : "
+            + ", ".join(unit_types.keys())
+        )
     if note < 1 or note > 10:
         return await ctx.send("La note doit être entre 1 et 10.")
     if goal < 1:
@@ -1169,10 +1254,45 @@ Le coût total est de {convert(str(cost))}.\n\n"
     )
     db.add_units(country.get("id"), unit_types.get(unit_type.lower()), recruited)
     if confirmed:
-        db.add_units(country.get("id"), f"public_{unit_types.get(unit_type.lower())}", recruited)
+        db.add_units(
+            country.get("id"), f"public_{unit_types.get(unit_type.lower())}", recruited
+        )
     return await ctx.send(
         f"Recrutement de {recruited} {unit_type} confirmé pour {convert(str(cost))}.\n"
-        
     )
+
+
+@bot.command()
+async def set_public_units(ctx, country: CountryConverter, unit_type: str, qty: int):
+    """
+    Commande pour définir le nombre d'unités publiques d'un pays.
+
+    Args:
+        ctx (commands.Context): Le contexte de la commande.
+        country (CountryConverter): Le pays dont on veut définir les unités publiques.
+        unit_type (str): Le type d'unité à définir.
+        qty (int): La quantité d'unités à définir.
+
+    Returns:
+        None
+    """
+
+    if not country.get("id"):
+        return await ctx.send("Pays non trouvé.")
+    if not dUtils.is_authorized(ctx):
+        return await ctx.send(embed=dUtils.get_auth_embed())
+    if unit_type.lower() not in unit_types.keys():
+        return await ctx.send(
+            "Type d'unité invalide. Utilisez une de ces valeurs : "
+            + ", ".join(unit_types.keys())
+        )
+    if qty < 0:
+        return await ctx.send("La quantité doit être supérieure ou égale à 0.")
+
+    db.set_units(country.get("id"), f"public_{unit_types.get(unit_type.lower())}", qty)
+    return await ctx.send(
+        f"Les unités publiques de {country.get('name')} pour {unit_type} ont été définies à {qty}."
+    )
+
 
 bot.run(token)

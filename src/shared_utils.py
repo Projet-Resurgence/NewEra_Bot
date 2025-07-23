@@ -8,7 +8,7 @@ from discord.ext import commands
 from typing import Union
 
 # Import the base classes
-from db import Database
+from db import Database, UsefulDatas
 from discord_utils import discordUtils
 from currency import convert, amount_converter
 
@@ -16,13 +16,12 @@ from currency import convert, amount_converter
 db = None
 dUtils = None
 
-
-def initialize_utilities(bot):
+def initialize_utilities(bot, bat_types, bat_buffs):
     """Initialize all utility instances with the bot instance."""
     global db, dUtils
-    db = Database()
+    uDatas = UsefulDatas(bat_types, bat_buffs)
+    db = Database("datas/rts.db", uDatas)
     dUtils = discordUtils(bot, db)
-
 
 def get_db():
     """Get the global database instance."""
@@ -31,14 +30,12 @@ def get_db():
         db = Database()
     return db
 
-
 def get_discord_utils(bot=None, db=None):
     """Get the global discord utils instance."""
     global dUtils
     if dUtils is None and bot is not None:
         dUtils = discordUtils(bot, db)
     return dUtils
-
 
 class CountryEntity:
     """Centralized CountryEntity class used across all cogs."""

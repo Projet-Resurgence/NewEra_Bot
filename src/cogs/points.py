@@ -146,7 +146,7 @@ class Points(commands.Cog):
 
         # Get utilities instances
         self.db = get_db()
-        self.dUtils = get_discord_utils(bot)
+        self.dUtils = get_discord_utils(bot, self.db)
 
         # We'll get code_list from main.json when needed
         self.code_list = []
@@ -167,7 +167,9 @@ class Points(commands.Cog):
     async def eco_logger(self, code, amount, user1, user2=None, type=1):
         """Log economic events to the designated channel."""
         await self.load_code_list()
-        log_channel = self.bot.get_channel(1261064715480862866)
+        log_channel_id = self.db.get_setting("eco_log_channel_id")
+        log_channel_id = int(log_channel_id) if log_channel_id else None
+        log_channel = self.bot.get_channel(log_channel_id) if log_channel_id else None
         event = EcoLogEvent(
             code,
             amount,
@@ -346,22 +348,145 @@ class Points(commands.Cog):
         await self.eco_logger("P1", amount, cible_obj, ctx.author, point_type)
         await ctx.send(embed=embed)
 
-    @commands.command(name="remove_pp")
-    async def remove_pp(self, ctx, cible: CountryConverter, amount: Union[int, str]):
+    @commands.command(
+        name="remove_pp",
+        brief="Retire des points politiques d'un pays (Staff uniquement).",
+        usage="remove_pp <pays> <montant>",
+        description="Retire un montant de points politiques spécifié d'un pays.",
+        help="""Retire des points politiques du solde d'un pays spécifié.
+
+        FONCTIONNALITÉ :
+        - Retire le montant spécifié des points politiques du pays
+        - Vérifie que le pays a suffisamment de points politiques
+        - Enregistre l'opération dans les logs économiques avec double alerte
+        - Supporte les montants relatifs (%, all, half)
+
+        MONTANTS SUPPORTÉS :
+        - Nombre exact : `10`, `50`
+        - Pourcentage : `50%` (50% des points du pays)
+        - Mots-clés : `all` (tous), `half` (moitié)
+
+        RESTRICTIONS :
+        - Réservé aux membres du staff uniquement
+        - Le pays doit avoir suffisamment de points politiques
+        - Le pays cible doit être valide
+
+        ARGUMENTS :
+        - `<pays>` : Pays dont retirer les points politiques (mention, nom ou ID)
+        - `<montant>` : Montant à retirer (nombre, pourcentage, ou mot-clé)
+
+        EXEMPLE :
+        - `remove_pp @France 5` : Retire 5 points politiques à la France
+        - `remove_pp Allemagne 25%` : Retire 25% des points politiques de l'Allemagne
+        - `remove_pp 123456789 all` : Retire tous les points politiques du pays
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    async def remove_pp(
+        self, 
+        ctx, 
+        cible: CountryConverter = commands.parameter(
+            description="Pays dont retirer les points politiques (mention, nom ou ID)"
+        ), 
+        amount: Union[int, str] = commands.parameter(
+            description="Montant à retirer (nombre, pourcentage comme '25%', ou 'all'/'half')"
+        )
+    ):
         """Remove political points from a country (Staff only)."""
         await self._remove_points_generic(
             ctx, cible, amount, 1, ":blue_circle:", self.p_points_color_int
         )
 
-    @commands.command(name="remove_pd")
-    async def remove_pd(self, ctx, cible: CountryConverter, amount: Union[int, str]):
+    @commands.command(
+        name="remove_pd",
+        brief="Retire des points diplomatiques d'un pays (Staff uniquement).",
+        usage="remove_pd <pays> <montant>",
+        description="Retire un montant de points diplomatiques spécifié d'un pays.",
+        help="""Retire des points diplomatiques du solde d'un pays spécifié.
+
+        FONCTIONNALITÉ :
+        - Retire le montant spécifié des points diplomatiques du pays
+        - Vérifie que le pays a suffisamment de points diplomatiques
+        - Enregistre l'opération dans les logs économiques avec double alerte
+        - Supporte les montants relatifs (%, all, half)
+
+        MONTANTS SUPPORTÉS :
+        - Nombre exact : `10`, `50`
+        - Pourcentage : `50%` (50% des points du pays)
+        - Mots-clés : `all` (tous), `half` (moitié)
+
+        RESTRICTIONS :
+        - Réservé aux membres du staff uniquement
+        - Le pays doit avoir suffisamment de points diplomatiques
+        - Le pays cible doit être valide
+
+        ARGUMENTS :
+        - `<pays>` : Pays dont retirer les points diplomatiques (mention, nom ou ID)
+        - `<montant>` : Montant à retirer (nombre, pourcentage, ou mot-clé)
+
+        EXEMPLE :
+        - `remove_pd @France 3` : Retire 3 points diplomatiques à la France
+        - `remove_pd Allemagne 30%` : Retire 30% des points diplomatiques de l'Allemagne
+        - `remove_pd 123456789 all` : Retire tous les points diplomatiques du pays
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    async def remove_pd(
+        self, 
+        ctx, 
+        cible: CountryConverter = commands.parameter(
+            description="Pays dont retirer les points diplomatiques (mention, nom ou ID)"
+        ), 
+        amount: Union[int, str] = commands.parameter(
+            description="Montant à retirer (nombre, pourcentage comme '30%', ou 'all'/'half')"
+        )
+    ):
         """Remove diplomatic points from a country (Staff only)."""
         await self._remove_points_generic(
             ctx, cible, amount, 2, ":purple_circle:", self.d_points_color_int
         )
 
-    @commands.command(name="points_p")
-    async def points_p(self, ctx, cible: CountryConverter = None):
+    @commands.command(
+        name="points_p",
+        brief="Affiche les points politiques d'un pays ou utilisateur.",
+        usage="points_p [pays]",
+        description="Consulte les points politiques d'un pays spécifique ou de votre propre pays.",
+        help="""Affiche les points politiques d'un pays avec son classement.
+
+        FONCTIONNALITÉ :
+        - Affiche le nombre de points politiques du pays spécifié
+        - Montre le classement du pays dans le leaderboard des points politiques
+        - Si aucun pays n'est spécifié, affiche vos propres points politiques
+
+        UTILITÉ DES POINTS POLITIQUES :
+        - Actions internes au pays (réformes, lois, etc.)
+        - Gestion gouvernementale
+        - Influence politique interne
+
+        ARGUMENTS :
+        - `[pays]` : Optionnel. Pays dont afficher les points politiques (mention, nom ou ID)
+
+        EXEMPLE :
+        - `points_p` : Affiche vos propres points politiques
+        - `points_p @France` : Affiche les points politiques de la France
+        - `points_p 123456789` : Affiche les points politiques du pays avec cet ID
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    async def points_p(
+        self, 
+        ctx, 
+        cible: CountryConverter = commands.parameter(
+            default=None,
+            description="Pays dont afficher les points politiques (optionnel, votre pays par défaut)"
+        )
+    ):
         """Check political points of a country or user."""
         if cible is None:
             cible = CountryEntity(ctx.author, ctx.guild).to_dict()
@@ -369,8 +494,44 @@ class Points(commands.Cog):
             ctx, cible, 1, ":blue_circle:", self.p_points_color_int, 2
         )
 
-    @commands.command(name="points_d")
-    async def points_d(self, ctx, cible: CountryConverter = None):
+    @commands.command(
+        name="points_d",
+        brief="Affiche les points diplomatiques d'un pays ou utilisateur.",
+        usage="points_d [pays]",
+        description="Consulte les points diplomatiques d'un pays spécifique ou de votre propre pays.",
+        help="""Affiche les points diplomatiques d'un pays avec son classement.
+
+        FONCTIONNALITÉ :
+        - Affiche le nombre de points diplomatiques du pays spécifié
+        - Montre le classement du pays dans le leaderboard des points diplomatiques
+        - Si aucun pays n'est spécifié, affiche vos propres points diplomatiques
+
+        UTILITÉ DES POINTS DIPLOMATIQUES :
+        - Relations internationales
+        - Négociations diplomatiques
+        - Traités et accords
+        - Influence diplomatique
+
+        ARGUMENTS :
+        - `[pays]` : Optionnel. Pays dont afficher les points diplomatiques (mention, nom ou ID)
+
+        EXEMPLE :
+        - `points_d` : Affiche vos propres points diplomatiques
+        - `points_d @France` : Affiche les points diplomatiques de la France
+        - `points_d 123456789` : Affiche les points diplomatiques du pays avec cet ID
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    async def points_d(
+        self, 
+        ctx, 
+        cible: CountryConverter = commands.parameter(
+            default=None,
+            description="Pays dont afficher les points diplomatiques (optionnel, votre pays par défaut)"
+        )
+    ):
         """Check diplomatic points of a country or user."""
         if cible is None:
             cible = CountryEntity(ctx.author, ctx.guild).to_dict()
@@ -378,36 +539,235 @@ class Points(commands.Cog):
             ctx, cible, 2, ":purple_circle:", self.d_points_color_int, 3
         )
 
-    @commands.command(name="set_pp")
-    async def set_pp(self, ctx, cible: CountryConverter, amount: int):
+    @commands.command(
+        name="set_pp",
+        brief="Définit les points politiques d'un pays à un montant exact (Staff uniquement).",
+        usage="set_pp <pays> <montant>",
+        description="Définit les points politiques d'un pays à un montant exact, remplaçant le total actuel.",
+        help="""Définit les points politiques d'un pays à un montant exact.
+
+        FONCTIONNALITÉ :
+        - Remplace complètement les points politiques actuels du pays
+        - Définit les nouveaux points politiques au montant spécifié
+        - Enregistre l'opération dans les logs économiques avec alerte
+        - Vérifie les autorisations staff avant exécution
+
+        RESTRICTIONS :
+        - Réservé aux membres du staff uniquement
+        - Le pays cible doit être valide
+        - Le montant doit être un nombre positif ou zéro
+
+        ARGUMENTS :
+        - `<pays>` : Pays dont définir les points politiques (mention, nom ou ID)
+        - `<montant>` : Nouveaux points politiques à définir (nombre positif)
+
+        EXEMPLE :
+        - `set_pp @France 15` : Définit les points politiques de la France à 15
+        - `set_pp Allemagne 20` : Définit les points politiques de l'Allemagne à 20
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    async def set_pp(
+        self, 
+        ctx, 
+        cible: CountryConverter = commands.parameter(
+            description="Pays dont définir les points politiques (mention, nom ou ID)"
+        ), 
+        amount: int = commands.parameter(
+            description="Nouveaux points politiques à définir (nombre positif)"
+        )
+    ):
         """Set political points for a country (Staff only)."""
         await self._set_points_generic(
             ctx, cible, amount, 1, ":blue_circle:", self.p_points_color_int
         )
 
-    @commands.command(name="set_pd")
-    async def set_pd(self, ctx, cible: CountryConverter, amount: int):
+    @commands.command(
+        name="set_pd",
+        brief="Définit les points diplomatiques d'un pays à un montant exact (Staff uniquement).",
+        usage="set_pd <pays> <montant>",
+        description="Définit les points diplomatiques d'un pays à un montant exact, remplaçant le total actuel.",
+        help="""Définit les points diplomatiques d'un pays à un montant exact.
+
+        FONCTIONNALITÉ :
+        - Remplace complètement les points diplomatiques actuels du pays
+        - Définit les nouveaux points diplomatiques au montant spécifié
+        - Enregistre l'opération dans les logs économiques avec alerte
+        - Vérifie les autorisations staff avant exécution
+
+        RESTRICTIONS :
+        - Réservé aux membres du staff uniquement
+        - Le pays cible doit être valide
+        - Le montant doit être un nombre positif ou zéro
+
+        ARGUMENTS :
+        - `<pays>` : Pays dont définir les points diplomatiques (mention, nom ou ID)
+        - `<montant>` : Nouveaux points diplomatiques à définir (nombre positif)
+
+        EXEMPLE :
+        - `set_pd @France 8` : Définit les points diplomatiques de la France à 8
+        - `set_pd Allemagne 12` : Définit les points diplomatiques de l'Allemagne à 12
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    async def set_pd(
+        self, 
+        ctx, 
+        cible: CountryConverter = commands.parameter(
+            description="Pays dont définir les points diplomatiques (mention, nom ou ID)"
+        ), 
+        amount: int = commands.parameter(
+            description="Nouveaux points diplomatiques à définir (nombre positif)"
+        )
+    ):
         """Set diplomatic points for a country (Staff only)."""
         await self._set_points_generic(
             ctx, cible, amount, 2, ":purple_circle:", self.d_points_color_int
         )
 
-    @commands.command(name="add_pp")
-    async def add_pp(self, ctx, cible: CountryConverter, amount: int):
+    @commands.command(
+        name="add_pp",
+        brief="Ajoute des points politiques à un pays (Staff uniquement).",
+        usage="add_pp <pays> <montant>",
+        description="Ajoute un montant de points politiques spécifié au total d'un pays.",
+        help="""Ajoute des points politiques au total d'un pays spécifié.
+
+        FONCTIONNALITÉ :
+        - Ajoute le montant spécifié aux points politiques existants du pays
+        - Enregistre l'opération dans les logs économiques avec alerte
+        - Vérifie les autorisations staff avant exécution
+
+        UTILITÉ DES POINTS POLITIQUES :
+        - Récompense pour bonnes actions internes
+        - Compensation pour événements politiques
+        - Ajustements d'équilibrage du jeu
+
+        RESTRICTIONS :
+        - Réservé aux membres du staff uniquement
+        - Le pays cible doit être valide
+
+        ARGUMENTS :
+        - `<pays>` : Pays qui recevra les points politiques (mention, nom ou ID)
+        - `<montant>` : Montant de points politiques à ajouter (nombre positif)
+
+        EXEMPLE :
+        - `add_pp @France 5` : Ajoute 5 points politiques à la France
+        - `add_pp Allemagne 10` : Ajoute 10 points politiques à l'Allemagne
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    async def add_pp(
+        self, 
+        ctx, 
+        cible: CountryConverter = commands.parameter(
+            description="Pays qui recevra les points politiques (mention, nom ou ID)"
+        ), 
+        amount: int = commands.parameter(
+            description="Montant de points politiques à ajouter (nombre positif)"
+        )
+    ):
         """Add political points to a country (Staff only)."""
         await self._add_points_generic(
             ctx, cible, amount, 1, ":blue_circle:", self.p_points_color_int
         )
 
-    @commands.command(name="add_pd")
-    async def add_pd(self, ctx, cible: CountryConverter, amount: int):
+    @commands.command(
+        name="add_pd",
+        brief="Ajoute des points diplomatiques à un pays (Staff uniquement).",
+        usage="add_pd <pays> <montant>",
+        description="Ajoute un montant de points diplomatiques spécifié au total d'un pays.",
+        help="""Ajoute des points diplomatiques au total d'un pays spécifié.
+
+        FONCTIONNALITÉ :
+        - Ajoute le montant spécifié aux points diplomatiques existants du pays
+        - Enregistre l'opération dans les logs économiques avec alerte
+        - Vérifie les autorisations staff avant exécution
+
+        UTILITÉ DES POINTS DIPLOMATIQUES :
+        - Récompense pour bonnes relations internationales
+        - Compensation pour événements diplomatiques
+        - Ajustements d'équilibrage du jeu
+
+        RESTRICTIONS :
+        - Réservé aux membres du staff uniquement
+        - Le pays cible doit être valide
+
+        ARGUMENTS :
+        - `<pays>` : Pays qui recevra les points diplomatiques (mention, nom ou ID)
+        - `<montant>` : Montant de points diplomatiques à ajouter (nombre positif)
+
+        EXEMPLE :
+        - `add_pd @France 3` : Ajoute 3 points diplomatiques à la France
+        - `add_pd Allemagne 7` : Ajoute 7 points diplomatiques à l'Allemagne
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    async def add_pd(
+        self, 
+        ctx, 
+        cible: CountryConverter = commands.parameter(
+            description="Pays qui recevra les points diplomatiques (mention, nom ou ID)"
+        ), 
+        amount: int = commands.parameter(
+            description="Montant de points diplomatiques à ajouter (nombre positif)"
+        )
+    ):
         """Add diplomatic points to a country (Staff only)."""
         await self._add_points_generic(
             ctx, cible, amount, 2, ":purple_circle:", self.d_points_color_int
         )
 
-    @commands.command(name="use_pp")
-    async def use_pp(self, ctx, amount: int = 1):
+    @commands.command(
+        name="use_pp",
+        brief="Utilise des points politiques de votre pays.",
+        usage="use_pp [montant]",
+        description="Dépense des points politiques de votre pays pour des actions internes.",
+        help="""Utilise des points politiques de votre pays pour des actions internes.
+
+        FONCTIONNALITÉ :
+        - Retire le montant spécifié de vos points politiques
+        - Vérifie que votre pays a suffisamment de points politiques
+        - Enregistre l'utilisation dans les logs économiques
+        - Montant par défaut : 1 point politique
+
+        UTILISATIONS TYPIQUES :
+        - Réformes internes
+        - Changements de lois
+        - Actions gouvernementales
+        - Gestion politique interne
+
+        RESTRICTIONS :
+        - Vous devez appartenir à un pays valide
+        - Votre pays doit avoir suffisamment de points politiques
+
+        ARGUMENTS :
+        - `[montant]` : Optionnel. Nombre de points politiques à utiliser (défaut : 1)
+
+        EXEMPLE :
+        - `use_pp` : Utilise 1 point politique
+        - `use_pp 3` : Utilise 3 points politiques
+        - `use_pp 5` : Utilise 5 points politiques
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    async def use_pp(
+        self, 
+        ctx, 
+        amount: int = commands.parameter(
+            default=1,
+            description="Nombre de points politiques à utiliser (défaut : 1)"
+        )
+    ):
         """Use political points."""
         country = CountryEntity(ctx.author, ctx.guild).to_dict()
 
@@ -453,8 +813,49 @@ class Points(commands.Cog):
         await self.eco_logger("P3", payment_amount, country["role"], None, 1)
         await ctx.send(embed=embed)
 
-    @commands.command(name="use_pd")
-    async def use_pd(self, ctx, amount: int = 1):
+    @commands.command(
+        name="use_pd",
+        brief="Utilise des points diplomatiques de votre pays.",
+        usage="use_pd [montant]",
+        description="Dépense des points diplomatiques de votre pays pour des actions diplomatiques.",
+        help="""Utilise des points diplomatiques de votre pays pour des actions diplomatiques.
+
+        FONCTIONNALITÉ :
+        - Retire le montant spécifié de vos points diplomatiques
+        - Vérifie que votre pays a suffisamment de points diplomatiques
+        - Enregistre l'utilisation dans les logs économiques
+        - Montant par défaut : 1 point diplomatique
+
+        UTILISATIONS TYPIQUES :
+        - Négociations internationales
+        - Signature de traités
+        - Actions diplomatiques
+        - Relations internationales
+
+        RESTRICTIONS :
+        - Vous devez appartenir à un pays valide
+        - Votre pays doit avoir suffisamment de points diplomatiques
+
+        ARGUMENTS :
+        - `[montant]` : Optionnel. Nombre de points diplomatiques à utiliser (défaut : 1)
+
+        EXEMPLE :
+        - `use_pd` : Utilise 1 point diplomatique
+        - `use_pd 2` : Utilise 2 points diplomatiques
+        - `use_pd 4` : Utilise 4 points diplomatiques
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    async def use_pd(
+        self, 
+        ctx, 
+        amount: int = commands.parameter(
+            default=1,
+            description="Nombre de points diplomatiques à utiliser (défaut : 1)"
+        )
+    ):
         """Use diplomatic points."""
         country = CountryEntity(ctx.author, ctx.guild).to_dict()
 

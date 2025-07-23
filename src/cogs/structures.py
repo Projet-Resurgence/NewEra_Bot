@@ -28,7 +28,7 @@ class Structures(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.db = get_db()
-        self.dUtils = get_discord_utils(bot)
+        self.dUtils = get_discord_utils(bot, self.db)
 
         # Color constants
         self.error_color_int = ERROR_COLOR_INT
