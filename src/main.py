@@ -30,6 +30,7 @@ import pytz
 import io
 import string
 import locale
+import traceback
 
 # Import centralized utilities
 from shared_utils import (
@@ -542,9 +543,6 @@ async def sign_user_to_treaty(
     except discord.Forbidden:
         await ctx.send("Impossible d'obtenir l'utilisateur.")
         return
-
-
-import traceback
 
 
 @bot.event
@@ -1480,8 +1478,11 @@ async def set_public_units(ctx, country: CountryConverter, unit_type: str, qty: 
         f"Les unités publiques de {country.get('name')} pour {unit_type} ont été définies à {qty}."
     )
 
+
 @bot.command()
-async def program_ghostping(ctx, target: Union[discord.Member, discord.Role], waiting : int = 5):
+async def program_ghostping(
+    ctx, target: Union[discord.Member, discord.Role], waiting: int = 5
+):
     """
     Programme un ghost ping sur un membre ou un rôle.
 
@@ -1495,16 +1496,19 @@ async def program_ghostping(ctx, target: Union[discord.Member, discord.Role], wa
     """
     if not dUtils.is_authorized(ctx):
         return await ctx.send(embed=dUtils.get_auth_embed())
-    
+
     await ctx.message.delete()  # Supprimer la commande pour éviter le spam
-    message = await ctx.send(f"Ghost ping programmé pour {target.name} dans {waiting} secondes.")
+    message = await ctx.send(
+        f"Ghost ping programmé pour {target.name} dans {waiting} secondes."
+    )
     await asyncio.sleep(2)  # Laisser le temps à l'utilisateur de lire le message
     await message.delete()  # Supprimer le message de confirmation
     await asyncio.sleep(waiting)
     message = await ctx.send(f"{target.mention}")
     await asyncio.sleep(2)
     await message.delete()  # Supprimer le message de ghost ping
-    
+
+
 @bot.command()
 async def test_converter(ctx, country: CountryConverter):
     """
@@ -1520,373 +1524,397 @@ async def test_converter(ctx, country: CountryConverter):
     if not country.get("id"):
         return await ctx.send("Pays non trouvé.")
     await ctx.send(f"Pays trouvé : {country.get('name')} (ID: {country.get('id')})")
-    
-    
+
+
 class TechFormData:
-    """Configuration data for different technology forms"""
-    
-    TECH_CONFIGS = {
-        "terrestre": {
-            "title": "Arme à Feu",
-            "color": discord.Color.green(),
-            "color_completed": discord.Color.dark_green(),
-            "emoji": "🔫",
-            "forms": {
-                1: {
-                    "title": "Arme à Feu - Caractéristiques Générales",
-                    "button_label": "🔫 Caractéristiques Générales",
-                    "fields": [
-                        {"label": "Nom de l'Arme", "placeholder": "Ex: AK-47, M4A1, etc.", "key": "nom"},
-                        {"label": "Manufacture(s)", "placeholder": "Ex: Company of the Skyforge", "key": "manufacture"},
-                        {"label": "Masse (kg)", "placeholder": "Ex: 3.5", "key": "masse"},
-                        {"label": "Dimensions (H x D cm)", "placeholder": "Ex: 87 x 5.5", "key": "dimensions"},
-                        {"label": "Capacité du chargeur", "placeholder": "Ex: 30 cartouches", "key": "capacite"}
-                    ],
-                    "embed_template": "> - Manufacture(s) : {manufacture}\n> - Masse : {masse} kg\n> - Dimensions : {dimensions} cm\n> - Capacité du chargeur : {capacite}\n> - Matériaux : [À compléter dans Form 2]"
-                },
-                2: {
-                    "title": "Arme à Feu - Informations Techniques",
-                    "button_label": "⚙️ Informations Techniques",
-                    "fields": [
-                        {"label": "Munitions (calibre)", "placeholder": "Ex: 7.62x39mm", "key": "munitions"},
-                        {"label": "Portée efficace (m)", "placeholder": "Ex: 400", "key": "portee"},
-                        {"label": "Cadence de tir (cpm)", "placeholder": "Ex: 600", "key": "cadence"},
-                        {"label": "Vitesse projectile (m/s)", "placeholder": "Ex: 715", "key": "vitesse"},
-                        {"label": "Mode de tir", "placeholder": "Ex: Semi-auto, Auto, Rafale", "key": "mode_tir"}
-                    ],
-                    "embed_template": "> - Munitions : {munitions}\n> - Portée efficace : {portee} mètres\n> - Cadence de tir : {cadence} coups par minute\n> - Vitesse du projectile : {vitesse} m/s\n> - Mode de tir : {mode_tir}"
-                },
-                3: {
-                    "title": "Arme à Feu - Informations Utiles",
-                    "button_label": "📋 Informations Utiles",
-                    "fields": [
-                        {"label": "Système de visée", "placeholder": "Ex: Viseur optique, holographique", "key": "visee"},
-                        {"label": "Matériaux", "placeholder": "Ex: Acier, alliage, polymère", "key": "materiaux"},
-                        {"label": "Variantes", "placeholder": "Ex: Version courte, sniper", "key": "variantes"},
-                        {"label": "Autre", "placeholder": "Ex: Informations supplémentaires", "key": "autre"},
-                        {"label": "Notes", "placeholder": "Ex: Remarques spéciales", "key": "notes"}
-                    ],
-                    "embed_template": "> - Système de visée : {visee}\n> - Matériaux : {materiaux}\n> - Variantes : {variantes}\n> - Autre : {autre}\n> - Notes : {notes}"
+    """Configuration data for different technology forms loaded from JSON"""
+
+    @staticmethod
+    def load_tech_configs():
+        """Load tech configurations from JSON file."""
+        import json
+
+        try:
+            with open("datas/tech_form_datas.json", "r", encoding="utf-8") as f:
+                raw_configs = json.load(f)
+
+            # Convert color strings to discord.Color objects
+            configs = {}
+            for tech_type, config in raw_configs.items():
+                configs[tech_type] = {
+                    "title": config["title"],
+                    "color": getattr(discord.Color, config["color"])(),
+                    "color_completed": getattr(
+                        discord.Color, config["color_completed"]
+                    )(),
+                    "emoji": config["emoji"],
+                    "forms": config["forms"],
                 }
-            }
-        },
-        "navale": {
-            "title": "Navire",
-            "color": discord.Color.blue(),
-            "color_completed": discord.Color.dark_blue(),
-            "emoji": "🚢",
-            "forms": {
-                1: {
-                    "title": "Navire - Caractéristiques Générales",
-                    "button_label": "🚢 Caractéristiques Générales",
-                    "fields": [
-                        {"label": "Nom du Navire", "placeholder": "Ex: USS Enterprise, HMS Victory", "key": "nom"},
-                        {"label": "Constructeur(s)", "placeholder": "Ex: Danish Pride Industries", "key": "constructeur"},
-                        {"label": "Masse (tonnes)", "placeholder": "Ex: 5000", "key": "masse"},
-                        {"label": "Dimensions (L x l x T m)", "placeholder": "Ex: 150 x 20 x 8", "key": "dimensions"},
-                        {"label": "Equipage", "placeholder": "Ex: 200 personnes", "key": "equipage"}
-                    ],
-                    "embed_template": "> - Constructeur(s) : {constructeur}\n> - Masse : {masse} tonnes (à pleine charge)\n> - Dimensions : {dimensions} m\n> - Equipage : {equipage}\n> - Déplacement : [À compléter dans Form 2]"
-                },
-                2: {
-                    "title": "Navire - Informations Techniques",
-                    "button_label": "⚓ Informations Techniques",
-                    "fields": [
-                        {"label": "Propulsion", "placeholder": "Ex: Moteurs diesel, turbines", "key": "propulsion"},
-                        {"label": "Puissance", "placeholder": "Ex: 50000 chevaux", "key": "puissance"},
-                        {"label": "Vitesse max (nœuds)", "placeholder": "Ex: 30", "key": "vitesse"},
-                        {"label": "Autonomie (jours)", "placeholder": "Ex: 45", "key": "autonomie"},
-                        {"label": "Rayon d'action (km)", "placeholder": "Ex: 8000", "key": "rayon"}
-                    ],
-                    "embed_template": "> - Propulsion : {propulsion}\n> - Puissance : {puissance}\n> - Vitesse maximale : {vitesse} nœuds\n> - Autonomie : {autonomie} jours\n> - Rayon d'action : {rayon} kilomètres"
-                },
-                3: {
-                    "title": "Navire - Informations Utiles",
-                    "button_label": "🌊 Informations Utiles",
-                    "fields": [
-                        {"label": "Armement principal", "placeholder": "Ex: Canons 127mm", "key": "armement_principal"},
-                        {"label": "Missiles", "placeholder": "Ex: Surface-air, surface-surface", "key": "missiles"},
-                        {"label": "Défenses", "placeholder": "Ex: CIWS, torpilles", "key": "defenses"},
-                        {"label": "Variantes", "placeholder": "Ex: Version civile, militaire", "key": "variantes"},
-                        {"label": "Autre", "placeholder": "Ex: Informations spéciales", "key": "autre"}
-                    ],
-                    "embed_template": "> - Armement principal : {armement_principal}\n> - Missiles : {missiles}\n> - Défenses : {defenses}\n> - Variantes : {variantes}\n> - Autre : {autre}"
-                }
-            }
-        },
-        "aerienne": {
-            "title": "Aéronef",
-            "color": discord.Color.orange(),
-            "color_completed": discord.Color.dark_orange(),
-            "emoji": "✈️",
-            "forms": {
-                1: {
-                    "title": "Aéronef - Caractéristiques Générales",
-                    "button_label": "✈️ Caractéristiques Générales",
-                    "fields": [
-                        {"label": "Nom de l'Aéronef", "placeholder": "Ex: F-22 Raptor, Boeing 747", "key": "nom"},
-                        {"label": "Constructeur(s)", "placeholder": "Ex: Lockheed Martin, Boeing", "key": "constructeur"},
-                        {"label": "Masse à vide (kg)", "placeholder": "Ex: 15000", "key": "masse"},
-                        {"label": "Dimensions (L x E x H m)", "placeholder": "Ex: 18.9 x 13.6 x 5.1", "key": "dimensions"},
-                        {"label": "Equipage/Passagers", "placeholder": "Ex: 2 pilotes", "key": "equipage"}
-                    ],
-                    "embed_template": "> - Constructeur(s) : {constructeur}\n> - Masse : {masse} kg (à vide)\n> - Dimensions : {dimensions} m\n> - Equipage : {equipage}\n> - Matériaux : [À compléter dans Form 2]"
-                },
-                2: {
-                    "title": "Aéronef - Informations Techniques", 
-                    "button_label": "🛩️ Informations Techniques",
-                    "fields": [
-                        {"label": "Moteurs", "placeholder": "Ex: 2x turbofan", "key": "moteurs"},
-                        {"label": "Poussée (kN)", "placeholder": "Ex: 156", "key": "poussee"},
-                        {"label": "Vitesse max (km/h)", "placeholder": "Ex: 2410", "key": "vitesse"},
-                        {"label": "Plafond (m)", "placeholder": "Ex: 19812", "key": "plafond"},
-                        {"label": "Rayon d'action (km)", "placeholder": "Ex: 2960", "key": "rayon"}
-                    ],
-                    "embed_template": "> - Moteurs : {moteurs}\n> - Poussée : {poussee} kN\n> - Vitesse maximale : {vitesse} km/h\n> - Plafond : {plafond} m\n> - Rayon d'action : {rayon} km"
-                },
-                3: {
-                    "title": "Aéronef - Informations Utiles",
-                    "button_label": "☁️ Informations Utiles", 
-                    "fields": [
-                        {"label": "Armement", "placeholder": "Ex: Canons, missiles", "key": "armement"},
-                        {"label": "Avionique", "placeholder": "Ex: Radar, contre-mesures", "key": "avionique"},
-                        {"label": "Matériaux", "placeholder": "Ex: Aluminium, composites", "key": "materiaux"},
-                        {"label": "Variantes", "placeholder": "Ex: Chasseur, bombardier", "key": "variantes"},
-                        {"label": "Autre", "placeholder": "Ex: Capacités spéciales", "key": "autre"}
-                    ],
-                    "embed_template": "> - Armement : {armement}\n> - Avionique : {avionique}\n> - Matériaux : {materiaux}\n> - Variantes : {variantes}\n> - Autre : {autre}"
-                }
-            }
-        }
-    }
+            return configs
+        except FileNotFoundError:
+            print("⚠️ tech_form_datas.json not found, using empty config")
+            return {}
+        except Exception as e:
+            print(f"⚠️ Error loading tech_form_datas.json: {e}")
+            return {}
+
+    # Load configurations on class initialization
+    TECH_CONFIGS = load_tech_configs()
 
 
 class UniversalTechForm(discord.ui.Modal):
-    """Universal form that adapts based on configuration data"""
-    
-    def __init__(self, tech_type: str, form_number: int, form_state: dict):
+    """Universal modal form that adapts based on configuration."""
+
+    def __init__(
+        self, tech_type: str, form_index: int, form_data: dict, parent_view=None
+    ):
+        config = TechFormData.TECH_CONFIGS[tech_type]
+        common_config = TechFormData.TECH_CONFIGS.get("common", {"forms": []})
+
+        # Combine common fields first, then tech-specific fields
+        all_forms = common_config["forms"] + config["forms"]
+
+        # Auto-split forms into groups of 5
+        forms_per_page = 5
+        start_idx = form_index * forms_per_page
+        end_idx = start_idx + forms_per_page
+        current_forms = all_forms[start_idx:end_idx]
+
+        title = f"{config['title']} - Partie {form_index + 1}"
+        super().__init__(title=title, timeout=None)
+
         self.tech_type = tech_type
-        self.form_number = form_number
-        self.form_state = form_state
-        self.config = TechFormData.TECH_CONFIGS[tech_type]["forms"][form_number]
-        
-        super().__init__(title=self.config["title"])
-        
-        # Dynamically create text inputs based on config
-        self.inputs = {}
-        for field in self.config["fields"]:
-            text_input = discord.ui.TextInput(
-                label=field["label"],
-                placeholder=field["placeholder"],
-                required=True,
-                max_length=200
+        self.form_index = form_index
+        self.form_data = form_data
+        self.parent_view = parent_view
+
+        # Create TextInput fields following ConstructionForm pattern
+        self.fields = []
+        for field_config in current_forms:
+            field = discord.ui.TextInput(
+                label=field_config["label"],
+                placeholder=field_config["placeholder"],
+                max_length=300,
+                style=discord.TextStyle.short,
+                required=False,
             )
-            self.inputs[field["key"]] = text_input
-            self.add_item(text_input)
+            setattr(self, f"field_{field_config['key']}", field)
+            self.fields.append((field_config["key"], field))
+            self.add_item(field)
 
     async def on_submit(self, interaction: discord.Interaction):
-        await interaction.response.defer(thinking=True)
-        
-        # Store form data
-        form_data = {}
-        for key, input_field in self.inputs.items():
-            form_data[key] = input_field.value
-        
-        # Update form state
-        self.form_state[f"form_{self.form_number}"] = form_data
-        self.form_state["completed_forms"].add(self.form_number)
-        
-        tech_config = TechFormData.TECH_CONFIGS[self.tech_type]
-        
-        # Determine if all forms are completed
-        all_completed = len(self.form_state["completed_forms"]) == 3
-        embed_color = tech_config["color_completed"] if all_completed else tech_config["color"]
-        
-        # Create embed
-        embed = discord.Embed(
-            title=f"**Type {tech_config['title']} : {form_data.get('nom', 'Sans nom')}**",
-            color=embed_color
-        )
-        
-        # Add completed forms sections
-        for form_num in sorted(self.form_state["completed_forms"]):
-            form_config = tech_config["forms"][form_num]
-            form_values = self.form_state[f"form_{form_num}"]
-            
-            try:
-                formatted_text = form_config["embed_template"].format(**form_values)
-            except KeyError as e:
-                formatted_text = f"Erreur de formatage: {e}\nDonnées: {form_values}"
-            
-            section_names = {
-                1: "**Caractéristiques générales :**",
-                2: "**Informations techniques :**", 
-                3: "**Informations utiles :**"
-            }
-            
-            embed.add_field(
-                name=section_names.get(form_num, f"**Section {form_num} :**"),
-                value=formatted_text,
-                inline=False
+        """Handle form submission and update parent view."""
+        # Collect field values
+        for key, field in self.fields:
+            self.form_data[key] = field.value
+
+        # Mark this form as completed in parent view
+        if self.parent_view:
+            self.parent_view.mark_form_completed(self.form_index)
+
+        embed = interaction.message.embeds[0] if interaction.message.embeds else None
+        if not embed:
+            embed = discord.Embed(
+                title=f"✅ Formulaire {self.form_index + 1} complété",
+                description="Données sauvegardées avec succès !",
+                color=TechFormData.TECH_CONFIGS[self.tech_type]["color_completed"],
             )
-        
-        # Add status section
-        status_emoji = "✅" if all_completed else "🔄"
-        status_text = "Toutes les sections complétées !" if all_completed else "En cours de completion..."
-        
-        forms_status = []
-        for i in range(1, 4):
-            if i in self.form_state["completed_forms"]:
-                forms_status.append(f"> ✅ Form {i}/3 complété")
-            else:
-                forms_status.append(f"> ⏳ Form {i}/3 en attente")
-        
-        embed.add_field(
-            name=f"**{status_emoji} Status :**",
-            value=f"{status_text}\n" + "\n".join(forms_status),
-            inline=False
-        )
-        
-        if all_completed:
-            embed.set_footer(text="🎉 Toutes les informations ont été collectées avec succès!")
-        
-        await interaction.followup.send(embed=embed)
+
+        await interaction.response.edit_message(embed=embed, view=self.parent_view)
 
 class MultiFormView(discord.ui.View):
-    """Universal view that handles all tech types with persistent state"""
-    
-    def __init__(self, tech_type: str):
+    """Universal view that handles tech types with auto-splitting forms."""
+
+    def __init__(self, tech_type: str, ctx: commands.Context, image_url: str):
         super().__init__(timeout=300)
         self.tech_type = tech_type
-        self.tech_config = TechFormData.TECH_CONFIGS[tech_type]
-        
-        # Initialize form state
-        self.form_state = {
-            "completed_forms": set(),
-            "form_1": {},
-            "form_2": {},
-            "form_3": {}
-        }
-        
-        # Create buttons dynamically
-        for form_num in range(1, 4):
-            form_config = self.tech_config["forms"][form_num]
+        self.config = TechFormData.TECH_CONFIGS[tech_type]
+        self.common_config = TechFormData.TECH_CONFIGS.get("common", {"forms": []})
+        self.form_data = {}
+        self.ctx = ctx
+        self.image_url = image_url
+
+        # Calculate number of forms needed (auto-split by 5)
+        # Include common fields + tech-specific fields
+        total_fields = len(self.common_config["forms"]) + len(self.config["forms"])
+        self.num_forms = (total_fields + 4) // 5  # Ceiling division
+        self.completed_forms = set()
+
+        # Create buttons in a single row
+        for i in range(self.num_forms):
             button = discord.ui.Button(
-                label=f"Form {form_num}/3",
-                style=discord.ButtonStyle.green if form_num == 1 else discord.ButtonStyle.blurple if form_num == 2 else discord.ButtonStyle.red,
-                row=form_num-1
+                label=f"Formulaire {i + 1}",
+                style=discord.ButtonStyle.green,
+                custom_id=f"form_{i}",
+                row=0,
             )
-            
-            # Create callback for each button
-            async def create_callback(form_number):
+
+            # Create callback using closure
+            def create_callback(form_index):
                 async def button_callback(interaction):
-                    form_config = self.tech_config["forms"][form_number]
-                    button.label = form_config["button_label"]
                     await interaction.response.send_modal(
-                        UniversalTechForm(self.tech_type, form_number, self.form_state)
+                        UniversalTechForm(
+                            self.tech_type, form_index, self.form_data, self
+                        )
                     )
+
                 return button_callback
-            
-            button.callback = create_callback(form_num)
+
+            button.callback = create_callback(i)
             self.add_item(button)
 
+    def mark_form_completed(self, form_index: int):
+        """Mark a form as completed and update button appearance."""
+        self.completed_forms.add(form_index)
+
+        # Update button to dark green and make unclickable
+        for item in self.children:
+            if hasattr(item, "custom_id") and item.custom_id == f"form_{form_index}":
+                item.style = discord.ButtonStyle.secondary
+                item.label = f"✅ Formulaire {form_index + 1}"
+                item.disabled = True
+                break
+
+        if self.all_forms_completed():
+            asyncio.create_task(
+                self.send_summary()
+            )  # Utiliser create_task car on n'est pas dans async
+
+
+    def all_forms_completed(self) -> bool:
+        """Check if all forms have been completed."""
+        return len(self.completed_forms) == self.num_forms
+
+    async def send_summary(self):
+        summary_lines = [
+            f"📦 **Résumé de la technologie `{self.config['title']}` :**\n"
+        ]
+
+        print(f"Form data collected: {self.form_data}")
+        print(f"Sending to ctx: {self.ctx.message.channel.id}")
+
+        # Combine common and tech-specific fields for summary
+        all_fields = self.common_config["forms"] + self.config["forms"]
+
+        for key, value in self.form_data.items():
+            label = next((f["label"] for f in all_fields if f["key"] == key), key)
+            summary_lines.append(f"• **{label}** : {value or '*Non renseigné*'}")
+
+        embed = discord.Embed(
+            title="🧪 Création terminée",
+            description="\n".join(summary_lines),
+            color=discord.Color.green(),
+        )
+        embed.set_image(url=self.image_url)
+
+        await self.ctx.send(embed=embed)
+
     async def on_timeout(self):
-        # Disable all buttons when view times out
+        """Disable all buttons when view times out."""
         for item in self.children:
             item.disabled = True
+
 
 @bot.command(
     name="test_multi_form",
     brief="Teste les formulaires multi-étapes pour les technologies.",
     usage="test_multi_form [tech_type]",
-    description="POC pour tester les formulaires en 3 parties selon le type de technologie.",
+    description="POC pour tester les formulaires auto-divisés selon le type de technologie.",
     help="""Teste les formulaires multi-étapes pour différents types de technologies.
 
     FONCTIONNALITÉ :
-    - Affiche 3 boutons pour 3 formulaires différents
+    - Divise automatiquement les champs en groupes de 5 maximum
     - Chaque formulaire est adapté au type de technologie
-    - Divise les données en 3 parties pour éviter la limite de 5 inputs
+    - Boutons en ligne unique avec couleurs progressives
 
     TYPES SUPPORTÉS :
-    - `terrestre` : Armes à feu et équipements terrestres
+    - `armes` : Armes à feu et équipements d'armement
+    - `terrestre` : Véhicules et équipements terrestres
     - `navale` : Navires et équipements navals  
     - `aerienne` : Aéronefs et équipements aériens
 
+    CHAMPS COMMUNS :
+    - Nom de la technologie
+    - Niveau technologique (1-20)
+    - Technologie d'inspiration originelle
+
     ARGUMENTS :
-    - `[tech_type]` : Optionnel. Type de technologie (terrestre/navale/aerienne)
+    - `[tech_type]` : Optionnel. Type de technologie (armes/terrestre/navale/aerienne)
 
     EXEMPLE :
     - `test_multi_form` : Lance l'interface de sélection
-    - `test_multi_form terrestre` : Lance directement le formulaire terrestre
+    - `test_multi_form armes` : Lance directement le formulaire d'armes
     """,
     hidden=False,
     enabled=True,
     case_insensitive=True,
 )
 async def test_multi_form(
-    ctx, 
+    ctx,
     tech_type: str = commands.parameter(
-        default=None,
-        description="Type de technologie (terrestre/navale/aerienne)"
-    )
+        default=None, description="Type de technologie (terrestre/navale/aerienne)"
+    ),
+    image_url: str = None,
 ) -> None:
     """Commande de test pour les formulaires multi-étapes selon le type de technologie."""
     if not tech_type:
         tech_type = await dUtils.discord_input(
             ctx,
-            "Bienvenue dans le programme de création de technologies!\nQuel type de technologie voulez-vous créer? (terrestre/navale/aerienne)",
+            f"Bienvenue dans le programme de création de technologies!\nQuel type de technologie voulez-vous créer? ({'/'.join(TechFormData.TECH_CONFIGS.keys())})",
         )
-    
+
+    image_url_finale = None
+    if ctx.message.attachments:
+        image_url_finale = ctx.message.attachments[0].url
+    elif image_url and image_url.startswith("http"):
+        image_url_finale = image_url
+
+    if not image_url_finale:
+        await ctx.send(
+            "Veuillez fournir une illustration pour la technologie (fichier ou lien)."
+        )
+        return
+
     tech_type = tech_type.lower()
-    if tech_type not in ["terrestre", "navale", "aerienne"]:
-        await ctx.send("Veuillez répondre par 'terrestre', 'navale' ou 'aerienne'.")
+    if tech_type not in TechFormData.TECH_CONFIGS.keys() or tech_type == "common":
+        valid_types = [k for k in TechFormData.TECH_CONFIGS.keys() if k != "common"]
+        await ctx.send("Veuillez répondre par " + ", ".join(valid_types) + ".")
         return
 
     # Get tech configuration
-    tech_config = TechFormData.TECH_CONFIGS[tech_type]
+    config = TechFormData.TECH_CONFIGS[tech_type]
+    common_config = TechFormData.TECH_CONFIGS.get("common", {"forms": []})
+
+    # Calculate number of forms (including common fields)
+    total_fields = len(common_config["forms"]) + len(config["forms"])
+    num_forms = (total_fields + 4) // 5  # Ceiling division
 
     # Création de l'embed d'information
-        title=f"� Création de Technologie - Type: {tech_type.title()}",
-        description=f"Sélectionnez le formulaire à remplir pour votre technologie de type **{tech_type}**.\n\n"
-                   f"**Formulaires disponibles:**\n"
-                   f"📝 **Form 1/3** - Caractéristiques générales\n"
-                   f"⚙️ **Form 2/3** - Informations techniques\n"
-                   f"📋 **Form 3/3** - Informations utiles\n\n"
-                   f"*Vous pouvez remplir les formulaires dans n'importe quel ordre.*",
-        color=discord.Color.gold()
+    embed = discord.Embed(
+        title=f"{config['emoji']} Création de Technologie - {config['title']}",
+        description=f"Formulaires auto-divisés pour votre **{config['title']}**.\n\n"
+        f"**Champs communs:** {len(common_config['forms'])}\n"
+        f"**Champs spécifiques:** {len(config['forms'])}\n"
+        f"**Total de champs:** {total_fields}\n"
+        f"**Formulaires générés:** {num_forms}\n\n"
+        f"*Chaque formulaire contient jusqu'à 5 champs.*\n"
+        f"*Les boutons deviennent verts foncés une fois complétés.*",
+        color=config["color"],
     )
-    
-    if tech_type == "terrestre":
-        embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/🔫.png")
-    elif tech_type == "navale":
-        embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/🚢.png")
-    else:  # aerienne
-        embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/✈️.png")
 
-    await ctx.send(embed=embed, view=MultiFormView(tech_type))
+    embed.set_footer(text="💡 Remplissez tous les formulaires pour terminer la saisie!")
+
+    await ctx.send(embed=embed, view=MultiFormView(tech_type, ctx, image_url_finale))
+
+@bot.command(
+    name="create_tech",
+    brief="Crée une technologie avec un formulaire multi-étapes.",
+    usage="create_tech [tech_type] [image_url]",
+    description="Formulaire pour créer une technologie avec un formulaire auto-divisé selon le type de technologie.",
+    help="""Crée une technologie avec un formulaire multi-étapes.
+    FONCTIONNALITÉ :
+    - Divise automatiquement les champs en groupes de 5 maximum
+    - Chaque formulaire est adapté au type de technologie
+    - Boutons en ligne unique avec couleurs progressives
+    - Calcule le coût, le temps de recherche et permet à l'utilisateur de confirmer la création
+    - Si confirmation donnée, enregistre la technologie dans la base de données
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
+async def create_tech(
+    ctx,
+    tech_type: str = commands.parameter(
+        default=None, description="Type de technologie (terrestre/navale/aerienne)"
+    ),
+    image_url: str = None,
+) -> None:
+    """Commande de création pour les formulaires multi-étapes selon le type de technologie."""
+    valid_types = [k for k in TechFormData.TECH_CONFIGS.keys() if k != "common"]
+    if not tech_type:
+        tech_type = await dUtils.discord_input(
+            ctx,
+            f"Bienvenue dans le programme de création de technologies!\nQuel type de technologie voulez-vous créer? ({'/'.join(valid_types)})",
+        )
+
+    image_url_finale = None
+    if ctx.message.attachments:
+        image_url_finale = ctx.message.attachments[0].url
+    elif image_url and image_url.startswith("http"):
+        image_url_finale = image_url
+
+    if not image_url_finale:
+        image_url_finale = await dUtils.discord_input(
+            ctx,
+            "Veuillez fournir une illustration pour la technologie (lien)."
+        )
+    if not image_url_finale or not image_url_finale.startswith("http"):
+        await ctx.send(
+            "Veuillez fournir une illustration valide pour la technologie (fichier ou lien)."
+        )
+        return
+
+    tech_type = tech_type.lower()
+    if tech_type not in TechFormData.TECH_CONFIGS.keys() or tech_type == "common":
+        await ctx.send("Veuillez répondre par " + ", ".join(valid_types) + ".")
+        return
+
+    # Get tech configuration
+    config = TechFormData.TECH_CONFIGS[tech_type]
+    common_config = TechFormData.TECH_CONFIGS.get("common", {"forms": []})
+
+    # Calculate number of forms (including common fields)
+    total_fields = len(common_config["forms"]) + len(config["forms"])
+    num_forms = (total_fields + 4) // 5  # Ceiling division
+
+    # Création de l'embed d'information
+    embed = discord.Embed(
+        title=f"{config['emoji']} Création de Technologie - {config['title']}",
+        description=f"Vous allez pouvoir créer une technologie de type **{config['title']}**.\n\n",
+        color=config["color"],
+    )
+
+    embed.set_footer(text="💡 Remplissez tous les formulaires pour terminer la saisie!")
+
+    await ctx.send(embed=embed, view=MultiFormView(tech_type, ctx, image_url_finale))
 
 @bot.command()
 async def annex(ctx, region_id):
     return
 
+
 @bot.command()
 async def add_player_to_country(ctx, user: discord.Member, country: CountryConverter):
     return
 
-@bot.command()
-async def remove_player_from_country(ctx, user: discord.Member, country: CountryConverter):
-    return
 
 @bot.command()
-async def add_region(ctx, region_name: str, map_name: str, population: int, country: CountryConverter = None):
+async def remove_player_from_country(
+    ctx, user: discord.Member, country: CountryConverter
+):
     return
+
+
+@bot.command()
+async def add_region(
+    ctx,
+    region_name: str,
+    map_name: str,
+    population: int,
+    country: CountryConverter = None,
+):
+    return
+
 
 @bot.command()
 async def remove_region(ctx, region_id: int):
     return
 
+
 @bot.command()
 async def set_region_data(ctx, region_id: int, key: str, value: str):
     return
+
 
 bot.run(token)
