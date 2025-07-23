@@ -1504,6 +1504,366 @@ async def program_ghostping(ctx, target: Union[discord.Member, discord.Role], wa
     message = await ctx.send(f"{target.mention}")
     await asyncio.sleep(2)
     await message.delete()  # Supprimer le message de ghost ping
+    
+@bot.command()
+async def test_converter(ctx, country: CountryConverter):
+    """
+    Teste le convertisseur de pays.
+
+    Args:
+        ctx (commands.Context): Le contexte de la commande.
+        country (CountryConverter): Le pays à tester.
+
+    Returns:
+        None
+    """
+    if not country.get("id"):
+        return await ctx.send("Pays non trouvé.")
+    await ctx.send(f"Pays trouvé : {country.get('name')} (ID: {country.get('id')})")
+    
+    
+class TechFormData:
+    """Configuration data for different technology forms"""
+    
+    TECH_CONFIGS = {
+        "terrestre": {
+            "title": "Arme à Feu",
+            "color": discord.Color.green(),
+            "color_completed": discord.Color.dark_green(),
+            "emoji": "🔫",
+            "forms": {
+                1: {
+                    "title": "Arme à Feu - Caractéristiques Générales",
+                    "button_label": "🔫 Caractéristiques Générales",
+                    "fields": [
+                        {"label": "Nom de l'Arme", "placeholder": "Ex: AK-47, M4A1, etc.", "key": "nom"},
+                        {"label": "Manufacture(s)", "placeholder": "Ex: Company of the Skyforge", "key": "manufacture"},
+                        {"label": "Masse (kg)", "placeholder": "Ex: 3.5", "key": "masse"},
+                        {"label": "Dimensions (H x D cm)", "placeholder": "Ex: 87 x 5.5", "key": "dimensions"},
+                        {"label": "Capacité du chargeur", "placeholder": "Ex: 30 cartouches", "key": "capacite"}
+                    ],
+                    "embed_template": "> - Manufacture(s) : {manufacture}\n> - Masse : {masse} kg\n> - Dimensions : {dimensions} cm\n> - Capacité du chargeur : {capacite}\n> - Matériaux : [À compléter dans Form 2]"
+                },
+                2: {
+                    "title": "Arme à Feu - Informations Techniques",
+                    "button_label": "⚙️ Informations Techniques",
+                    "fields": [
+                        {"label": "Munitions (calibre)", "placeholder": "Ex: 7.62x39mm", "key": "munitions"},
+                        {"label": "Portée efficace (m)", "placeholder": "Ex: 400", "key": "portee"},
+                        {"label": "Cadence de tir (cpm)", "placeholder": "Ex: 600", "key": "cadence"},
+                        {"label": "Vitesse projectile (m/s)", "placeholder": "Ex: 715", "key": "vitesse"},
+                        {"label": "Mode de tir", "placeholder": "Ex: Semi-auto, Auto, Rafale", "key": "mode_tir"}
+                    ],
+                    "embed_template": "> - Munitions : {munitions}\n> - Portée efficace : {portee} mètres\n> - Cadence de tir : {cadence} coups par minute\n> - Vitesse du projectile : {vitesse} m/s\n> - Mode de tir : {mode_tir}"
+                },
+                3: {
+                    "title": "Arme à Feu - Informations Utiles",
+                    "button_label": "📋 Informations Utiles",
+                    "fields": [
+                        {"label": "Système de visée", "placeholder": "Ex: Viseur optique, holographique", "key": "visee"},
+                        {"label": "Matériaux", "placeholder": "Ex: Acier, alliage, polymère", "key": "materiaux"},
+                        {"label": "Variantes", "placeholder": "Ex: Version courte, sniper", "key": "variantes"},
+                        {"label": "Autre", "placeholder": "Ex: Informations supplémentaires", "key": "autre"},
+                        {"label": "Notes", "placeholder": "Ex: Remarques spéciales", "key": "notes"}
+                    ],
+                    "embed_template": "> - Système de visée : {visee}\n> - Matériaux : {materiaux}\n> - Variantes : {variantes}\n> - Autre : {autre}\n> - Notes : {notes}"
+                }
+            }
+        },
+        "navale": {
+            "title": "Navire",
+            "color": discord.Color.blue(),
+            "color_completed": discord.Color.dark_blue(),
+            "emoji": "🚢",
+            "forms": {
+                1: {
+                    "title": "Navire - Caractéristiques Générales",
+                    "button_label": "🚢 Caractéristiques Générales",
+                    "fields": [
+                        {"label": "Nom du Navire", "placeholder": "Ex: USS Enterprise, HMS Victory", "key": "nom"},
+                        {"label": "Constructeur(s)", "placeholder": "Ex: Danish Pride Industries", "key": "constructeur"},
+                        {"label": "Masse (tonnes)", "placeholder": "Ex: 5000", "key": "masse"},
+                        {"label": "Dimensions (L x l x T m)", "placeholder": "Ex: 150 x 20 x 8", "key": "dimensions"},
+                        {"label": "Equipage", "placeholder": "Ex: 200 personnes", "key": "equipage"}
+                    ],
+                    "embed_template": "> - Constructeur(s) : {constructeur}\n> - Masse : {masse} tonnes (à pleine charge)\n> - Dimensions : {dimensions} m\n> - Equipage : {equipage}\n> - Déplacement : [À compléter dans Form 2]"
+                },
+                2: {
+                    "title": "Navire - Informations Techniques",
+                    "button_label": "⚓ Informations Techniques",
+                    "fields": [
+                        {"label": "Propulsion", "placeholder": "Ex: Moteurs diesel, turbines", "key": "propulsion"},
+                        {"label": "Puissance", "placeholder": "Ex: 50000 chevaux", "key": "puissance"},
+                        {"label": "Vitesse max (nœuds)", "placeholder": "Ex: 30", "key": "vitesse"},
+                        {"label": "Autonomie (jours)", "placeholder": "Ex: 45", "key": "autonomie"},
+                        {"label": "Rayon d'action (km)", "placeholder": "Ex: 8000", "key": "rayon"}
+                    ],
+                    "embed_template": "> - Propulsion : {propulsion}\n> - Puissance : {puissance}\n> - Vitesse maximale : {vitesse} nœuds\n> - Autonomie : {autonomie} jours\n> - Rayon d'action : {rayon} kilomètres"
+                },
+                3: {
+                    "title": "Navire - Informations Utiles",
+                    "button_label": "🌊 Informations Utiles",
+                    "fields": [
+                        {"label": "Armement principal", "placeholder": "Ex: Canons 127mm", "key": "armement_principal"},
+                        {"label": "Missiles", "placeholder": "Ex: Surface-air, surface-surface", "key": "missiles"},
+                        {"label": "Défenses", "placeholder": "Ex: CIWS, torpilles", "key": "defenses"},
+                        {"label": "Variantes", "placeholder": "Ex: Version civile, militaire", "key": "variantes"},
+                        {"label": "Autre", "placeholder": "Ex: Informations spéciales", "key": "autre"}
+                    ],
+                    "embed_template": "> - Armement principal : {armement_principal}\n> - Missiles : {missiles}\n> - Défenses : {defenses}\n> - Variantes : {variantes}\n> - Autre : {autre}"
+                }
+            }
+        },
+        "aerienne": {
+            "title": "Aéronef",
+            "color": discord.Color.orange(),
+            "color_completed": discord.Color.dark_orange(),
+            "emoji": "✈️",
+            "forms": {
+                1: {
+                    "title": "Aéronef - Caractéristiques Générales",
+                    "button_label": "✈️ Caractéristiques Générales",
+                    "fields": [
+                        {"label": "Nom de l'Aéronef", "placeholder": "Ex: F-22 Raptor, Boeing 747", "key": "nom"},
+                        {"label": "Constructeur(s)", "placeholder": "Ex: Lockheed Martin, Boeing", "key": "constructeur"},
+                        {"label": "Masse à vide (kg)", "placeholder": "Ex: 15000", "key": "masse"},
+                        {"label": "Dimensions (L x E x H m)", "placeholder": "Ex: 18.9 x 13.6 x 5.1", "key": "dimensions"},
+                        {"label": "Equipage/Passagers", "placeholder": "Ex: 2 pilotes", "key": "equipage"}
+                    ],
+                    "embed_template": "> - Constructeur(s) : {constructeur}\n> - Masse : {masse} kg (à vide)\n> - Dimensions : {dimensions} m\n> - Equipage : {equipage}\n> - Matériaux : [À compléter dans Form 2]"
+                },
+                2: {
+                    "title": "Aéronef - Informations Techniques", 
+                    "button_label": "🛩️ Informations Techniques",
+                    "fields": [
+                        {"label": "Moteurs", "placeholder": "Ex: 2x turbofan", "key": "moteurs"},
+                        {"label": "Poussée (kN)", "placeholder": "Ex: 156", "key": "poussee"},
+                        {"label": "Vitesse max (km/h)", "placeholder": "Ex: 2410", "key": "vitesse"},
+                        {"label": "Plafond (m)", "placeholder": "Ex: 19812", "key": "plafond"},
+                        {"label": "Rayon d'action (km)", "placeholder": "Ex: 2960", "key": "rayon"}
+                    ],
+                    "embed_template": "> - Moteurs : {moteurs}\n> - Poussée : {poussee} kN\n> - Vitesse maximale : {vitesse} km/h\n> - Plafond : {plafond} m\n> - Rayon d'action : {rayon} km"
+                },
+                3: {
+                    "title": "Aéronef - Informations Utiles",
+                    "button_label": "☁️ Informations Utiles", 
+                    "fields": [
+                        {"label": "Armement", "placeholder": "Ex: Canons, missiles", "key": "armement"},
+                        {"label": "Avionique", "placeholder": "Ex: Radar, contre-mesures", "key": "avionique"},
+                        {"label": "Matériaux", "placeholder": "Ex: Aluminium, composites", "key": "materiaux"},
+                        {"label": "Variantes", "placeholder": "Ex: Chasseur, bombardier", "key": "variantes"},
+                        {"label": "Autre", "placeholder": "Ex: Capacités spéciales", "key": "autre"}
+                    ],
+                    "embed_template": "> - Armement : {armement}\n> - Avionique : {avionique}\n> - Matériaux : {materiaux}\n> - Variantes : {variantes}\n> - Autre : {autre}"
+                }
+            }
+        }
+    }
+
+
+class UniversalTechForm(discord.ui.Modal):
+    """Universal form that adapts based on configuration data"""
+    
+    def __init__(self, tech_type: str, form_number: int, form_state: dict):
+        self.tech_type = tech_type
+        self.form_number = form_number
+        self.form_state = form_state
+        self.config = TechFormData.TECH_CONFIGS[tech_type]["forms"][form_number]
+        
+        super().__init__(title=self.config["title"])
+        
+        # Dynamically create text inputs based on config
+        self.inputs = {}
+        for field in self.config["fields"]:
+            text_input = discord.ui.TextInput(
+                label=field["label"],
+                placeholder=field["placeholder"],
+                required=True,
+                max_length=200
+            )
+            self.inputs[field["key"]] = text_input
+            self.add_item(text_input)
+
+    async def on_submit(self, interaction: discord.Interaction):
+        await interaction.response.defer(thinking=True)
+        
+        # Store form data
+        form_data = {}
+        for key, input_field in self.inputs.items():
+            form_data[key] = input_field.value
+        
+        # Update form state
+        self.form_state[f"form_{self.form_number}"] = form_data
+        self.form_state["completed_forms"].add(self.form_number)
+        
+        tech_config = TechFormData.TECH_CONFIGS[self.tech_type]
+        
+        # Determine if all forms are completed
+        all_completed = len(self.form_state["completed_forms"]) == 3
+        embed_color = tech_config["color_completed"] if all_completed else tech_config["color"]
+        
+        # Create embed
+        embed = discord.Embed(
+            title=f"**Type {tech_config['title']} : {form_data.get('nom', 'Sans nom')}**",
+            color=embed_color
+        )
+        
+        # Add completed forms sections
+        for form_num in sorted(self.form_state["completed_forms"]):
+            form_config = tech_config["forms"][form_num]
+            form_values = self.form_state[f"form_{form_num}"]
+            
+            try:
+                formatted_text = form_config["embed_template"].format(**form_values)
+            except KeyError as e:
+                formatted_text = f"Erreur de formatage: {e}\nDonnées: {form_values}"
+            
+            section_names = {
+                1: "**Caractéristiques générales :**",
+                2: "**Informations techniques :**", 
+                3: "**Informations utiles :**"
+            }
+            
+            embed.add_field(
+                name=section_names.get(form_num, f"**Section {form_num} :**"),
+                value=formatted_text,
+                inline=False
+            )
+        
+        # Add status section
+        status_emoji = "✅" if all_completed else "🔄"
+        status_text = "Toutes les sections complétées !" if all_completed else "En cours de completion..."
+        
+        forms_status = []
+        for i in range(1, 4):
+            if i in self.form_state["completed_forms"]:
+                forms_status.append(f"> ✅ Form {i}/3 complété")
+            else:
+                forms_status.append(f"> ⏳ Form {i}/3 en attente")
+        
+        embed.add_field(
+            name=f"**{status_emoji} Status :**",
+            value=f"{status_text}\n" + "\n".join(forms_status),
+            inline=False
+        )
+        
+        if all_completed:
+            embed.set_footer(text="🎉 Toutes les informations ont été collectées avec succès!")
+        
+        await interaction.followup.send(embed=embed)
+
+class MultiFormView(discord.ui.View):
+    """Universal view that handles all tech types with persistent state"""
+    
+    def __init__(self, tech_type: str):
+        super().__init__(timeout=300)
+        self.tech_type = tech_type
+        self.tech_config = TechFormData.TECH_CONFIGS[tech_type]
+        
+        # Initialize form state
+        self.form_state = {
+            "completed_forms": set(),
+            "form_1": {},
+            "form_2": {},
+            "form_3": {}
+        }
+        
+        # Create buttons dynamically
+        for form_num in range(1, 4):
+            form_config = self.tech_config["forms"][form_num]
+            button = discord.ui.Button(
+                label=f"Form {form_num}/3",
+                style=discord.ButtonStyle.green if form_num == 1 else discord.ButtonStyle.blurple if form_num == 2 else discord.ButtonStyle.red,
+                row=form_num-1
+            )
+            
+            # Create callback for each button
+            async def create_callback(form_number):
+                async def button_callback(interaction):
+                    form_config = self.tech_config["forms"][form_number]
+                    button.label = form_config["button_label"]
+                    await interaction.response.send_modal(
+                        UniversalTechForm(self.tech_type, form_number, self.form_state)
+                    )
+                return button_callback
+            
+            button.callback = create_callback(form_num)
+            self.add_item(button)
+
+    async def on_timeout(self):
+        # Disable all buttons when view times out
+        for item in self.children:
+            item.disabled = True
+
+@bot.command(
+    name="test_multi_form",
+    brief="Teste les formulaires multi-étapes pour les technologies.",
+    usage="test_multi_form [tech_type]",
+    description="POC pour tester les formulaires en 3 parties selon le type de technologie.",
+    help="""Teste les formulaires multi-étapes pour différents types de technologies.
+
+    FONCTIONNALITÉ :
+    - Affiche 3 boutons pour 3 formulaires différents
+    - Chaque formulaire est adapté au type de technologie
+    - Divise les données en 3 parties pour éviter la limite de 5 inputs
+
+    TYPES SUPPORTÉS :
+    - `terrestre` : Armes à feu et équipements terrestres
+    - `navale` : Navires et équipements navals  
+    - `aerienne` : Aéronefs et équipements aériens
+
+    ARGUMENTS :
+    - `[tech_type]` : Optionnel. Type de technologie (terrestre/navale/aerienne)
+
+    EXEMPLE :
+    - `test_multi_form` : Lance l'interface de sélection
+    - `test_multi_form terrestre` : Lance directement le formulaire terrestre
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
+async def test_multi_form(
+    ctx, 
+    tech_type: str = commands.parameter(
+        default=None,
+        description="Type de technologie (terrestre/navale/aerienne)"
+    )
+) -> None:
+    """Commande de test pour les formulaires multi-étapes selon le type de technologie."""
+    if not tech_type:
+        tech_type = await dUtils.discord_input(
+            ctx,
+            "Bienvenue dans le programme de création de technologies!\nQuel type de technologie voulez-vous créer? (terrestre/navale/aerienne)",
+        )
+    
+    tech_type = tech_type.lower()
+    if tech_type not in ["terrestre", "navale", "aerienne"]:
+        await ctx.send("Veuillez répondre par 'terrestre', 'navale' ou 'aerienne'.")
+        return
+
+    # Get tech configuration
+    tech_config = TechFormData.TECH_CONFIGS[tech_type]
+
+    # Création de l'embed d'information
+        title=f"� Création de Technologie - Type: {tech_type.title()}",
+        description=f"Sélectionnez le formulaire à remplir pour votre technologie de type **{tech_type}**.\n\n"
+                   f"**Formulaires disponibles:**\n"
+                   f"📝 **Form 1/3** - Caractéristiques générales\n"
+                   f"⚙️ **Form 2/3** - Informations techniques\n"
+                   f"📋 **Form 3/3** - Informations utiles\n\n"
+                   f"*Vous pouvez remplir les formulaires dans n'importe quel ordre.*",
+        color=discord.Color.gold()
+    )
+    
+    if tech_type == "terrestre":
+        embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/🔫.png")
+    elif tech_type == "navale":
+        embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/🚢.png")
+    else:  # aerienne
+        embed.set_thumbnail(url="https://cdn.discordapp.com/emojis/✈️.png")
+
+    await ctx.send(embed=embed, view=MultiFormView(tech_type))
 
 @bot.command()
 async def annex(ctx, region_id):

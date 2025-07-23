@@ -95,8 +95,29 @@ class CountryConverter(commands.Converter):
                 role = await commands.RoleConverter().convert(ctx, argument)
                 entity = CountryEntity(role, ctx.guild)
             except commands.BadArgument:
-                raise commands.BadArgument("Entité inconnue.")
-
+                try:
+                    country_id = int(argument)
+                    db_instance = get_db()
+                    country_role_id = int(db_instance.get_country_role_with_id(country_id))
+                    if not country_role_id:
+                        raise commands.BadArgument("Entité inconnue.")
+                    role = ctx.guild.get_role(country_role_id)
+                    if not role:
+                        raise commands.BadArgument("Rôle introuvable.")
+                    entity = CountryEntity(role, ctx.guild)
+                except (commands.BadArgument, ValueError):
+                    try:
+                        country_name = argument.strip().lower()
+                        db_instance = get_db()
+                        country_id = db_instance.get_country_by_name(country_name.capitalize())
+                        if not country_id:
+                            raise commands.BadArgument("Pays inconnu.")
+                        role = ctx.guild.get_role(int(db_instance.get_country_role_with_id(country_id)))
+                        if not role:
+                            raise commands.BadArgument("Rôle introuvable.")
+                        entity = CountryEntity(role, ctx.guild)
+                    except commands.BadArgument:
+                        raise commands.BadArgument("Entité inconnue.")
         return entity.to_dict()
 
 
