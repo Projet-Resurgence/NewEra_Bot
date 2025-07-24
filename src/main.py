@@ -1,4 +1,3 @@
-from http.client import FORBIDDEN
 import discord
 import time
 from pyutil import filereplace
@@ -16,6 +15,7 @@ import aiohttp
 import os
 import re
 import sqlite3
+import shutil
 import events
 from construction import *
 from currency import *
@@ -192,7 +192,7 @@ starting_amounts = {
 usefull_role_ids_dic = {
     "staff": db.get_setting("staff_role_id"), 
     "admin": db.get_setting("admin_role_id"),
-    "military_admin": 1260960074403151895
+    "military_admin": 874869709223383091
 }
 
 Erreurs = {
@@ -1701,10 +1701,10 @@ class MultiFormView(discord.ui.View):
 
         # Combine common and tech-specific fields for summary
         all_fields = self.common_config["forms"] + self.config["forms"]
-        dev_cost = db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "dev_cost")
-        dev_time = db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "dev_time")
-        prod_cost = db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "prod_cost")
-        slots_taken = db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "slots_taken")
+        dev_cost = await db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "dev_cost")
+        dev_time = await db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "dev_time")
+        prod_cost = await db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "prod_cost")
+        slots_taken = await db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "slots_taken")
 
         for key, value in self.form_data.items():
             label = next((f["label"] for f in all_fields if f["key"] == key), key)
@@ -1734,42 +1734,545 @@ class MultiFormView(discord.ui.View):
         """Disable all buttons when view times out."""
         for item in self.children:
             item.disabled = True
+            
+@bot.command()
+async def easy_tech_test(ctx, image: str = None):
+    """Test command to create a technology with a simple form."""
+    if not dUtils.is_authorized(ctx):
+        return await ctx.send(embed=dUtils.get_auth_embed())
+
+    tech_datas = {'nom': 'hello', 'niveau_technologique': '2', 'tech_inspiration': '30', 'constructeur': '39', 'masse': '129', 'dimensions': '55', 'equipage': '55', 'moteurs': '55', 'poussee': '55', 'vitesse': '55', 'variantes': '424', 'autre': '433', 'plafond': '43', 'rayon': '32', 'armement': '43', 'avionique': '54', 'materiaux': '32'}
+    tech_type = "terrestre"  # Example tech type, replace with actual logic
+    tech_datas['specialisation'] = tech_type
+
+    image = "https://cdn.discordapp.com/attachments/1394353396059996220/1396138139826913300/Best_Tank.webp?ex=68824477&is=6880f2f7&hm=0841d65cf11039e527f4ac3fd0929c96fa2b376fdb8123a819f3e4beb4dfc099&"
+    
+
+    confirmed = True
+    if confirmed:
+        await handle_new_tech(
+            ctx, tech_type, tech_datas, image
+        )
 
 async def handle_new_tech(ctx, tech_type: str, tech_datas: dict, image_url: str):
     """Handle the creation of a new technology with the provided data."""
 
     # Validate tech type
     if tech_type not in TechFormData.TECH_CONFIGS:
-        valid_types = ", ".join(TechFormData.TECH_CONFIGS.keys())
+        valid_types = ", ".join([k for k in TechFormData.TECH_CONFIGS.keys() if k != "common"])
         return await ctx.send(f"Type de technologie invalide. Choisissez parmi : {valid_types}")
-    
-    all_fields = TechFormData.TECH_CONFIGS.get("common", {"forms": []})["forms"] + TechFormData.TECH_CONFIGS[tech_type]["forms"]
     
     country = CountryEntity(ctx.author, ctx.guild).to_dict()
     if not country.get("id"):
         return await ctx.send("Vous devez être dans un pays pour créer une technologie.")
 
-    techno_role = ctx.guild.get_role(useful_roles.get("military_admin"))
-    if not techno_role:
-        return await ctx.send("Rôle de technologie non trouvé. Veuillez contacter un administrateur.")
-    techno_channel = ctx.guild.get_channel(tech_channel_id)
-    
-    if not techno_channel:
+    # 1. Send image to tech channel and get new URL
+    tech_channel_id = 1397862765028442183
+    tech_channel = ctx.guild.get_channel(tech_channel_id)
+    if not tech_channel:
         return await ctx.send("Salon de technologie non trouvé. Veuillez contacter un administrateur.")
     
-    dev_cost = db.get_tech_datas(tech_datas.get("tech_type"), tech_datas.get("tech_level"), "dev_cost")
-    dev_time = db.get_tech_datas(tech_datas.get("tech_type"), tech_datas.get("tech_level"), "dev_time")
-    prod_cost = db.get_tech_datas(tech_datas.get("tech_type"), tech_datas.get("tech_level"), "prod_cost")
-    slots_taken = db.get_tech_datas(tech_datas.get("tech_type"), tech_datas.get("tech_level"), "slots_taken")
+    # Download and re-upload image
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(image_url) as resp:
+                if resp.status == 200:
+                    image_data = await resp.read()
+                    # Create a file-like object
+                    from io import BytesIO
+                    image_file = discord.File(BytesIO(image_data), filename=f"tech_{tech_datas.get('nom', 'unknown')}.png")
+                    tech_message = await tech_channel.send(f"📷 Image pour la technologie: **{tech_datas.get('nom')}**", file=image_file)
+                    new_image_url = tech_message.attachments[0].url
+                else:
+                    return await ctx.send("Impossible de télécharger l'image fournie.")
+    except Exception as e:
+        return await ctx.send(f"Erreur lors du traitement de l'image: {e}")
 
-    # Ask to confirm the creation to staff
-    # Store in cache the datas until confirmation
-    # If confirmed, save to database
+    # 2. Save technology data to JSON file
+    tech_data_complete = {
+        "id": f"tech_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{country['id']}",
+        "country_id": country["id"],
+        "country_name": country["name"],
+        "tech_type": tech_type,
+        "image_url": new_image_url,
+        "created_at": datetime.now().isoformat(),
+        "status": "pending_staff_review",
+        "submitted_by": ctx.author.id,
+        **tech_datas
+    }
     
-    # Save to database (pseudo-code, replace with actual DB logic)
-    # db.save_technology(tech_data)
+    # Ensure the directory exists
+    os.makedirs("datas/pending_techs", exist_ok=True)
+    tech_file_path = f"datas/pending_techs/{tech_data_complete['id']}.json"
+    
+    with open(tech_file_path, 'w', encoding='utf-8') as f:
+        json.dump(tech_data_complete, f, ensure_ascii=False, indent=2)
+    
+    # 3. Create staff confirmation embed and view
+    embed = discord.Embed(
+        title="🔬 Nouvelle technologie à valider",
+        description=f"**Pays:** {country['name']}\n**Type:** {tech_type.title()}\n**Soumis par:** {ctx.author.mention}",
+        color=discord.Color.orange()
+    )
+    
+    # Add all tech data to embed
+    for key, value in tech_datas.items():
+        if value:  # Only show non-empty fields
+            embed.add_field(name=key.replace('_', ' ').title(), value=value, inline=True)
+    
+    embed.set_image(url=new_image_url)
+    embed.set_footer(text=f"ID: {tech_data_complete['id']}")
+    
+    # Create confirmation view
+    view = StaffTechConfirmationView(tech_data_complete, ctx)
+    
+    # Send to staff channel (assuming tech channel is where staff reviews)
+    staff_message = await tech_channel.send("Nouvelle technologie à valider:", embed=embed, view=view)
+    
+    # Notify the submitter
+    await ctx.send(f"✅ Votre technologie **{tech_datas.get('nom')}** a été soumise pour validation par le staff!")
 
-    await ctx.send(f"Technologie `{tech_data['name']}` de type `{tech_type}` créée avec succès!")
+class StaffTechConfirmationView(discord.ui.View):
+    """View for staff to confirm or reject technology submissions."""
+    
+    def __init__(self, tech_data: dict, original_ctx):
+        super().__init__(timeout=86400)  # 24 hours timeout
+        self.tech_data = tech_data
+        self.original_ctx = original_ctx
+    
+    @discord.ui.button(label="✅ Valider", style=discord.ButtonStyle.green, custom_id="approve")
+    async def approve_tech(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Approve the technology and proceed to difficulty rating."""
+        if not any(role.id == usefull_role_ids_dic.get("military_admin") for role in interaction.user.roles):
+            return await interaction.response.send_message("❌ Vous n'avez pas les permissions nécessaires.", ephemeral=True)
+        
+        # Update status
+        self.tech_data["status"] = "approved"
+        self.tech_data["approved_by"] = interaction.user.id
+        self.tech_data["approved_at"] = datetime.now().isoformat()
+        
+        # Save updated data
+        tech_file_path = f"datas/pending_techs/{self.tech_data['id']}.json"
+        with open(tech_file_path, 'w', encoding='utf-8') as f:
+            json.dump(self.tech_data, f, ensure_ascii=False, indent=2)
+        
+        # Disable buttons
+        for item in self.children:
+            item.disabled = True
+        
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.green()
+        embed.title = "✅ Technologie validée par le staff"
+        
+        await interaction.response.edit_message(embed=embed, view=self)
+        
+        # Show difficulty rating form
+        await self.show_difficulty_rating(interaction)
+    
+    @discord.ui.button(label="❌ Rejeter", style=discord.ButtonStyle.red, custom_id="reject")
+    async def reject_tech(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Reject the technology and ask for feedback."""
+        if not any(role.id == usefull_role_ids_dic.get("military_admin") for role in interaction.user.roles):
+            return await interaction.response.send_message("❌ Vous n'avez pas les permissions nécessaires.", ephemeral=True)
+        
+        # Show rejection reason form
+        modal = TechRejectionModal(self.tech_data, self.original_ctx, self)
+        await interaction.response.send_modal(modal)
+    
+    async def show_difficulty_rating(self, interaction):
+        """Show the difficulty rating form to determine final costs."""
+        # Get average difficulty for same inspiration tech
+        inspiration_name = self.tech_data.get('tech_inspiration', '').lower()
+        tech_type = self.tech_data.get('tech_type')
+        tech_level = int(self.tech_data.get('niveau_technologique', 1))
+        
+        # Get base costs from database (await if async)
+        try:
+            if hasattr(db, 'get_tech_datas') and callable(getattr(db, 'get_tech_datas')):
+                if asyncio.iscoroutinefunction(db.get_tech_datas):
+                    base_dev_cost = await db.get_tech_datas(tech_type, tech_level, "dev_cost")
+                    base_dev_time = await db.get_tech_datas(tech_type, tech_level, "dev_time")
+                    base_prod_cost = await db.get_tech_datas(tech_type, tech_level, "prod_cost")
+                    base_slots_taken = await db.get_tech_datas(tech_type, tech_level, "slots_taken")
+                else:
+                    base_dev_cost = db.get_tech_datas(tech_type, tech_level, "dev_cost")
+                    base_dev_time = db.get_tech_datas(tech_type, tech_level, "dev_time")
+                    base_prod_cost = db.get_tech_datas(tech_type, tech_level, "prod_cost")
+                    base_slots_taken = db.get_tech_datas(tech_type, tech_level, "slots_taken")
+            else:
+                # Fallback values if method doesn't exist
+                base_dev_cost = [10000, 50000]
+                base_dev_time = [30, 90]
+                base_prod_cost = [1000, 5000]
+                base_slots_taken = 1
+        except Exception as e:
+            print(f"Error getting tech data: {e}")
+            # Fallback values
+            base_dev_cost = [10000, 50000]
+            base_dev_time = [30, 90]
+            base_prod_cost = [1000, 5000]
+            base_slots_taken = 1
+        
+        # Calculate average difficulty for similar techs (placeholder for now)
+        suggested_difficulty = 5  # Default middle value
+        
+        # Create a new button to trigger the modal
+        # Since we can't send modal through followup, we'll create a temporary button
+        embed = discord.Embed(
+            title="🎯 Évaluation de la difficulté",
+            description=f"Cliquez sur le bouton ci-dessous pour évaluer la difficulté de **{self.tech_data.get('nom')}**",
+            color=discord.Color.blue()
+        )
+        
+        view = TempDifficultyButtonView(
+            self.tech_data, 
+            self.original_ctx,
+            base_dev_cost,
+            base_dev_time, 
+            base_prod_cost,
+            base_slots_taken,
+            suggested_difficulty
+        )
+        
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
+
+
+class TempDifficultyButtonView(discord.ui.View):
+    """Temporary view with a button to show the difficulty rating modal."""
+    
+    def __init__(self, tech_data: dict, original_ctx, base_dev_cost, base_dev_time, base_prod_cost, base_slots_taken, suggested_difficulty):
+        super().__init__(timeout=300)
+        self.tech_data = tech_data
+        self.original_ctx = original_ctx
+        self.base_dev_cost = base_dev_cost
+        self.base_dev_time = base_dev_time
+        self.base_prod_cost = base_prod_cost
+        self.base_slots_taken = base_slots_taken
+        self.suggested_difficulty = suggested_difficulty
+    
+    @discord.ui.button(label="🎯 Évaluer la difficulté", style=discord.ButtonStyle.primary)
+    async def show_difficulty_modal(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Show the difficulty rating modal."""
+        if not any(role.id == usefull_role_ids_dic.get("military_admin") for role in interaction.user.roles):
+            return await interaction.response.send_message("❌ Vous n'avez pas les permissions nécessaires.", ephemeral=True)
+        
+        modal = DifficultyRatingModal(
+            self.tech_data, 
+            self.original_ctx,
+            self.base_dev_cost,
+            self.base_dev_time, 
+            self.base_prod_cost,
+            self.base_slots_taken,
+            self.suggested_difficulty
+        )
+        
+        await interaction.response.send_modal(modal)
+
+
+class TechRejectionModal(discord.ui.Modal, title="Rejeter la technologie"):
+    """Modal for staff to provide rejection feedback."""
+    
+    def __init__(self, tech_data: dict, original_ctx, parent_view):
+        super().__init__()
+        self.tech_data = tech_data
+        self.original_ctx = original_ctx
+        self.parent_view = parent_view
+        
+        self.rejection_reason = discord.ui.TextInput(
+            label="Raison du rejet",
+            placeholder="Expliquez pourquoi cette technologie est rejetée et ce qui doit être modifié...",
+            style=discord.TextStyle.paragraph,
+            max_length=1000,
+            required=True
+        )
+        self.add_item(self.rejection_reason)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        # Update tech data
+        self.tech_data["status"] = "rejected"
+        self.tech_data["rejected_by"] = interaction.user.id
+        self.tech_data["rejected_at"] = datetime.now().isoformat()
+        self.tech_data["rejection_reason"] = self.rejection_reason.value
+        
+        # Save updated data
+        tech_file_path = f"datas/pending_techs/{self.tech_data['id']}.json"
+        with open(tech_file_path, 'w', encoding='utf-8') as f:
+            json.dump(self.tech_data, f, ensure_ascii=False, indent=2)
+        
+        # Update the staff message
+        embed = interaction.message.embeds[0]
+        embed.color = discord.Color.red()
+        embed.title = "❌ Technologie rejetée par le staff"
+        embed.add_field(name="Raison du rejet", value=self.rejection_reason.value, inline=False)
+        
+        # Disable buttons
+        for item in self.parent_view.children:
+            item.disabled = True
+        
+        await interaction.response.edit_message(embed=embed, view=self.parent_view)
+        
+        # Send feedback to country channel
+        country_id = self.tech_data["country_id"]
+        try:
+            country_channel_id = db.get_country_datas(country_id).get("public_channel_id")
+        except:
+            country_channel_id = None
+        
+        print(f"Sending rejection feedback to country channel ID: {country_channel_id}")
+        if country_channel_id:
+            country_channel = interaction.guild.get_channel(int(country_channel_id))
+            if country_channel:
+                feedback_embed = discord.Embed(
+                    title="❌ Technologie rejetée",
+                    description=f"Votre technologie **{self.tech_data.get('nom')}** a été rejetée par le staff.",
+                    color=discord.Color.red()
+                )
+                feedback_embed.add_field(name="Raison", value=self.rejection_reason.value, inline=False)
+                feedback_embed.add_field(name="Action requise", value="Veuillez modifier votre technologie selon les commentaires et la soumettre à nouveau.", inline=False)
+                
+                await country_channel.send(f"<@{self.tech_data['submitted_by']}>", embed=feedback_embed)
+
+
+class DifficultyRatingModal(discord.ui.Modal, title="Notation de difficulté"):
+    """Modal for staff to rate technology difficulty."""
+    
+    def __init__(self, tech_data: dict, original_ctx, base_dev_cost, base_dev_time, base_prod_cost, base_slots_taken, suggested_difficulty):
+        super().__init__()
+        self.tech_data = tech_data
+        self.original_ctx = original_ctx
+        self.base_dev_cost = base_dev_cost
+        self.base_dev_time = base_dev_time
+        self.base_prod_cost = base_prod_cost
+        self.base_slots_taken = base_slots_taken
+        
+        self.difficulty_rating = discord.ui.TextInput(
+            label="Note de difficulté (1-10)",
+            placeholder=f"Suggestion: {suggested_difficulty} (basé sur des techs similaires)",
+            default=str(suggested_difficulty),
+            max_length=2,
+            required=True
+        )
+        self.add_item(self.difficulty_rating)
+    
+    async def on_submit(self, interaction: discord.Interaction):
+        try:
+            difficulty = int(self.difficulty_rating.value)
+            if difficulty < 1 or difficulty > 10:
+                return await interaction.response.send_message("❌ La note doit être entre 1 et 10.", ephemeral=True)
+        except ValueError:
+            return await interaction.response.send_message("❌ Veuillez entrer un nombre valide.", ephemeral=True)
+        
+        # Calculate final costs based on difficulty
+        # Formula: final_cost = min_cost + (max_cost - min_cost) * (difficulty - 1) / 9
+        def calculate_final_value(base_range, difficulty_rating):
+            if isinstance(base_range, (list, tuple)) and len(base_range) == 2:
+                min_val, max_val = base_range
+                return int(min_val + (max_val - min_val) * (difficulty_rating - 1) / 9)
+            return base_range
+        
+        final_dev_cost = calculate_final_value(self.base_dev_cost, difficulty)
+        final_dev_time = calculate_final_value(self.base_dev_time, difficulty)
+        final_prod_cost = calculate_final_value(self.base_prod_cost, difficulty)
+        final_slots_taken = self.base_slots_taken
+        
+        # Update tech data
+        self.tech_data.update({
+            "difficulty_rating": difficulty,
+            "final_dev_cost": final_dev_cost,
+            "final_dev_time": final_dev_time,
+            "final_prod_cost": final_prod_cost,
+            "final_slots_taken": final_slots_taken,
+            "status": "awaiting_final_confirmation"
+        })
+        
+        # Save updated data
+        tech_file_path = f"datas/pending_techs/{self.tech_data['id']}.json"
+        with open(tech_file_path, 'w', encoding='utf-8') as f:
+            json.dump(self.tech_data, f, ensure_ascii=False, indent=2)
+        
+        # Show final confirmation
+        embed = discord.Embed(
+            title="🎯 Confirmation finale de la technologie",
+            description=f"**{self.tech_data.get('nom')}** - Note de difficulté: {difficulty}/10",
+            color=discord.Color.blue()
+        )
+        
+        embed.add_field(name="💰 Coût de développement", value=f"{final_dev_cost:,}", inline=True)
+        embed.add_field(name="⏱️ Temps de développement", value=f"{final_dev_time} jours", inline=True)
+        embed.add_field(name="🏭 Coût de production", value=f"{final_prod_cost:,}", inline=True)
+        embed.add_field(name="🔧 Slots occupés", value=str(final_slots_taken), inline=True)
+        
+        embed.set_image(url=self.tech_data["image_url"])
+        
+        view = FinalTechConfirmationView(self.tech_data)
+        
+        await interaction.response.send_message(embed=embed, view=view)
+
+
+class FinalTechConfirmationView(discord.ui.View):
+    """Final confirmation view for technology creation."""
+    
+    def __init__(self, tech_data: dict):
+        super().__init__(timeout=3600)  # 1 hour timeout
+        self.tech_data = tech_data
+    
+    @discord.ui.button(label="✅ Créer la technologie", style=discord.ButtonStyle.green)
+    async def create_technology(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Create the technology in the database."""
+        if not any(role.id == usefull_role_ids_dic.get("military_admin") for role in interaction.user.roles):
+            return await interaction.response.send_message("❌ Vous n'avez pas les permissions nécessaires.", ephemeral=True)
+        
+        # Add to database
+        success = db.add_technology(
+            name=self.tech_data.get('nom'),
+            specialisation=self.tech_data.get('specialisation'),
+            tech_type=self.tech_data.get('tech_type'),
+            tech_level=int(self.tech_data.get('niveau_technologique', 1)),
+            country_id=self.tech_data.get('country_id'),
+            dev_cost=self.tech_data.get('final_dev_cost'),
+            dev_time=self.tech_data.get('final_dev_time'),
+            prod_cost=self.tech_data.get('final_prod_cost'),
+            slots_taken=self.tech_data.get('final_slots_taken'),
+            image_url=self.tech_data.get('image_url'),
+            tech_data=self.tech_data  # Store all form data
+        )
+        
+        if success:
+            # Update status
+            self.tech_data["status"] = "created"
+            self.tech_data["created_in_db_at"] = datetime.now().isoformat()
+            
+            # Move from pending to completed
+            import shutil
+            os.makedirs("datas/completed_techs", exist_ok=True)
+            old_path = f"datas/pending_techs/{self.tech_data['id']}.json"
+            new_path = f"datas/completed_techs/{self.tech_data['id']}.json"
+            
+            with open(new_path, 'w', encoding='utf-8') as f:
+                json.dump(self.tech_data, f, ensure_ascii=False, indent=2)
+            
+            if os.path.exists(old_path):
+                os.remove(old_path)
+            
+            # Disable button
+            button.disabled = True
+            await interaction.response.edit_message(view=self)
+            
+            # Notify success
+            await interaction.followup.send(f"✅ Technologie **{self.tech_data.get('nom')}** créée avec succès dans la base de données!")
+            
+            # Notify country
+            country_id = self.tech_data["country_id"]
+            country_channel_id = db.get_country_datas(country_id).get("public_channel_id")
+            
+            if country_channel_id:
+                country_channel = interaction.guild.get_channel(int(country_channel_id))
+                if country_channel:
+                    success_embed = discord.Embed(
+                        title="🎉 Technologie approuvée!",
+                        description=f"Votre technologie **{self.tech_data.get('nom')}** a été officiellement créée!",
+                        color=discord.Color.green()
+                    )
+                    success_embed.add_field(name="💰 Coût de développement", value=f"{self.tech_data.get('final_dev_cost'):,}", inline=True)
+                    success_embed.add_field(name="⏱️ Temps de développement", value=f"{self.tech_data.get('final_dev_time')} jours", inline=True)
+                    success_embed.set_image(url=self.tech_data.get('image_url'))
+                    
+                    await country_channel.send(f"<@{self.tech_data['submitted_by']}>", embed=success_embed)
+        else:
+            await interaction.response.send_message("❌ Erreur lors de la création de la technologie en base de données.", ephemeral=True)
+    
+    @discord.ui.button(label="❌ Annuler", style=discord.ButtonStyle.red)
+    async def cancel_creation(self, interaction: discord.Interaction, button: discord.ui.Button):
+        """Cancel the technology creation."""
+        if not any(role.id == usefull_role_ids_dic.get("military_admin") for role in interaction.user.roles):
+            return await interaction.response.send_message("❌ Vous n'avez pas les permissions nécessaires.", ephemeral=True)
+        
+        # Update status
+        self.tech_data["status"] = "cancelled"
+        self.tech_data["cancelled_at"] = datetime.now().isoformat()
+        
+        tech_file_path = f"datas/pending_techs/{self.tech_data['id']}.json"
+        with open(tech_file_path, 'w', encoding='utf-8') as f:
+            json.dump(self.tech_data, f, ensure_ascii=False, indent=2)
+        
+        # Disable buttons
+        for item in self.children:
+            item.disabled = True
+        
+        await interaction.response.edit_message(view=self)
+        await interaction.followup.send("❌ Création de la technologie annulée.")
+
+# # Add missing database methods if they don't exist
+# def ensure_db_methods():
+#     if not hasattr(db, 'get_tech_datas'):
+#         def get_tech_datas(tech_type, tech_level, data_type):
+#             """Get technology data ranges from database."""
+#             try:
+#                 # This is a placeholder implementation
+#                 # You should replace this with actual database queries
+#                 base_costs = {
+#                     "dev_cost": {
+#                         1: [5000, 15000],
+#                         2: [10000, 30000],
+#                         3: [20000, 60000],
+#                         4: [40000, 120000],
+#                         5: [80000, 240000],
+#                     },
+#                     "dev_time": {
+#                         1: [15, 45],
+#                         2: [30, 90],
+#                         3: [60, 180],
+#                         4: [120, 360],
+#                         5: [240, 720],
+#                     },
+#                     "prod_cost": {
+#                         1: [500, 1500],
+#                         2: [1000, 3000],
+#                         3: [2000, 6000],
+#                         4: [4000, 12000],
+#                         5: [8000, 24000],
+#                     },
+#                     "slots_taken": {
+#                         1: 1,
+#                         2: 1,
+#                         3: 2,
+#                         4: 2,
+#                         5: 3,
+#                     }
+#                 }
+                
+#                 # Ensure tech_level is within bounds
+#                 tech_level = max(1, min(tech_level, 5))
+                
+#                 if data_type in base_costs and tech_level in base_costs[data_type]:
+#                     return base_costs[data_type][tech_level]
+#                 else:
+#                     # Default fallback values
+#                     if data_type == "dev_cost":
+#                         return [10000, 50000]
+#                     elif data_type == "dev_time":
+#                         return [30, 90]
+#                     elif data_type == "prod_cost":
+#                         return [1000, 5000]
+#                     elif data_type == "slots_taken":
+#                         return 1
+                
+#             except Exception as e:
+#                 print(f"Error getting tech data: {e}")
+#                 # Return safe defaults
+#                 if data_type == "dev_cost":
+#                     return [10000, 50000]
+#                 elif data_type == "dev_time":
+#                     return [30, 90]
+#                 elif data_type == "prod_cost":
+#                     return [1000, 5000]
+#                 elif data_type == "slots_taken":
+#                     return 1
+        
+#         db.get_tech_datas = get_tech_datas
+
+# # Call the helper function to ensure methods exist
+# ensure_db_methods()
 
 @bot.command(
     name="test_multi_form",
