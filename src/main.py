@@ -119,7 +119,6 @@ async def load_cogs():
         print(f"📋 Loaded admin commands: {[cmd.name for cmd in admin_commands]}")
     except Exception as e:
         print(f"❌ Failed to load cogs: {e}")
-        import traceback
 
         traceback.print_exc()
 
@@ -131,6 +130,7 @@ async def on_ready():
     print("🔧 Utilities already initialized")
 
     await load_cogs()
+    await bot.tree.sync()
     polling_notion.start()
     update_rp_date.start()
 
@@ -1535,6 +1535,7 @@ async def test_converter(ctx, country: CountryConverter):
         return await ctx.send("Pays non trouvé.")
     await ctx.send(f"Pays trouvé : {country.get('name')} (ID: {country.get('id')})")
 
+
 class TechFormData:
     """Configuration data for different technology forms loaded from JSON"""
 
@@ -1571,43 +1572,53 @@ class TechFormData:
     # Load configurations on class initialization
     TECH_CONFIGS = load_tech_configs()
 
+
 class TechTypeSelectView(discord.ui.View):
     """View with a SelectMenu for choosing technology type."""
-    
-    def __init__(self, accepted_types: list, tech_type: str, form_index: int, form_data: dict, parent_view=None, callback=None):
+
+    def __init__(
+        self,
+        accepted_types: list,
+        tech_type: str,
+        form_index: int,
+        form_data: dict,
+        parent_view=None,
+        callback=None,
+    ):
         super().__init__(timeout=300)
         self.tech_type = tech_type
         self.form_index = form_index
         self.form_data = form_data
         self.parent_view = parent_view
         self.callback = callback
-        
+
         # Create options from accepted_types
         options = []
         for tech_type_option in accepted_types:
             # Convert snake_case to human readable
             display_name = tech_type_option.replace("_", " ").title()
-            options.append(discord.SelectOption(
-                label=display_name,
-                value=tech_type_option,
-                description=f"Choisir {display_name}"
-            ))
-        
+            options.append(
+                discord.SelectOption(
+                    label=display_name,
+                    value=tech_type_option,
+                    description=f"Choisir {display_name}",
+                )
+            )
+
         self.type_select = discord.ui.Select(
-            placeholder="Choisissez le type de technologie...",
-            options=options
+            placeholder="Choisissez le type de technologie...", options=options
         )
         self.type_select.callback = self.on_type_select
         self.add_item(self.type_select)
-    
+
     async def on_type_select(self, interaction: discord.Interaction):
         """Handle type selection and continue with the form."""
         selected_type = self.type_select.values[0]
-        
+
         # Convert back to display name for storage
         display_name = selected_type.replace("_", " ").title()
         self.form_data["type_technologie"] = display_name
-        
+
         if self.callback:
             await self.callback(interaction, selected_type)
 
@@ -1642,14 +1653,14 @@ class UniversalTechForm(discord.ui.Modal):
         self.fields = []
         self.has_type_field = False
         self.type_field_config = None
-        
+
         for field_config in current_forms:
             # Skip type_technologie field as it will be handled by SelectMenu
             if field_config["key"] == "type_technologie":
                 self.has_type_field = True
                 self.type_field_config = field_config
                 continue
-                
+
             field = discord.ui.TextInput(
                 label=field_config["label"],
                 placeholder=field_config["placeholder"],
@@ -1685,10 +1696,10 @@ class UniversalTechForm(discord.ui.Modal):
 class MultiFormView(discord.ui.View):
     """Universal view that handles tech types with auto-splitting forms."""
 
-    def __init__(self, tech_type: str, ctx: commands.Context, image_url: str):
+    def __init__(self, specialisation: str, ctx: commands.Context, image_url: str):
         super().__init__(timeout=300)
-        self.tech_type = tech_type
-        self.config = TechFormData.TECH_CONFIGS[tech_type]
+        self.specialisation = specialisation
+        self.config = TechFormData.TECH_CONFIGS[specialisation]
         self.common_config = TechFormData.TECH_CONFIGS.get("common", {"forms": []})
         self.form_data = {}
         self.ctx = ctx
@@ -1713,48 +1724,64 @@ class MultiFormView(discord.ui.View):
             def create_callback(form_index):
                 async def button_callback(interaction):
                     # Check if this form contains the type_technologie field
-                    config = TechFormData.TECH_CONFIGS[self.tech_type]
-                    common_config = TechFormData.TECH_CONFIGS.get("common", {"forms": []})
+                    config = TechFormData.TECH_CONFIGS[self.specialisation]
+                    common_config = TechFormData.TECH_CONFIGS.get(
+                        "common", {"forms": []}
+                    )
                     all_forms = common_config["forms"] + config["forms"]
-                    
+
                     forms_per_page = 5
                     start_idx = form_index * forms_per_page
                     end_idx = start_idx + forms_per_page
                     current_forms = all_forms[start_idx:end_idx]
-                    
+
                     # Check if any form in this page has type_technologie
-                    has_type_field = any(field["key"] == "type_technologie" for field in current_forms)
-                    
+                    has_type_field = any(
+                        field["key"] == "type_technologie" for field in current_forms
+                    )
+
                     if has_type_field and "type_technologie" not in self.form_data:
                         # Show SelectMenu first for type selection
                         accepted_types = config.get("accepted_types", [])
                         if accepted_types:
-                            async def continue_with_form(select_interaction, selected_type):
+
+                            async def continue_with_form(
+                                select_interaction, selected_type
+                            ):
                                 # After type selection, show the modal
                                 await select_interaction.response.send_modal(
                                     UniversalTechForm(
-                                        self.tech_type, form_index, self.form_data, self
+                                        self.specialisation,
+                                        form_index,
+                                        self.form_data,
+                                        self,
                                     )
                                 )
-                            
+
                             embed = discord.Embed(
                                 title=f"🔧 Sélection du type - {config['title']}",
                                 description="Veuillez d'abord choisir le type de technologie :",
-                                color=config["color"]
+                                color=config["color"],
                             )
-                            
+
                             view = TechTypeSelectView(
-                                accepted_types, self.tech_type, form_index, 
-                                self.form_data, self, continue_with_form
+                                accepted_types,
+                                self.specialisation,
+                                form_index,
+                                self.form_data,
+                                self,
+                                continue_with_form,
                             )
-                            
-                            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+                            await interaction.response.send_message(
+                                embed=embed, view=view, ephemeral=True
+                            )
                             return
-                    
+
                     # Normal flow - show modal directly
                     await interaction.response.send_modal(
                         UniversalTechForm(
-                            self.tech_type, form_index, self.form_data, self
+                            self.specialisation, form_index, self.form_data, self
                         )
                     )
 
@@ -1792,65 +1819,117 @@ class MultiFormView(discord.ui.View):
         print(f"Form data collected: {self.form_data}")
         print(f"Sending to ctx: {self.ctx.message.channel.id}")
 
-        # Combine common and tech-specific fields for summary
-        all_fields = self.common_config["forms"] + self.config["forms"]
-        dev_cost = await db.get_tech_datas(
-            self.form_data.get("tech_type"),
-            self.form_data.get("tech_level"),
-            "dev_cost",
-        )
-        dev_time = await db.get_tech_datas(
-            self.form_data.get("tech_type"),
-            self.form_data.get("tech_level"),
-            "dev_time",
-        )
-        prod_cost = await db.get_tech_datas(
-            self.form_data.get("tech_type"),
-            self.form_data.get("tech_level"),
-            "prod_cost",
-        )
-        slots_taken = await db.get_tech_datas(
-            self.form_data.get("tech_type"),
-            self.form_data.get("tech_level"),
-            "slots_taken",
-        )
+        try:
+            # Combine common and tech-specific fields for summary
+            all_fields = self.common_config["forms"] + self.config["forms"]
+            country_id = db.get_players_country(self.ctx.author.id)
 
-        for key, value in self.form_data.items():
-            label = next((f["label"] for f in all_fields if f["key"] == key), key)
-            summary_lines.append(f"• **{label}** : {value or '*Non renseigné*'}")
+            # Get tech type and level from form data (not tech_data!)
+            tech_type = self.form_data.get(
+                "type_technologie"
+            )  # Fixed: was self.tech_data
+            tech_level_str = self.form_data.get("niveau_technologique", "1")
 
-        summary_lines.append(
-            f"**Coût de développement** : entre {dev_cost[0]} et {dev_cost[1]}"
-        )  # Assuming dev_cost is a tuple
-        summary_lines.append(
-            f"**Temps de développement** : entre {dev_time[0]} et {dev_time[1]}"
-        )  # Assuming dev_time is a tuple
-        summary_lines.append(
-            f"**Coût de production** : entre {prod_cost[0]} et {prod_cost[1]}"
-        )  # Assuming prod_cost is a tuple
-        summary_lines.append(f"**Slots occupés** : {slots_taken}")
+            # Ensure tech_level is an integer
+            try:
+                tech_level = int(tech_level_str)
+            except (ValueError, TypeError):
+                tech_level = 1
+                print(
+                    f"Warning: Invalid tech_level '{tech_level_str}', defaulting to 1"
+                )
 
-        embed = discord.Embed(
-            title="🧪 Résumé de votre nouvelle technologie",
-            description="\n".join(summary_lines),
-            color=discord.Color.green(),
-        )
-        embed.set_image(url=self.image_url)
+            print(f"Getting tech data for type: {tech_type}, level: {tech_level}")
 
-        await self.ctx.send(embed=embed)
+            # Get costs with error handling
+            try:
+                dev_cost = await db.get_tech_datas(tech_type, tech_level, "dev_cost")
+                dev_time = await db.get_tech_datas(tech_type, tech_level, "dev_time")
+                prod_cost = await db.get_tech_datas(tech_type, tech_level, "prod_cost")
+                slots_taken = await db.get_tech_datas(
+                    tech_type, tech_level, "slots_taken"
+                )
+            except Exception as e:
+                print(f"Error getting tech data from database: {e}")
+                # Fallback values
+                dev_cost = [10000, 50000]
+                dev_time = [30, 90]
+                prod_cost = [1000, 5000]
+                slots_taken = 1
 
-        confirmed = await dUtils.ask_confirmation(
-            self.ctx, self.ctx.author.id, "Souhaitez-vous créer cette technologie ?"
-        )
-        if confirmed:
-            await handle_new_tech(
-                self.ctx, self.tech_type, self.form_data, self.image_url
+            print(
+                f"dev_cost: {dev_cost}, dev_time: {dev_time}, prod_cost: {prod_cost}, slots_taken: {slots_taken}"
             )
+
+            # Add form data to summary
+            for key, value in self.form_data.items():
+                label = next((f["label"] for f in all_fields if f["key"] == key), key)
+                summary_lines.append(f"• **{label}** : {value or '*Non renseigné*'}")
+
+            # Add cost information with safe formatting
+            try:
+                if isinstance(dev_cost, (list, tuple)) and len(dev_cost) >= 2:
+                    summary_lines.append(
+                        f"**Coût de développement** : entre {dev_cost[0]:,} et {dev_cost[1]:,}"
+                    )
+                else:
+                    summary_lines.append(f"**Coût de développement** : {dev_cost}")
+
+                if isinstance(dev_time, (list, tuple)) and len(dev_time) >= 2:
+                    summary_lines.append(
+                        f"**Temps de développement** : entre {dev_time[0]} et {dev_time[1]} jours"
+                    )
+                else:
+                    summary_lines.append(
+                        f"**Temps de développement** : {dev_time} jours"
+                    )
+
+                if isinstance(prod_cost, (list, tuple)) and len(prod_cost) >= 2:
+                    summary_lines.append(
+                        f"**Coût de production** : entre {prod_cost[0]:,} et {prod_cost[1]:,}"
+                    )
+                else:
+                    summary_lines.append(f"**Coût de production** : {prod_cost}")
+
+                summary_lines.append(f"**Slots occupés** : {slots_taken}")
+            except Exception as e:
+                print(f"Error formatting cost data: {e}")
+                summary_lines.append("**Coûts** : Données non disponibles")
+
+            print(f"Summary lines: {summary_lines}")
+
+            embed = discord.Embed(
+                title="🧪 Résumé de votre nouvelle technologie",
+                description="\n".join(summary_lines),
+                color=discord.Color.green(),
+            )
+
+            if hasattr(self, "image_url") and self.image_url:
+                embed.set_image(url=self.image_url)
+
+            print(f"Sending summary to channel {self.ctx.message.channel.id}")
+
+            await self.ctx.send(embed=embed)
+
+            confirmed = await dUtils.ask_confirmation(
+                self.ctx, country_id, "Souhaitez-vous créer cette technologie ?"
+            )
+            print(f"User confirmed: {confirmed}")
+            if confirmed:
+                await handle_new_tech(
+                    self.ctx, self.specialisation, self.form_data, self.image_url
+                )
+        except Exception as e:
+            print(f"Error in send_summary: {e}")
+            # Send a basic error message to the user
+            await self.ctx.send(f"❌ Erreur lors de la génération du résumé: {e}")
+            traceback.print_exc()
 
     async def on_timeout(self):
         """Disable all buttons when view times out."""
         for item in self.children:
             item.disabled = True
+
 
 @bot.hybrid_command()
 async def sync_tree(ctx):
@@ -1860,6 +1939,7 @@ async def sync_tree(ctx):
 
     await bot.tree.sync()
     await ctx.send("✅ Command tree synchronized successfully.")
+
 
 @bot.hybrid_command()
 async def easy_tech_test(ctx, image: str = None):
@@ -1887,19 +1967,20 @@ async def easy_tech_test(ctx, image: str = None):
         "avionique": "54",
         "materiaux": "32",
     }
-    tech_type = "terrestre"  # Example tech type, replace with actual logic
+    specialisation = "terrestre"  # Example tech type, replace with actual logic
 
     image = "https://media.discordapp.net/attachments/1394353396059996220/1396138139826913300/Best_Tank.webp?ex=6882ed37&is=68819bb7&hm=8983b2e014e7999b3a11d05aa6fad5240748c15a679d2308e437f1e0646a271c&=&format=webp&width=860&height=483"
 
     confirmed = True
     if confirmed:
-        await handle_new_tech(ctx, tech_type, tech_datas, image)
+        await handle_new_tech(ctx, specialisation, tech_datas, image)
 
-async def handle_new_tech(ctx, tech_type: str, tech_datas: dict, image_url: str):
+
+async def handle_new_tech(ctx, specialisation: str, tech_datas: dict, image_url: str):
     """Handle the creation of a new technology with the provided data."""
 
     # Validate tech type
-    if tech_type not in TechFormData.TECH_CONFIGS:
+    if specialisation not in TechFormData.TECH_CONFIGS:
         valid_types = ", ".join(
             [k for k in TechFormData.TECH_CONFIGS.keys() if k != "common"]
         )
@@ -1907,7 +1988,7 @@ async def handle_new_tech(ctx, tech_type: str, tech_datas: dict, image_url: str)
             f"Type de technologie invalide. Choisissez parmi : {valid_types}"
         )
 
-    tech_datas["specialisation"] = tech_type
+    tech_datas["specialisation"] = specialisation
     tech_datas["tech_type"] = tech_datas.get("type_technologie")
     tech_datas.pop("type_technologie", None)  # Remove if not needed
 
@@ -1969,6 +2050,7 @@ async def handle_new_tech(ctx, tech_type: str, tech_datas: dict, image_url: str)
         "country_id": country["id"],
         "country_name": country["name"],
         "tech_type": tech_datas.get("tech_type"),
+        "specialisation": specialisation,
         "image_url": new_image_url,
         "created_at": datetime.now().isoformat(),
         "status": "pending_staff_review",
@@ -1988,7 +2070,7 @@ async def handle_new_tech(ctx, tech_type: str, tech_datas: dict, image_url: str)
     # 3. Create staff confirmation embed and view
     embed = discord.Embed(
         title="🔬 Nouvelle technologie à valider",
-        description=f"**Pays:** {country['name']}\n**Type:** {tech_type.title()}\n**Soumis par:** {ctx.author.mention}\n**Canal:** {'🔒 Secret' if is_from_secret_channel else '🌐 Public'}",
+        description=f"**Pays:** {country['name']}\n**Type:** {specialisation.title()}\n**Soumis par:** {ctx.author.mention}\n**Canal:** {'🔒 Secret' if is_from_secret_channel else '🌐 Public'}",
         color=discord.Color.orange(),
     )
 
@@ -2036,6 +2118,7 @@ async def handle_new_tech(ctx, tech_type: str, tech_datas: dict, image_url: str)
     await ctx.send(
         f"✅ Votre technologie **{tech_datas.get('nom')}** a été soumise pour validation par le staff!"
     )
+
 
 class StaffTechConfirmationView(discord.ui.View):
     """View for staff to confirm or reject technology submissions."""
@@ -2106,8 +2189,11 @@ class StaffTechConfirmationView(discord.ui.View):
         """Show the difficulty rating form to determine final costs."""
         # Get average difficulty for same inspiration tech
         inspiration_name = self.tech_data.get("tech_inspiration", "").lower()
-        tech_type = self.tech_data.get("tech_type")
+        specialisation = self.tech_data.get("specialisation")
         tech_level = int(self.tech_data.get("niveau_technologique", 1))
+        tech_type = self.tech_data.get(
+            "tech_type"
+        )  # Fixed: was overwriting specialisation
 
         # Get base costs from database (await if async)
         try:
@@ -2168,6 +2254,7 @@ class StaffTechConfirmationView(discord.ui.View):
         )
         await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
+
 class TempDifficultyButtonView(discord.ui.View):
     """Temporary view with a button to show the difficulty rating modal."""
 
@@ -2216,6 +2303,7 @@ class TempDifficultyButtonView(discord.ui.View):
         )
 
         await interaction.response.send_modal(modal)
+
 
 class TechRejectionModal(discord.ui.Modal, title="Rejeter la technologie"):
     """Modal for staff to provide rejection feedback."""
@@ -2291,6 +2379,7 @@ class TechRejectionModal(discord.ui.Modal, title="Rejeter la technologie"):
                 await country_channel.send(
                     f"<@{self.tech_data['submitted_by']}>", embed=feedback_embed
                 )
+
 
 class DifficultyRatingModal(discord.ui.Modal, title="Notation de difficulté"):
     """Modal for staff to rate technology difficulty."""
@@ -2397,6 +2486,7 @@ class DifficultyRatingModal(discord.ui.Modal, title="Notation de difficulté"):
 
         await interaction.response.send_message(embed=embed, view=view)
 
+
 class FinalTechConfirmationView(discord.ui.View):
     """Final confirmation view for technology creation."""
 
@@ -2419,10 +2509,23 @@ class FinalTechConfirmationView(discord.ui.View):
 
         # Add to database
         try:
+            # Map specialisation to database-compatible values
+            specialisation_mapping = {
+                "terrestre": "Terrestre",
+                "aerienne": "Aerienne",
+                "navale": "Navale",
+                "armes": "NA",  # Assuming "armes" maps to "NA" based on constraint
+            }
+
+            db_specialisation = specialisation_mapping.get(
+                self.tech_data.get("specialisation", "").lower(),
+                "NA",  # Default fallback
+            )
+
             success = db.add_technology(
                 name=self.tech_data.get("nom"),
                 inspiration_name=self.tech_data.get("tech_inspiration"),
-                specialisation=self.tech_data.get("specialisation", "").capitalize(),
+                specialisation=db_specialisation,  # Use mapped value
                 tech_type=self.tech_data.get("tech_type"),
                 tech_level=int(self.tech_data.get("niveau_technologique", 1)),
                 country_id=self.tech_data.get("country_id"),
@@ -2534,10 +2637,11 @@ class FinalTechConfirmationView(discord.ui.View):
         await interaction.response.edit_message(view=self)
         await interaction.followup.send("❌ Création de la technologie annulée.")
 
+
 @bot.hybrid_command(
     name="create_tech",
     brief="Teste les formulaires multi-étapes pour les technologies.",
-    usage="create_tech [tech_type]",
+    usage="create_tech [specialisation]",
     description="POC pour tester les formulaires auto-divisés selon le type de technologie.",
     help="""Teste les formulaires multi-étapes pour différents types de technologies.
 
@@ -2558,7 +2662,7 @@ class FinalTechConfirmationView(discord.ui.View):
     - Technologie d'inspiration originelle
 
     ARGUMENTS :
-    - `[tech_type]` : Optionnel. Type de technologie (armes/terrestre/navale/aerienne)
+    - `[specialisation]` : Optionnel. Type de technologie (armes/terrestre/navale/aerienne)
 
     EXEMPLE :
     - `create_tech` : Lance l'interface de sélection
@@ -2568,16 +2672,24 @@ class FinalTechConfirmationView(discord.ui.View):
     enabled=True,
     case_insensitive=True,
 )
+@app_commands.choices(
+    specialisation=[
+        app_commands.Choice(name=k.capitalize(), value=k.lower())
+        for k in TechFormData.TECH_CONFIGS.keys()
+        if k != "common"
+    ]
+)
 async def create_tech(
     ctx,
-    tech_type: str = commands.parameter(
-        default=None, description="Type de technologie (terrestre/navale/aerienne)"
+    specialisation: str = commands.parameter(
+        default=None,
+        description="Type de technologie (terrestre/navale/aerienne/armes)",
     ),
     image_url: str = None,
 ) -> None:
     """Commande de test pour les formulaires multi-étapes selon le type de technologie."""
-    if not tech_type:
-        tech_type = await dUtils.discord_input(
+    if not specialisation:
+        specialisation = await dUtils.discord_input(
             ctx,
             f"Bienvenue dans le programme de création de technologies!\nQuel type de technologie voulez-vous créer? ({'/'.join(TechFormData.TECH_CONFIGS.keys())})",
         )
@@ -2594,14 +2706,17 @@ async def create_tech(
         )
         return
 
-    tech_type = tech_type.lower()
-    if tech_type not in TechFormData.TECH_CONFIGS.keys() or tech_type == "common":
+    specialisation = specialisation.lower()
+    if (
+        specialisation not in TechFormData.TECH_CONFIGS.keys()
+        or specialisation == "common"
+    ):
         valid_types = [k for k in TechFormData.TECH_CONFIGS.keys() if k != "common"]
         await ctx.send("Veuillez répondre par " + ", ".join(valid_types) + ".")
         return
 
     # Get tech configuration
-    config = TechFormData.TECH_CONFIGS[tech_type]
+    config = TechFormData.TECH_CONFIGS[specialisation]
     common_config = TechFormData.TECH_CONFIGS.get("common", {"forms": []})
 
     # Calculate number of forms (including common fields)
@@ -2617,7 +2732,10 @@ async def create_tech(
 
     embed.set_footer(text="💡 Remplissez tous les formulaires pour terminer la saisie!")
 
-    await ctx.send(embed=embed, view=MultiFormView(tech_type, ctx, image_url_finale))
+    await ctx.send(
+        embed=embed, view=MultiFormView(specialisation, ctx, image_url_finale)
+    )
+
 
 @bot.hybrid_command(
     name="get_infos",
