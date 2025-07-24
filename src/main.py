@@ -77,7 +77,6 @@ bot = commands.Bot(
     activity=discord.Game(name="Aider le staff!"),
     command_prefix=[".", "/"],
 )
-usefull_role_ids_dic = {}
 groq_client = Groq(api_key=groq_api_key)
 last_groq_query_time = datetime.now(timezone.utc)
 
@@ -1702,10 +1701,10 @@ class MultiFormView(discord.ui.View):
 
         # Combine common and tech-specific fields for summary
         all_fields = self.common_config["forms"] + self.config["forms"]
-        dev_cost = db.get_tech_datas("dev_cost", "Non renseigné")
-        dev_time = db.get_tech_datas("dev_time", "Non renseigné")
-        prod_cost = db.get_tech_datas("prod_cost", "Non renseigné")
-        slots_taken = db.get_tech_datas("slots_taken", "Non renseigné")
+        dev_cost = db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "dev_cost")
+        dev_time = db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "dev_time")
+        prod_cost = db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "prod_cost")
+        slots_taken = db.get_tech_datas(self.form_data.get("tech_type"), self.form_data.get("tech_level"), "slots_taken")
 
         for key, value in self.form_data.items():
             label = next((f["label"] for f in all_fields if f["key"] == key), key)
@@ -1717,7 +1716,7 @@ class MultiFormView(discord.ui.View):
         summary_lines.append(f"**Slots occupés** : {slots_taken}")
 
         embed = discord.Embed(
-            title="🧪 Résumé de votre technologie",
+            title="🧪 Résumé de votre nouvelle technologie",
             description="\n".join(summary_lines),
             color=discord.Color.green(),
         )
@@ -1744,20 +1743,29 @@ async def handle_new_tech(ctx, tech_type: str, tech_datas: dict, image_url: str)
         valid_types = ", ".join(TechFormData.TECH_CONFIGS.keys())
         return await ctx.send(f"Type de technologie invalide. Choisissez parmi : {valid_types}")
     
+    all_fields = TechFormData.TECH_CONFIGS.get("common", {"forms": []})["forms"] + TechFormData.TECH_CONFIGS[tech_type]["forms"]
+    
     country = CountryEntity(ctx.author, ctx.guild).to_dict()
     if not country.get("id"):
         return await ctx.send("Vous devez être dans un pays pour créer une technologie.")
 
+    techno_role = ctx.guild.get_role(useful_roles.get("military_admin"))
+    if not techno_role:
+        return await ctx.send("Rôle de technologie non trouvé. Veuillez contacter un administrateur.")
+    techno_channel = ctx.guild.get_channel(tech_channel_id)
+    
+    if not techno_channel:
+        return await ctx.send("Salon de technologie non trouvé. Veuillez contacter un administrateur.")
+    
+    dev_cost = db.get_tech_datas(tech_datas.get("tech_type"), tech_datas.get("tech_level"), "dev_cost")
+    dev_time = db.get_tech_datas(tech_datas.get("tech_type"), tech_datas.get("tech_level"), "dev_time")
+    prod_cost = db.get_tech_datas(tech_datas.get("tech_type"), tech_datas.get("tech_level"), "prod_cost")
+    slots_taken = db.get_tech_datas(tech_datas.get("tech_type"), tech_datas.get("tech_level"), "slots_taken")
 
-    # Prepare the technology data
-    tech_data = {
-        "type": tech_type,
-        "name": tech_datas.get("name"),
-        "level": int(tech_datas.get("level", 1)),
-        "inspiration": tech_datas.get("inspiration", ""),
-        "image_url": image_url,
-    }
-
+    # Ask to confirm the creation to staff
+    # Store in cache the datas until confirmation
+    # If confirmed, save to database
+    
     # Save to database (pseudo-code, replace with actual DB logic)
     # db.save_technology(tech_data)
 
