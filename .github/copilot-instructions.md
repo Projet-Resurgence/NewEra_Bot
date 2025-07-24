@@ -51,7 +51,7 @@ class NewCog(commands.Cog):
         self.db = get_db()
         self.dUtils = get_discord_utils(bot, self.db)
     
-    @commands.command()
+    @commands.hybrid_command()
     async def example_command(self, ctx):
         """Command description."""
         # Implementation here
@@ -100,7 +100,7 @@ Use the centralized `CountryEntity` class for country/player management:
 from shared_utils import CountryEntity, CountryConverter
 
 # Command with country parameter
-@commands.command()
+@commands.hybrid_command()
 async def command_name(self, ctx, target: CountryConverter):
     country_entity = CountryEntity(target, ctx.guild)
     country_id = country_entity.get_country_id()
@@ -129,7 +129,7 @@ if not success_condition:
 ### 6. Permission Systems
 **Administrative Commands**:
 ```python
-@commands.command()
+@commands.hybrid_command()
 @commands.has_permissions(administrator=True)
 async def admin_command(self, ctx):
     """Admin-only command."""
@@ -291,13 +291,13 @@ datas/
 ## Quick Development Commands
 ```python
 # Reload cogs during development
-@commands.command()
+@commands.hybrid_command()
 async def reload_cogs(self, ctx):
     """Reload all cogs."""
     pass
 
 # List all loaded cogs and commands  
-@commands.command()
+@commands.hybrid_command()
 async def list_cogs(self, ctx):
     """List all loaded cogs and their commands."""
     pass

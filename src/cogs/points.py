@@ -1,6 +1,6 @@
 import discord
 from discord.ext import commands
-from typing import Union
+from discord import app_commands
 import json
 
 # Import centralized utilities
@@ -9,6 +9,7 @@ from shared_utils import (
     get_discord_utils,
     CountryEntity,
     CountryConverter,
+    country_autocomplete,
     amount_converter,
     ERROR_COLOR_INT,
     P_POINTS_COLOR_INT,
@@ -196,7 +197,7 @@ class Points(commands.Cog):
         self,
         ctx,
         cible,
-        amount: Union[int, str],
+        amount: str,
         point_type: int,
         emoji: str,
         color: int,
@@ -350,7 +351,7 @@ class Points(commands.Cog):
         await self.eco_logger("P1", amount, cible_obj, ctx.author, point_type)
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="remove_pp",
         brief="Retire des points politiques d'un pays (Staff uniquement).",
         usage="remove_pp <pays> <montant>",
@@ -392,7 +393,7 @@ class Points(commands.Cog):
         cible: CountryConverter = commands.parameter(
             description="Pays dont retirer les points politiques (mention, nom ou ID)"
         ),
-        amount: Union[int, str] = commands.parameter(
+        amount: str = commands.parameter(
             description="Montant à retirer (nombre, pourcentage comme '25%', ou 'all'/'half')"
         ),
     ):
@@ -401,7 +402,7 @@ class Points(commands.Cog):
             ctx, cible, amount, 1, ":blue_circle:", self.p_points_color_int
         )
 
-    @commands.command(
+    @commands.hybrid_command(
         name="remove_pd",
         brief="Retire des points diplomatiques d'un pays (Staff uniquement).",
         usage="remove_pd <pays> <montant>",
@@ -443,7 +444,7 @@ class Points(commands.Cog):
         cible: CountryConverter = commands.parameter(
             description="Pays dont retirer les points diplomatiques (mention, nom ou ID)"
         ),
-        amount: Union[int, str] = commands.parameter(
+        amount: str = commands.parameter(
             description="Montant à retirer (nombre, pourcentage comme '30%', ou 'all'/'half')"
         ),
     ):
@@ -452,7 +453,7 @@ class Points(commands.Cog):
             ctx, cible, amount, 2, ":purple_circle:", self.d_points_color_int
         )
 
-    @commands.command(
+    @commands.hybrid_command(
         name="points_p",
         brief="Affiche les points politiques d'un pays ou utilisateur.",
         usage="points_p [pays]",
@@ -481,6 +482,7 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(cible=country_autocomplete)
     async def points_p(
         self,
         ctx,
@@ -496,7 +498,7 @@ class Points(commands.Cog):
             ctx, cible, 1, ":blue_circle:", self.p_points_color_int, 2
         )
 
-    @commands.command(
+    @commands.hybrid_command(
         name="points_d",
         brief="Affiche les points diplomatiques d'un pays ou utilisateur.",
         usage="points_d [pays]",
@@ -541,7 +543,7 @@ class Points(commands.Cog):
             ctx, cible, 2, ":purple_circle:", self.d_points_color_int, 3
         )
 
-    @commands.command(
+    @commands.hybrid_command(
         name="set_pp",
         brief="Définit les points politiques d'un pays à un montant exact (Staff uniquement).",
         usage="set_pp <pays> <montant>",
@@ -586,7 +588,7 @@ class Points(commands.Cog):
             ctx, cible, amount, 1, ":blue_circle:", self.p_points_color_int
         )
 
-    @commands.command(
+    @commands.hybrid_command(
         name="set_pd",
         brief="Définit les points diplomatiques d'un pays à un montant exact (Staff uniquement).",
         usage="set_pd <pays> <montant>",
@@ -631,7 +633,7 @@ class Points(commands.Cog):
             ctx, cible, amount, 2, ":purple_circle:", self.d_points_color_int
         )
 
-    @commands.command(
+    @commands.hybrid_command(
         name="add_pp",
         brief="Ajoute des points politiques à un pays (Staff uniquement).",
         usage="add_pp <pays> <montant>",
@@ -679,7 +681,7 @@ class Points(commands.Cog):
             ctx, cible, amount, 1, ":blue_circle:", self.p_points_color_int
         )
 
-    @commands.command(
+    @commands.hybrid_command(
         name="add_pd",
         brief="Ajoute des points diplomatiques à un pays (Staff uniquement).",
         usage="add_pd <pays> <montant>",
@@ -727,7 +729,7 @@ class Points(commands.Cog):
             ctx, cible, amount, 2, ":purple_circle:", self.d_points_color_int
         )
 
-    @commands.command(
+    @commands.hybrid_command(
         name="use_pp",
         brief="Utilise des points politiques de votre pays.",
         usage="use_pp [montant]",
@@ -814,7 +816,7 @@ class Points(commands.Cog):
         await self.eco_logger("P3", payment_amount, country["role"], None, 1)
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="use_pd",
         brief="Utilise des points diplomatiques de votre pays.",
         usage="use_pd [montant]",

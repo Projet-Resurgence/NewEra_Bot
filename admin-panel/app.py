@@ -142,7 +142,7 @@ class Structure(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     region_id = db.Column(db.String, nullable=False)
     type = db.Column(db.String, nullable=False)
-    specialization = db.Column(db.String, nullable=False)
+    specialisation = db.Column(db.String, nullable=False)
     level = db.Column(db.Integer, default=1, nullable=False)
     capacity = db.Column(db.Integer, default=0, nullable=False)
     population = db.Column(db.Integer, default=0, nullable=False)
@@ -168,7 +168,7 @@ class Technology(db.Model):
     tech_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String, nullable=False)
     cost = db.Column(db.Integer, default=0, nullable=False)
-    specialization = db.Column(db.String, nullable=False)
+    specialisation = db.Column(db.String, nullable=False)
     development_time = db.Column(db.Integer, default=0, nullable=False)
     development_cost = db.Column(db.Integer, default=0, nullable=False)
     slots_taken = db.Column(db.Float, default=1.0, nullable=False)
@@ -858,7 +858,7 @@ def add_structure():
             structure = Structure(
                 region_id=request.form["region_id"],
                 type=request.form["type"],
-                specialization=request.form["specialization"],
+                specialisation=request.form["specialisation"],
                 level=int(request.form["level"]),
                 capacity=int(request.form["capacity"]),
                 population=int(request.form["population"]),

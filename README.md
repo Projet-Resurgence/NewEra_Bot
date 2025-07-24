@@ -267,7 +267,7 @@ class MyCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
     
-    @commands.command(name='mycommand')
+    @commands.hybrid_command(name='mycommand')
     async def my_command(self, ctx):
         await ctx.send("Hello from my cog!")
 

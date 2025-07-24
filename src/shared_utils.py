@@ -4,8 +4,9 @@ Contains all shared utility class instances and common classes.
 """
 
 import discord
+from discord import app_commands
 from discord.ext import commands
-from typing import Union
+from typing import Union, List
 
 # Import the base classes
 from db import Database, UsefulDatas
@@ -16,12 +17,14 @@ from currency import convert, amount_converter
 db = None
 dUtils = None
 
+
 def initialize_utilities(bot, bat_types, bat_buffs):
     """Initialize all utility instances with the bot instance."""
     global db, dUtils
     uDatas = UsefulDatas(bat_types, bat_buffs)
     db = Database("datas/rts.db", uDatas)
     dUtils = discordUtils(bot, db)
+
 
 def get_db():
     """Get the global database instance."""
@@ -30,12 +33,14 @@ def get_db():
         db = Database()
     return db
 
+
 def get_discord_utils(bot=None, db=None):
     """Get the global discord utils instance."""
     global dUtils
     if dUtils is None and bot is not None:
         dUtils = discordUtils(bot, db)
     return dUtils
+
 
 class CountryEntity:
     """Centralized CountryEntity class used across all cogs."""
@@ -98,7 +103,9 @@ class CountryConverter(commands.Converter):
                 try:
                     country_id = int(argument)
                     db_instance = get_db()
-                    country_role_id = int(db_instance.get_country_role_with_id(country_id))
+                    country_role_id = int(
+                        db_instance.get_country_role_with_id(country_id)
+                    )
                     if not country_role_id:
                         raise commands.BadArgument("Entité inconnue.")
                     role = ctx.guild.get_role(country_role_id)
@@ -109,16 +116,111 @@ class CountryConverter(commands.Converter):
                     try:
                         country_name = argument.strip().lower()
                         db_instance = get_db()
-                        country_id = db_instance.get_country_by_name(country_name.capitalize())
+                        country_id = db_instance.get_country_by_name(
+                            country_name.capitalize()
+                        )
                         if not country_id:
                             raise commands.BadArgument("Pays inconnu.")
-                        role = ctx.guild.get_role(int(db_instance.get_country_role_with_id(country_id)))
+                        role = ctx.guild.get_role(
+                            int(db_instance.get_country_role_with_id(country_id))
+                        )
                         if not role:
                             raise commands.BadArgument("Rôle introuvable.")
                         entity = CountryEntity(role, ctx.guild)
                     except commands.BadArgument:
                         raise commands.BadArgument("Entité inconnue.")
         return entity.to_dict()
+
+
+async def country_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for country parameters in slash commands.
+    Returns a list of Discord roles (countries) and users that match the current input.
+    """
+    choices = []
+    current_lower = current.lower()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance or not interaction.guild:
+        return choices
+
+    try:
+        # Get all countries by querying the Countries table directly
+        cursor = db_instance.cur
+        cursor.execute("SELECT country_id, name, role_id FROM Countries ORDER BY name")
+        countries = cursor.fetchall()
+
+        # Add country roles first (prioritized)
+        for country in countries:
+            if len(choices) >= 20:  # Leave some space for users
+                break
+
+            country_id, country_name, role_id = country
+
+            if current_lower in country_name.lower():
+                # Get the role to verify it exists
+                role = interaction.guild.get_role(int(role_id)) if role_id else None
+                if role:
+                    choices.append(
+                        app_commands.Choice(
+                            name=f"🏛️ {country_name}", value=str(role.id)
+                        )
+                    )
+
+        # Add users/members if there's still space and current input looks like a user search
+        if len(choices) < 20 and len(current) >= 2:
+            # Get members who have government positions (are country players)
+            cursor.execute("SELECT DISTINCT player_id FROM Governments")
+            government_players = [row[0] for row in cursor.fetchall()]
+
+            for player_id in government_players:
+                if len(choices) >= 25:  # Discord limit
+                    break
+
+                try:
+                    member = interaction.guild.get_member(int(player_id))
+                    if member and (
+                        current_lower in member.display_name.lower()
+                        or current_lower in member.name.lower()
+                    ):
+                        # Get the country name for this member
+                        member_country_id = db_instance.get_players_government(
+                            member.id
+                        )
+                        if member_country_id:
+                            country_data = db_instance.get_country_datas(
+                                member_country_id
+                            )
+                            country_name = (
+                                country_data.get("name", "Pays inconnu")
+                                if country_data
+                                else "Pays inconnu"
+                            )
+
+                            choices.append(
+                                app_commands.Choice(
+                                    name=f"👤 {member.display_name} ({country_name})",
+                                    value=str(member.id),
+                                )
+                            )
+                except (ValueError, AttributeError):
+                    continue
+
+    except Exception as e:
+        # Fallback: show guild roles that might be countries
+        for role in interaction.guild.roles:
+            if len(choices) >= 25:
+                break
+            if current_lower in role.name.lower() and not role.is_default():
+                choices.append(
+                    app_commands.Choice(name=f"🏛️ {role.name}", value=str(role.id))
+                )
+
+    return choices
 
 
 # Color constants used across cogs
@@ -136,6 +238,7 @@ __all__ = [
     "get_discord_utils",
     "CountryEntity",
     "CountryConverter",
+    "country_autocomplete",
     "convert",
     "amount_converter",
     "ERROR_COLOR_INT",

@@ -122,7 +122,7 @@ class AdminUtilities(commands.Cog):
         groq_chat_history.append((user_message, content))
         return content
 
-    @commands.command(
+    @commands.hybrid_command(
         name="reload_cogs",
         brief="Recharge tous les cogs du bot.",
         usage="reload_cogs",
@@ -168,7 +168,7 @@ class AdminUtilities(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Failed to reload/load cogs: {e}")
 
-    @commands.command(
+    @commands.hybrid_command(
         name="list_cogs",
         brief="Affiche tous les cogs chargés et leurs commandes.",
         usage="list_cogs",
@@ -221,7 +221,7 @@ class AdminUtilities(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="execute_cmd",
         brief="Exécute du code Python.",
         usage="execute_cmd <code>",
@@ -248,12 +248,10 @@ class AdminUtilities(commands.Cog):
         case_insensitive=True,
     )
     async def execute_cmd(
-        self, 
-        ctx, 
-        *, 
-        code: str = commands.parameter(
-            description="Le code Python à exécuter"
-        )
+        self,
+        ctx,
+        *,
+        code: str = commands.parameter(description="Le code Python à exécuter"),
     ):
         """Execute Python code (Owner only)."""
         if ctx.author.id != 293869524091142144:
@@ -285,7 +283,7 @@ class AdminUtilities(commands.Cog):
                 f"**Une erreur est survenue lors de l'exécution du code :**\n```python\n{e}\n```"
             )
 
-    @commands.command(
+    @commands.hybrid_command(
         name="del_betw",
         brief="Supprime les messages entre deux messages spécifiés.",
         usage="del_betw <message_base> <message_cible>",
@@ -313,14 +311,14 @@ class AdminUtilities(commands.Cog):
         case_insensitive=True,
     )
     async def del_betw(
-        self, 
-        ctx, 
+        self,
+        ctx,
         base_message: discord.Message = commands.parameter(
             description="Message de début (les messages après celui-ci seront supprimés)"
-        ), 
+        ),
         reach_message: discord.Message = commands.parameter(
             description="Message de fin (les messages avant celui-ci seront supprimés)"
-        )
+        ),
     ):
         """Delete messages between two specified messages."""
         if not ctx.author.id in self.bi_admins_id:
@@ -343,7 +341,7 @@ class AdminUtilities(commands.Cog):
         )
         await ctx.channel.send(f"J'ai supprimé {len(deleted)} message(s)")
 
-    @commands.command(
+    @commands.hybrid_command(
         name="del_til",
         brief="Supprime tous les messages depuis un message spécifié jusqu'au plus récent.",
         usage="del_til <message_cible>",
@@ -370,11 +368,11 @@ class AdminUtilities(commands.Cog):
         case_insensitive=True,
     )
     async def del_til(
-        self, 
-        ctx, 
+        self,
+        ctx,
         reach_message: discord.Message = commands.parameter(
             description="Message à partir duquel supprimer tous les messages suivants"
-        )
+        ),
     ):
         """Delete messages from a specified message to the most recent."""
         if not ctx.author.id in self.bi_admins_id:
@@ -392,11 +390,11 @@ class AdminUtilities(commands.Cog):
         deleted = await ctx.channel.purge(limit=1000, after=reach_message)
         await ctx.channel.send(f"J'ai supprimé {len(deleted)} message(s)")
 
-    @commands.command(
+    @commands.hybrid_command(
         name="reformat_emoji",
         brief="Reformate un emoji en lui assignant un nouveau nom, et optionnellement, enlève son arrière-plan.",
         usage="reformat_emoji <emoji> <nouveau_nom> [del_bg]",
-        description="Reformate l'emoji spécifié avec un nouveau nom. Peut également supprimer l'arrière-plan si `del_bg` est activé.",
+        description="Reformate l'emoji avec un nouveau nom et supprime l'arrière-plan si demandé.",
         help="""Reformate un emoji en changeant son nom et en enlevant, si demandé, l'arrière-plan.
 
         ARGUMENTS :
@@ -461,7 +459,7 @@ class AdminUtilities(commands.Cog):
             await asyncio.sleep(2)
         await ctx.send("Fait")
 
-    @commands.command(
+    @commands.hybrid_command(
         name="sync_channels",
         brief="Synchronise les permissions entre deux salons.",
         usage="sync_channels <salon_à_synchroniser> <salon_modèle>",
@@ -514,11 +512,11 @@ class AdminUtilities(commands.Cog):
         await chan_to_sync.edit(overwrites=new_permissions)
         await ctx.send("Fait")
 
-    @commands.command(
+    @commands.hybrid_command(
         name="sync_cats",
         brief="Synchronise les permissions entre deux catégories et leurs salons.",
         usage="sync_cats <catégorie_à_synchroniser> <catégorie_modèle>",
-        description="Copie les permissions d'une catégorie modèle vers une catégorie cible et synchronise tous ses salons.",
+        description="Copie les permissions d'une catégorie vers une autre et synchronise tous ses salons.",
         help="""Synchronise les permissions entre deux catégories et leurs salons.
 
         FONCTIONNALITÉ :
@@ -558,7 +556,7 @@ class AdminUtilities(commands.Cog):
         await self.cat_syncer(ctx, cat_to_sync)
         await ctx.send("Fait")
 
-    @commands.command(
+    @commands.hybrid_command(
         name="reformat_rp_channels",
         brief="Reformate les noms des salons RP selon les conventions.",
         usage="reformat_rp_channels",
@@ -598,11 +596,11 @@ class AdminUtilities(commands.Cog):
                 # await channel.edit(name=new_name)
         await ctx.send("Fait")
 
-    @commands.command(
+    @commands.hybrid_command(
         name="send_rules",
         brief="Envoie les règles du serveur via un webhook.",
         usage="send_rules <url_webhook>",
-        description="Publie toutes les règles du serveur (HRP, RP, militaires, territoriales) via un webhook et annonce leur publication.",
+        description="Publie toutes les règles du serveur via un webhook et annonce leur publication.",
         help="""Envoie un ensemble complet de règles via webhook.
 
         FONCTIONNALITÉ :
@@ -634,11 +632,11 @@ class AdminUtilities(commands.Cog):
         case_insensitive=True,
     )
     async def send_rules(
-        self, 
-        ctx, 
+        self,
+        ctx,
         webhook_url: str = commands.parameter(
             description="URL du webhook Discord où publier les règles"
-        )
+        ),
     ):
         """Send rules to a webhook URL."""
         if ctx.author.id not in self.bi_admins_id:
@@ -727,7 +725,7 @@ class AdminUtilities(commands.Cog):
         await announce_channel.send("@everyone")
         await ctx.message.delete()
 
-    @commands.command(
+    @commands.hybrid_command(
         name="groq_chat",
         brief="Discute avec l'IA Groq spécialisée dans le RP géopolitique.",
         usage="groq_chat <message>",
@@ -759,12 +757,12 @@ class AdminUtilities(commands.Cog):
         case_insensitive=True,
     )
     async def groq_chat(
-        self, 
-        ctx, 
-        *, 
+        self,
+        ctx,
+        *,
         message: str = commands.parameter(
             description="Votre question ou message pour l'IA Groq"
-        )
+        ),
     ):
         """Chat with Groq AI."""
         global last_groq_query_time
@@ -790,11 +788,11 @@ class AdminUtilities(commands.Cog):
         except Exception as e:
             await ctx.send(f"❌ Erreur lors de la requête : {e}")
 
-    @commands.command(
+    @commands.hybrid_command(
         name="leak_inventory",
         brief="Affiche le contenu de la base de données d'inventaire.",
         usage="leak_inventory",
-        description="Exporte et affiche toutes les données d'inventaire des joueurs (argent, points politiques/diplomatiques, capacité de population).",
+        description="Exporte et affiche toutes les données d'inventaire des joueurs.",
         help="""Affiche le contenu complet de la base de données d'inventaire.
 
         INFORMATIONS AFFICHÉES :

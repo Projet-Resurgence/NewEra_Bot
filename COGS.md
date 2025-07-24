@@ -45,7 +45,7 @@ class YourCogName(commands.Cog):
         self.error_color_int = int("FF5733", 16)
         self.success_color_int = int("00FF44", 16)
     
-    @commands.command(name='your_command')
+    @commands.hybrid_command(name='your_command')
     async def your_command_function(self, ctx, argument: str = None):
         """Command description for help system."""
         # Your command logic here
@@ -72,7 +72,7 @@ async def setup(bot):
 
 #### Basic Command
 ```python
-@commands.command(name='hello')
+@commands.hybrid_command(name='hello')
 async def hello_command(self, ctx):
     """Say hello to the user."""
     await ctx.send(f"Hello {ctx.author.mention}!")
@@ -80,7 +80,7 @@ async def hello_command(self, ctx):
 
 #### Command with Arguments
 ```python
-@commands.command(name='greet')
+@commands.hybrid_command(name='greet')
 async def greet_command(self, ctx, user: discord.Member):
     """Greet a specific user."""
     await ctx.send(f"Hello {user.mention}!")
@@ -88,7 +88,7 @@ async def greet_command(self, ctx, user: discord.Member):
 
 #### Command with Permission Checks
 ```python
-@commands.command(name='admin_only')
+@commands.hybrid_command(name='admin_only')
 @commands.has_permissions(administrator=True)
 async def admin_command(self, ctx):
     """Admin-only command."""
@@ -143,7 +143,7 @@ async def on_ready():
 
 #### Reload Command (for development)
 ```python
-@bot.command()
+@bot.hybrid_command()
 @commands.has_permissions(administrator=True)
 async def reload_cogs(ctx):
     """Reload all cogs."""
@@ -158,7 +158,7 @@ async def reload_cogs(ctx):
 
 #### Load/Unload Specific Cogs
 ```python
-@bot.command()
+@bot.hybrid_command()
 @commands.has_permissions(administrator=True)
 async def load_cog(ctx, cog_name: str):
     """Load a specific cog."""
@@ -168,7 +168,7 @@ async def load_cog(ctx, cog_name: str):
     except Exception as e:
         await ctx.send(f"❌ Failed to load {cog_name}: {e}")
 
-@bot.command()
+@bot.hybrid_command()
 @commands.has_permissions(administrator=True)
 async def unload_cog(ctx, cog_name: str):
     """Unload a specific cog."""
@@ -187,7 +187,7 @@ async def unload_cog(ctx, cog_name: str):
 
 ### 2. **Error Handling**
 ```python
-@commands.command()
+@commands.hybrid_command()
 async def safe_command(self, ctx):
     try:
         # Your command logic
@@ -229,7 +229,7 @@ class Economy(commands.Cog):
         self.error_color_int = int("FF5733", 16)
         self.money_color_int = int("FFF005", 16)
     
-    @commands.command(name='bal')
+    @commands.hybrid_command(name='bal')
     async def balance(self, ctx, country: CountryConverter = None):
         """Check the balance of a country or user."""
         # Implementation with proper error handling

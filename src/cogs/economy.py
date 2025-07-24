@@ -5,7 +5,7 @@ Contains balance and other economic-related commands.
 
 import discord
 from discord.ext import commands
-from typing import Union
+from discord import app_commands
 
 # Import centralized utilities
 from shared_utils import (
@@ -13,6 +13,7 @@ from shared_utils import (
     get_discord_utils,
     CountryEntity,
     CountryConverter,
+    country_autocomplete,
     convert,
     amount_converter,
     ERROR_COLOR_INT,
@@ -78,7 +79,7 @@ class Economy(commands.Cog):
         else:
             print("Code non reconnu dans les mappings.")
 
-    @commands.command(
+    @commands.hybrid_command(
         name="bal",
         brief="Affiche le solde d'un pays ou utilisateur.",
         usage="bal [pays]",
@@ -102,6 +103,7 @@ class Economy(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(country=country_autocomplete)
     async def balance(
         self,
         ctx,
@@ -139,7 +141,7 @@ class Economy(commands.Cog):
             )
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="money",
         brief="Alias pour la commande bal - affiche le solde.",
         usage="money [pays]",
@@ -173,7 +175,7 @@ class Economy(commands.Cog):
         """Alias for the balance command."""
         await self.balance(ctx, country)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="give",
         brief="Transfère de l'argent à un autre pays.",
         usage="give <pays_destinataire> <montant>",
@@ -208,13 +210,14 @@ class Economy(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(country=country_autocomplete)
     async def give_money(
         self,
         ctx,
         country: CountryConverter = commands.parameter(
             description="Pays qui recevra l'argent (mention, nom ou ID)"
         ),
-        amount: Union[int, str] = commands.parameter(
+        amount: str = commands.parameter(
             description="Montant à transférer (nombre, pourcentage comme '50%', ou 'all'/'half')"
         ),
     ):
@@ -261,7 +264,7 @@ class Economy(commands.Cog):
         )
         await ctx.send(embed=transa_embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="add_money",
         brief="Ajoute de l'argent à un pays (Staff uniquement).",
         usage="add_money <pays> <montant>",
@@ -335,7 +338,7 @@ class Economy(commands.Cog):
         await self.eco_logger("M2", amount, country.get("role"), ctx.author)
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="remove_money",
         brief="Retire de l'argent d'un pays (Staff uniquement).",
         usage="remove_money <pays> <montant>",
@@ -377,7 +380,7 @@ class Economy(commands.Cog):
         country: CountryConverter = commands.parameter(
             description="Pays dont retirer l'argent (mention, nom ou ID)"
         ),
-        amount: Union[int, str] = commands.parameter(
+        amount: str = commands.parameter(
             description="Montant à retirer (nombre, pourcentage comme '25%', ou 'all'/'half')"
         ),
     ):
@@ -431,7 +434,7 @@ class Economy(commands.Cog):
         await self.eco_logger("M5", payment_amount, country.get("role"), ctx.author)
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="set_money",
         brief="Définit le solde d'un pays à un montant exact (Staff uniquement).",
         usage="set_money <pays> <montant>",
@@ -500,7 +503,7 @@ class Economy(commands.Cog):
         await self.eco_logger("M3", amount, country.get("role"), ctx.author)
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="pay",
         brief="Paye de l'argent au bot (retire de l'argent de votre solde).",
         usage="pay <montant>",
@@ -538,7 +541,7 @@ class Economy(commands.Cog):
     async def pay(
         self,
         ctx,
-        amount: Union[int, str] = commands.parameter(
+        amount: str = commands.parameter(
             description="Montant à payer au bot (nombre, pourcentage comme '15%', ou 'all'/'half')"
         ),
     ):

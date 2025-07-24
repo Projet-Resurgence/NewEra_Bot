@@ -5,6 +5,7 @@ Contains all structure-related commands (previously usines/batiments).
 
 import discord
 from discord.ext import commands
+from discord import app_commands
 from typing import Union
 import json
 
@@ -13,6 +14,8 @@ from shared_utils import (
     get_db,
     get_discord_utils,
     CountryEntity,
+    CountryConverter,
+    country_autocomplete,
     CountryConverter,
     convert,
     amount_converter,
@@ -35,16 +38,16 @@ class Structures(commands.Cog):
         self.money_color_int = MONEY_COLOR_INT
         self.factory_color_int = FACTORY_COLOR_INT
 
-    @commands.command(
+    @commands.hybrid_command(
         name="construct_structure",
         brief="Construit un certain nombre de structures d'un niveau spécifié.",
-        usage="construct_structure <type> <specialization> <level> <amount> <region_id>",
+        usage="construct_structure <type> <specialisation> <level> <amount> <region_id>",
         description="Construit plusieurs structures du niveau indiqué et débite le coût correspondant.",
         help="""Construit une ou plusieurs structures en fonction des paramètres indiqués, tout en vérifiant le solde de l'utilisateur.
 
         ARGUMENTS :
         - `<type>` : Type de structure ('Usine', 'Base', 'Ecole', 'Logement', 'Centrale', 'Technocentre').
-        - `<specialization>` : Spécialisation ('Terrestre', 'Aerienne', 'Navale', 'NA').
+        - `<specialisation>` : Spécialisation ('Terrestre', 'Aerienne', 'Navale', 'NA').
         - `<level>` : Niveau des structures à construire (1-7).
         - `<amount>` : Nombre de structures à construire (entier positif).
         - `<region_id>` : ID de la région où les structures seront construites.
@@ -60,7 +63,7 @@ class Structures(commands.Cog):
         structure_type: str = commands.parameter(
             description="Type de structure à construire."
         ),
-        specialization: str = commands.parameter(
+        specialisation: str = commands.parameter(
             description="Spécialisation de la structure."
         ),
         level: int = commands.parameter(
@@ -95,9 +98,9 @@ class Structures(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        # Validate specialization
+        # Validate specialisation
         valid_specs = ["terrestre", "aerienne", "navale", "na"]
-        if specialization.lower() not in valid_specs:
+        if specialisation.lower() not in valid_specs:
             embed = discord.Embed(
                 title="❌ Spécialisation invalide",
                 description=f"Spécialisations valides: {', '.join(valid_specs)}",
@@ -156,12 +159,12 @@ class Structures(commands.Cog):
 
         # Perform construction
         if self.db.construct_structure(
-            country.get("id"), structure_type, specialization, level, region_id, amount
+            country.get("id"), structure_type, specialisation, level, region_id, amount
         ):
             self.db.take_balance(country.get("id"), total_cost)
             embed = discord.Embed(
                 title="🏗️ Construction réussie",
-                description=f"{amount} {structure_type}(s) {specialization} niveau {level} construite(s) pour {convert(str(total_cost))}.",
+                description=f"{amount} {structure_type}(s) {specialisation} niveau {level} construite(s) pour {convert(str(total_cost))}.",
                 color=self.money_color_int,
             )
         else:
@@ -173,7 +176,7 @@ class Structures(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="sell_structure",
         brief="Vend une structure spécifique.",
         usage="sell_structure <structure_id>",
@@ -259,7 +262,7 @@ class Structures(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="structures",
         brief="Affiche les structures d'un utilisateur.",
         usage="structures [type] [user]",
@@ -351,20 +354,20 @@ class Structures(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        # Group structures by type, specialization, level
+        # Group structures by type, specialisation, level
         structure_groups = {}
         for structure in structures:
             (
                 struct_id,
                 struct_type,
-                specialization,
+                specialisation,
                 level,
                 capacity,
                 population,
                 region_id,
                 region_name,
             ) = structure
-            key = f"{struct_type} {specialization} Niv.{level}"
+            key = f"{struct_type} {specialisation} Niv.{level}"
 
             if key not in structure_groups:
                 structure_groups[key] = {
@@ -404,7 +407,7 @@ class Structures(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="structure_info",
         brief="Affiche les détails d'une structure spécifique.",
         usage="structure_info <structure_id>",
@@ -473,7 +476,7 @@ class Structures(commands.Cog):
         (
             struct_id,
             struct_type,
-            specialization,
+            specialisation,
             level,
             capacity,
             population,
@@ -490,7 +493,7 @@ class Structures(commands.Cog):
         )
 
         embed.add_field(name="Type", value=struct_type, inline=True)
-        embed.add_field(name="Spécialisation", value=specialization, inline=True)
+        embed.add_field(name="Spécialisation", value=specialisation, inline=True)
         embed.add_field(name="Niveau", value=level, inline=True)
         embed.add_field(
             name="Région", value=f"{region_name} (#{region_id})", inline=False
@@ -507,10 +510,10 @@ class Structures(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="add_structure",
         brief="Ajoute des structures à un pays (Staff seulement).",
-        usage="add_structure <country> <type> <specialization> <level> <amount> <region_id>",
+        usage="add_structure <country> <type> <specialisation> <level> <amount> <region_id>",
         description="Ajoute des structures à l'inventaire d'un pays.",
         help="""Ajoute des structures à un pays sans frais de construction (commande staff).
 
@@ -543,7 +546,7 @@ class Structures(commands.Cog):
         ARGUMENTS :
         - `<country>` : Pays destinataire (mention, nom ou ID)
         - `<type>` : Type de structure
-        - `<specialization>` : Spécialisation de la structure
+        - `<specialisation>` : Spécialisation de la structure
         - `<level>` : Niveau des structures (1-7)
         - `<amount>` : Nombre de structures à ajouter
         - `<region_id>` : ID de la région où placer les structures
@@ -564,7 +567,7 @@ class Structures(commands.Cog):
         structure_type: str = commands.parameter(
             description="Type de structure (Usine, Base, Ecole, Logement, Centrale, Technocentre)"
         ),
-        specialization: str = commands.parameter(
+        specialisation: str = commands.parameter(
             description="Spécialisation (Terrestre, Aerienne, Navale, NA)"
         ),
         level: int = commands.parameter(description="Niveau des structures (1-7)"),
@@ -606,7 +609,7 @@ class Structures(commands.Cog):
             return
 
         valid_specs = ["Terrestre", "Aerienne", "Navale", "NA"]
-        if specialization not in valid_specs:
+        if specialisation not in valid_specs:
             embed = discord.Embed(
                 title="❌ Spécialisation invalide",
                 description=f"Spécialisations valides: {', '.join(valid_specs)}",
@@ -626,11 +629,11 @@ class Structures(commands.Cog):
 
         # Add structures without cost
         if self.db.construct_structure(
-            country.get("id"), structure_type, specialization, level, region_id, amount
+            country.get("id"), structure_type, specialisation, level, region_id, amount
         ):
             embed = discord.Embed(
                 title="✅ Structures ajoutées",
-                description=f"{amount} {structure_type}(s) {specialization} niveau {level} ajoutée(s) à {country['name']}.",
+                description=f"{amount} {structure_type}(s) {specialisation} niveau {level} ajoutée(s) à {country['name']}.",
                 color=self.money_color_int,
             )
         else:
@@ -642,7 +645,7 @@ class Structures(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="remove_structure",
         brief="Retire une structure par son ID (Staff seulement).",
         usage="remove_structure <structure_id>",
@@ -720,7 +723,7 @@ class Structures(commands.Cog):
             (
                 struct_id,
                 struct_type,
-                specialization,
+                specialisation,
                 level,
                 capacity,
                 population,
@@ -731,7 +734,7 @@ class Structures(commands.Cog):
             if self.db.remove_structure(structure_id):
                 embed = discord.Embed(
                     title="✅ Structure supprimée",
-                    description=f"{struct_type} {specialization} niveau {level} (ID: {structure_id}) supprimée de la région {region_name}.",
+                    description=f"{struct_type} {specialisation} niveau {level} (ID: {structure_id}) supprimée de la région {region_name}.",
                     color=self.money_color_int,
                 )
             else:
@@ -749,7 +752,7 @@ class Structures(commands.Cog):
 
         await ctx.send(embed=embed)
 
-    @commands.command(
+    @commands.hybrid_command(
         name="structure_costs",
         brief="Affiche les coûts de construction des structures.",
         usage="structure_costs [type]",

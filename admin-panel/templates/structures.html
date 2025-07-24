@@ -30,7 +30,7 @@
           <th>ID</th>
           <th>Region</th>
           <th>Type</th>
-          <th>Specialization</th>
+          <th>specialisation</th>
           <th>Level</th>
           <th>Capacity</th>
           <th>Population</th>
@@ -49,7 +49,7 @@
             {% endfor %}
           </td>
           <td><span class="badge bg-primary">{{ structure.type }}</span></td>
-          <td><span class="badge bg-secondary">{{ structure.specialization }}</span></td>
+          <td><span class="badge bg-secondary">{{ structure.specialisation }}</span></td>
           <td><span class="badge bg-info">Level {{ structure.level }}</span></td>
           <td>{{ "{:,}".format(structure.capacity) }}</td>
           <td>{{ "{:,}".format(structure.population) }}</td>
