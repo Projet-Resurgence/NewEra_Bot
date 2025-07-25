@@ -16,7 +16,13 @@ from shared_utils import (
     CountryEntity,
     CountryConverter,
     country_autocomplete,
-    CountryConverter,
+    structure_type_autocomplete,
+    specialisation_autocomplete,
+    structure_autocomplete,
+    region_autocomplete,
+    technology_autocomplete,
+    STRUCTURE_TYPES,
+    SPECIALISATIONS,
     convert,
     amount_converter,
     ERROR_COLOR_INT,
@@ -57,6 +63,18 @@ class Structures(commands.Cog):
         """,
         case_insensitive=True,
     )
+    @app_commands.choices(
+        structure_type=[
+            app_commands.Choice(name=struct_type, value=struct_type)
+            for struct_type in STRUCTURE_TYPES
+        ]
+    )
+    @app_commands.choices(
+        specialisation=[
+            app_commands.Choice(name=spec, value=spec) for spec in SPECIALISATIONS
+        ]
+    )
+    @app_commands.autocomplete(region_id=region_autocomplete)
     async def construct_structure(
         self,
         ctx,
@@ -88,22 +106,20 @@ class Structures(commands.Cog):
             return
 
         # Validate structure type
-        valid_types = ["usine", "base", "ecole", "logement", "centrale", "technocentre"]
-        if structure_type.lower() not in valid_types:
+        if structure_type not in STRUCTURE_TYPES:
             embed = discord.Embed(
                 title="❌ Type invalide",
-                description=f"Types valides: {', '.join(valid_types)}",
+                description=f"Types valides: {', '.join(STRUCTURE_TYPES)}",
                 color=self.error_color_int,
             )
             await ctx.send(embed=embed)
             return
 
         # Validate specialisation
-        valid_specs = ["terrestre", "aerienne", "navale", "na"]
-        if specialisation.lower() not in valid_specs:
+        if specialisation not in SPECIALISATIONS:
             embed = discord.Embed(
                 title="❌ Spécialisation invalide",
-                description=f"Spécialisations valides: {', '.join(valid_specs)}",
+                description=f"Spécialisations valides: {', '.join(SPECIALISATIONS)}",
                 color=self.error_color_int,
             )
             await ctx.send(embed=embed)
@@ -159,7 +175,12 @@ class Structures(commands.Cog):
 
         # Perform construction
         if self.db.construct_structure(
-            country.get("id"), structure_type, specialisation, level, region_id, amount
+            country.get("id"),
+            structure_type.capitalize(),
+            specialisation.capitalize(),
+            level,
+            region_id,
+            amount,
         ):
             self.db.take_balance(country.get("id"), total_cost)
             embed = discord.Embed(
@@ -504,7 +525,7 @@ class Structures(commands.Cog):
         if struct_type == "Usine":
             embed.add_field(
                 name="Slots de production",
-                value=f"**Utilisés**: {slot_info['used_capacity']:.1f}\n**Disponibles**: {slot_info['remaining_capacity']:.1f}\n**Total**: {slot_info['effective_capacity']}",
+                value=f"**Utilisés**: {slot_info['used_capacity']:.1f}\n**Disponibles**: {slot_info['remaining_capacity']:.1f}\n**Total**: {slot_info['effective_cost']}",
                 inline=False,
             )
 
@@ -558,6 +579,19 @@ class Structures(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(target_country=country_autocomplete)
+    @app_commands.choices(
+        structure_type=[
+            app_commands.Choice(name=struct_type, value=struct_type)
+            for struct_type in STRUCTURE_TYPES
+        ]
+    )
+    @app_commands.choices(
+        specialisation=[
+            app_commands.Choice(name=spec, value=spec) for spec in SPECIALISATIONS
+        ]
+    )
+    @app_commands.autocomplete(region_id=region_autocomplete)
     async def add_structure(
         self,
         ctx,
@@ -598,21 +632,19 @@ class Structures(commands.Cog):
             return
 
         # Validate parameters (same validation as construct_structure)
-        valid_types = ["Usine", "Base", "Ecole", "Logement", "Centrale", "Technocentre"]
-        if structure_type not in valid_types:
+        if structure_type not in STRUCTURE_TYPES:
             embed = discord.Embed(
                 title="❌ Type invalide",
-                description=f"Types valides: {', '.join(valid_types)}",
+                description=f"Types valides: {', '.join(STRUCTURE_TYPES)}",
                 color=self.error_color_int,
             )
             await ctx.send(embed=embed)
             return
 
-        valid_specs = ["Terrestre", "Aerienne", "Navale", "NA"]
-        if specialisation not in valid_specs:
+        if specialisation not in SPECIALISATIONS:
             embed = discord.Embed(
                 title="❌ Spécialisation invalide",
-                description=f"Spécialisations valides: {', '.join(valid_specs)}",
+                description=f"Spécialisations valides: {', '.join(SPECIALISATIONS)}",
                 color=self.error_color_int,
             )
             await ctx.send(embed=embed)

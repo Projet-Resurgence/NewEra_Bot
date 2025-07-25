@@ -387,6 +387,7 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(cible=country_autocomplete)
     async def remove_pp(
         self,
         ctx,
@@ -438,6 +439,7 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(cible=country_autocomplete)
     async def remove_pd(
         self,
         ctx,
@@ -528,6 +530,7 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(cible=country_autocomplete)
     async def points_d(
         self,
         ctx,
@@ -573,6 +576,7 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(cible=country_autocomplete)
     async def set_pp(
         self,
         ctx,
@@ -618,6 +622,7 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(cible=country_autocomplete)
     async def set_pd(
         self,
         ctx,
@@ -666,6 +671,7 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(cible=country_autocomplete)
     async def add_pp(
         self,
         ctx,
@@ -714,6 +720,7 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(cible=country_autocomplete)
     async def add_pd(
         self,
         ctx,

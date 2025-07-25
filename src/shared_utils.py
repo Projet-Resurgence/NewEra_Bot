@@ -223,6 +223,387 @@ async def country_autocomplete(
     return choices
 
 
+# Global lists for autocompletion and validation
+STRUCTURE_TYPES = ["Usine", "Base", "Ecole", "Logement", "Centrale", "Technocentre"]
+SPECIALISATIONS = ["Terrestre", "Aerienne", "Navale", "NA"]
+
+
+async def structure_type_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for structure type parameters in slash commands.
+    Returns a list of available structure types.
+    """
+    choices = []
+    current_lower = current.lower()
+
+    for structure_type in STRUCTURE_TYPES:
+        if current_lower in structure_type.lower():
+            choices.append(
+                app_commands.Choice(name=structure_type, value=structure_type)
+            )
+
+    return choices
+
+
+async def specialisation_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for specialisation parameters in slash commands.
+    Returns a list of available specialisations.
+    """
+    choices = []
+    current_lower = current.lower()
+
+    specialisation_emojis = {
+        "Terrestre": "🚗",
+        "Aerienne": "✈️",
+        "Navale": "🚢",
+        "NA": "⚙️",
+    }
+
+    for specialisation in SPECIALISATIONS:
+        if current_lower in specialisation.lower():
+            emoji = specialisation_emojis.get(specialisation, "")
+            choices.append(
+                app_commands.Choice(
+                    name=f"{emoji} {specialisation}", value=specialisation
+                )
+            )
+
+    return choices
+
+
+async def structure_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for built structures in slash commands.
+    Returns a list of structures owned by the user's country.
+    """
+    choices = []
+    current_lower = current.lower()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance or not interaction.guild:
+        return choices
+
+    try:
+        # Get the user's country
+        country_entity = CountryEntity(interaction.user, interaction.guild)
+        country_id = country_entity.get_country_id()
+
+        if not country_id:
+            return choices
+
+        # Get structures for this country
+        cursor = db_instance.cur
+        cursor.execute(
+            """
+            SELECT s.id, s.type, s.specialization, s.level, r.name as region_name
+            FROM Structures s
+            JOIN Regions r ON s.region_id = r.region_id
+            WHERE r.country_id = ?
+            ORDER BY s.type, s.level DESC
+            LIMIT 25
+        """,
+            (country_id,),
+        )
+
+        structures = cursor.fetchall()
+
+        for structure in structures:
+            structure_id, struct_type, specialization, level, region_name = structure
+
+            # Create search text
+            search_text = f"{struct_type} {specialization} {region_name}".lower()
+
+            if current_lower in search_text:
+                choices.append(
+                    app_commands.Choice(
+                        name=f"{struct_type} {specialization} Niv.{level} ({region_name})",
+                        value=str(structure_id),
+                    )
+                )
+
+    except Exception as e:
+        print(f"Error in structure_autocomplete: {e}")
+
+    return choices
+
+
+async def region_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for regions in slash commands.
+    Returns a list of regions owned by the user's country.
+    """
+    choices = []
+    current_lower = current.lower()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance or not interaction.guild:
+        return choices
+
+    try:
+        # Get the user's country
+        country_entity = CountryEntity(interaction.user, interaction.guild)
+        country_id = country_entity.get_country_id()
+
+        if not country_id:
+            return choices
+
+        # Get regions for this country
+        cursor = db_instance.cur
+        cursor.execute(
+            """
+            SELECT region_id, name, population
+            FROM Regions
+            WHERE country_id = ?
+            ORDER BY name
+            LIMIT 25
+        """,
+            (country_id,),
+        )
+
+        regions = cursor.fetchall()
+
+        for region in regions:
+            region_id, region_name, population = region
+
+            if current_lower in region_name.lower():
+                choices.append(
+                    app_commands.Choice(
+                        name=f"🌍 {region_name} (Pop: {population:,})",
+                        value=str(region_id),
+                    )
+                )
+
+    except Exception as e:
+        print(f"Error in region_autocomplete: {e}")
+
+    return choices
+
+
+async def technology_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for technologies in slash commands.
+    Returns technologies based on user role and context:
+    - Military admin: All technologies
+    - Non-player: Nothing
+    - Player in any channel: Country's public techs only
+    - Player in secret channel: All country's techs (public + secret)
+    """
+    choices = []
+    current_lower = current.lower()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance or not interaction.guild:
+        print(f"technology_autocomplete: No db_instance or guild")
+        return choices
+
+    try:
+        print(
+            f"technology_autocomplete: User {interaction.user.display_name} (ID: {interaction.user.id}) searching for '{current}'"
+        )
+
+        # Check if user is military admin first
+        military_admin_role_id = 874869709223383091  # Hardcoded for testing
+        if military_admin_role_id:
+            military_admin_role_id = int(military_admin_role_id)
+            is_military_admin = any(
+                role.id == military_admin_role_id for role in interaction.user.roles
+            )
+            print(f"technology_autocomplete: Is military admin: {is_military_admin}")
+
+            if is_military_admin:
+                # Military admin sees ALL technologies
+                cursor = db_instance.cur
+                cursor.execute(
+                    """
+                    SELECT tech_id, name, specialisation, technology_level, type
+                    FROM Technologies
+                    WHERE name LIKE ?
+                    ORDER BY name
+                    LIMIT 25
+                """,
+                    (f"%{current}%",),
+                )
+                technologies = cursor.fetchall()
+                print(
+                    f"technology_autocomplete: Military admin found {len(technologies)} technologies"
+                )
+
+                specialisation_emojis = {
+                    "Terrestre": "🚗",
+                    "Aerienne": "✈️",
+                    "Navale": "🚢",
+                    "NA": "⚙️",
+                }
+
+                for tech in technologies:
+                    tech_id, tech_name, specialisation, tech_level, tech_type = tech
+
+                    if current_lower in tech_name.lower():
+                        emoji = specialisation_emojis.get(specialisation, "🔧")
+                        choices.append(
+                            app_commands.Choice(
+                                name=f"{emoji} {tech_name} (Niv.{tech_level}) [ADMIN]",
+                                value=str(tech_id),
+                            )
+                        )
+                print(
+                    f"technology_autocomplete: Military admin returning {len(choices)} choices"
+                )
+                return choices
+
+        # Check if user is a player (this was missing!)
+        # For now, let's assume everyone who isn't military admin is a player
+        # You can add proper player role check here later
+        f = open("test.txt", "w")
+        # User is a player, get their country
+        country_entity = CountryEntity(interaction.user, interaction.guild).to_dict()
+        country_id = country_entity.get("id")
+        f.write(f"technology_autocomplete: Player country_id: {country_id}")
+
+        if not country_id:
+            # Player but no country, return nothing
+            f.write(f"technology_autocomplete: No country found for player")
+            return choices
+
+        # Check if user is in their secret channel
+        is_secret_channel = False
+        country_data = db_instance.get_country_datas(country_id)
+        if country_data:
+            secret_channel_id = country_data.get("secret_channel_id")
+            if secret_channel_id and str(interaction.channel_id) == str(
+                secret_channel_id
+            ):
+                is_secret_channel = True
+        f.write(
+            f"technology_autocomplete: Is secret channel: {is_secret_channel}, Channel ID: {interaction.channel_id}"
+        )
+
+        # Get technologies based on context
+        cursor = db_instance.cur
+
+        # Debug: First check if there are ANY technologies in the database
+        cursor.execute("SELECT COUNT(*) FROM Technologies")
+        total_techs = cursor.fetchone()[0]
+        f.write(f"technology_autocomplete: Total technologies in database: {total_techs}")
+
+        # Debug: Check if there are exported technologies
+        cursor.execute("SELECT COUNT(*) FROM Technologies WHERE exported = 1")
+        exported_techs = cursor.fetchone()[0]
+        f.write(f"technology_autocomplete: Exported technologies: {exported_techs}")
+
+        # Debug: Check if there are technologies developed by this country
+        cursor.execute(
+            "SELECT COUNT(*) FROM Technologies WHERE developed_by = ?", (country_id,)
+        )
+        country_techs = cursor.fetchone()[0]
+        f.write(
+            f"technology_autocomplete: Technologies developed by country {country_id}: {country_techs}"
+        )
+
+        if is_secret_channel:
+            # In secret channel: show all country's technologies (public + secret)
+            query = """
+                SELECT tech_id, name, specialisation, technology_level, type, is_secret
+                FROM Technologies
+                WHERE (developed_by = ? OR tech_id IN (
+                    SELECT tech_id FROM TechnologyLicenses WHERE country_id = ?
+                ) OR exported = 1)
+                ORDER BY name
+                LIMIT 25
+            """
+            params = (country_id, country_id)
+        else:
+            # In any other channel: only public technologies
+            query = """
+                SELECT tech_id, name, specialisation, technology_level, type, is_secret
+                FROM Technologies
+                WHERE (developed_by = ? OR tech_id IN (
+                    SELECT tech_id FROM TechnologyLicenses WHERE country_id = ?
+                ) OR exported = 1)
+                AND is_secret = 0
+                ORDER BY name
+                LIMIT 25
+            """
+            params = (country_id, country_id)
+
+        f.write(f"technology_autocomplete: Executing query with params: {params}")
+        cursor.execute(query, params)
+        technologies = cursor.fetchall()
+        f.write(f"technology_autocomplete: Player found {len(technologies)} technologies")
+
+        # Debug: If no results, try simpler query
+        if not technologies:
+            f.write(f"technology_autocomplete: No results, trying simpler query...")
+            cursor.execute(
+                """
+                SELECT tech_id, name, specialisation, technology_level, type, 
+                       COALESCE(is_secret, 0) as is_secret
+                FROM Technologies
+                WHERE name LIKE ?
+                ORDER BY name
+                LIMIT 10
+            """,
+                (f"%{current}%",),
+            )
+            all_matching = cursor.fetchall()
+            f.write(
+                f"technology_autocomplete: All matching technologies (debug): {len(all_matching)}"
+            )
+            for tech in all_matching:
+                f.write(f"  - Tech: {tech}")
+
+        specialisation_emojis = {
+            "Terrestre": "🚗",
+            "Aerienne": "✈️",
+            "Navale": "🚢",
+            "NA": "⚙️",
+        }
+
+        for tech in technologies:
+            tech_id, tech_name, specialisation, tech_level, tech_type, is_secret = tech
+
+            if current_lower in tech_name.lower():
+                emoji = specialisation_emojis.get(specialisation, "🔧")
+                secret_indicator = " 🔒" if is_secret and is_secret_channel else ""
+                choices.append(
+                    app_commands.Choice(
+                        name=f"{emoji} {tech_name} (Niv.{tech_level}){secret_indicator}",
+                        value=str(tech_id),
+                    )
+                )
+
+        f.write(f"technology_autocomplete: Player returning {len(choices)} choices")
+        f.close()
+
+    except Exception as e:
+        f.write(f"Error in technology_autocomplete: {e}")
+        f.close()
+        import traceback
+
+        traceback.print_exc()
+
+    return choices
+
+
 # Color constants used across cogs
 ERROR_COLOR_INT = int("FF5733", 16)
 MONEY_COLOR_INT = int("FFF005", 16)
@@ -239,6 +620,13 @@ __all__ = [
     "CountryEntity",
     "CountryConverter",
     "country_autocomplete",
+    "structure_type_autocomplete",
+    "specialisation_autocomplete",
+    "structure_autocomplete",
+    "region_autocomplete",
+    "technology_autocomplete",
+    "STRUCTURE_TYPES",
+    "SPECIALISATIONS",
     "convert",
     "amount_converter",
     "ERROR_COLOR_INT",

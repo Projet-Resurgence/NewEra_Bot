@@ -47,7 +47,17 @@ from shared_utils import (
     D_POINTS_COLOR_INT as d_points_color_int,
     ALL_COLOR_INT as all_color_int,
     FACTORY_COLOR_INT as factory_color_int,
+    structure_type_autocomplete,
+    specialisation_autocomplete,
+    structure_autocomplete,
+    region_autocomplete,
+    technology_autocomplete,
+    STRUCTURE_TYPES,
+    SPECIALISATIONS,
+    convert,
+    amount_converter,
 )
+
 import requests
 from dotenv import dotenv_values
 import math
@@ -1332,6 +1342,16 @@ async def transfer_archives(ctx):
 
 @bot.hybrid_command()
 @app_commands.autocomplete(country=country_autocomplete)
+@app_commands.choices(
+    unit_type=[
+        app_commands.Choice(name="Tous", value="all"),
+        app_commands.Choice(name="Soldat", value="soldat"),
+        app_commands.Choice(name="Réserve", value="reserve"),
+        app_commands.Choice(name="Policier", value="policier"),
+        app_commands.Choice(name="Secret", value="secret"),
+        app_commands.Choice(name="Ingénieur", value="ingenieur"),
+    ]
+)
 async def get_units(ctx, country: CountryConverter = None, unit_type: str = "all"):
     """
     Commande pour obtenir le nombre d'unités d'un pays.
@@ -1390,6 +1410,16 @@ async def get_units(ctx, country: CountryConverter = None, unit_type: str = "all
 
 
 @bot.hybrid_command()
+@app_commands.autocomplete(country=country_autocomplete)
+@app_commands.choices(
+    unit_type=[
+        app_commands.Choice(name="Soldat", value="soldat"),
+        app_commands.Choice(name="Réserve", value="reserve"),
+        app_commands.Choice(name="Policier", value="policier"),
+        app_commands.Choice(name="Secret", value="secret"),
+        app_commands.Choice(name="Ingénieur", value="ingenieur"),
+    ]
+)
 async def recruit(
     ctx, country: CountryConverter, note: int, goal: int, unit_type: str = "None"
 ):
@@ -1457,6 +1487,16 @@ Le coût total est de {convert(str(cost))}.\n\n"
 
 
 @bot.hybrid_command()
+@app_commands.autocomplete(country=country_autocomplete)
+@app_commands.choices(
+    unit_type=[
+        app_commands.Choice(name="Soldat", value="soldat"),
+        app_commands.Choice(name="Réserve", value="reserve"),
+        app_commands.Choice(name="Policier", value="policier"),
+        app_commands.Choice(name="Secret", value="secret"),
+        app_commands.Choice(name="Ingénieur", value="ingenieur"),
+    ]
+)
 async def set_public_units(ctx, country: CountryConverter, unit_type: str, qty: int):
     """
     Commande pour définir le nombre d'unités publiques d'un pays.
@@ -1520,6 +1560,7 @@ async def program_ghostping(
 
 
 @bot.hybrid_command()
+@app_commands.autocomplete(country=country_autocomplete)
 async def test_converter(ctx, country: CountryConverter):
     """
     Teste le convertisseur de pays.
@@ -1969,7 +2010,7 @@ async def easy_tech_test(ctx, image: str = None):
     }
     specialisation = "terrestre"  # Example tech type, replace with actual logic
 
-    image = "https://media.discordapp.net/attachments/1394353396059996220/1396138139826913300/Best_Tank.webp?ex=6882ed37&is=68819bb7&hm=8983b2e014e7999b3a11d05aa6fad5240748c15a679d2308e437f1e0646a271c&=&format=webp&width=860&height=483"
+    image = "https://media.discordapp.net/attachments/1397862765028442183/1397982345310769189/tech_12.png?ex=6883b404&is=68826284&hm=b17254d5f35a4875dba953afe826bdbcf418fe0d65de1513154bd9fd2316cdda&=&format=webp&quality=lossless&width=352&height=234"
 
     confirmed = True
     if confirmed:
@@ -2691,7 +2732,7 @@ async def create_tech(
     if not specialisation:
         specialisation = await dUtils.discord_input(
             ctx,
-            f"Bienvenue dans le programme de création de technologies!\nQuel type de technologie voulez-vous créer? ({'/'.join(TechFormData.TECH_CONFIGS.keys())})",
+            f"Bienvenue dans le programme de création de technologies!\nQuel type de technologie voulez-vous créer? ({'/'.join(k for k in TechFormData.TECH_CONFIGS.keys() if k != 'common')})",
         )
 
     image_url_finale = None
@@ -2772,9 +2813,10 @@ async def create_tech(
     enabled=True,
     case_insensitive=True,
 )
+@app_commands.autocomplete(tech_id=technology_autocomplete)
 async def get_infos(
     ctx,
-    tech_id: int = commands.parameter(description="ID de la technologie à consulter"),
+    tech_id: str = commands.parameter(description="ID de la technologie à consulter"),
 ) -> None:
     """Affiche les informations d'une technologie par son ID."""
 
@@ -2877,11 +2919,13 @@ async def annex(ctx, region_id):
 
 
 @bot.hybrid_command()
+@app_commands.autocomplete(country=country_autocomplete)
 async def add_player_to_country(ctx, user: discord.Member, country: CountryConverter):
     return
 
 
 @bot.hybrid_command()
+@app_commands.autocomplete(country=country_autocomplete)
 async def remove_player_from_country(
     ctx, user: discord.Member, country: CountryConverter
 ):
@@ -2889,6 +2933,7 @@ async def remove_player_from_country(
 
 
 @bot.hybrid_command()
+@app_commands.autocomplete(country=country_autocomplete)
 async def add_region(
     ctx,
     region_name: str,
@@ -3122,5 +3167,51 @@ def ensure_db_methods():
 
 # Call the helper function to ensure methods exist
 ensure_db_methods()
+
+
+@bot.hybrid_command(
+    name="exponential",
+    brief="Génère une progression exponentielle de valeurs.",
+    usage="exponential <start> <target> <steps>",
+    description="Génère une liste de valeurs d'une exponentielle de X à Y.",
+    help="""Génère une liste de valeurs suivant une progression exponentielle.
+
+    FONCTIONNALITÉ :
+    - Calcule des valeurs exponentielles entre un point de départ et un point cible
+    - Utile pour des applications nécessitant des progressions exponentielles
+
+    ARGUMENTS :
+    - `<start>` : Point de départ (doit être différent de 0)
+    - `<target>` : Point cible
+    - `<steps>` : Nombre d'étapes à générer
+
+    EXEMPLE :
+    - `exponential 100 1000 5` : Génère 6 valeurs entre 100 et 1000
+    """,
+)
+async def exponential(
+    ctx,
+    start: float = commands.parameter(
+        description="Point de départ de la progression exponentielle"
+    ),
+    target: float = commands.parameter(
+        description="Point cible de la progression exponentielle"
+    ),
+    steps: int = commands.parameter(
+        description="Nombre d'étapes à générer (au moins 1)"
+    ),
+) -> None:
+    if start == 0:
+        raise ValueError(
+            "Le point de départ ne peut pas être 0 pour une progression exponentielle."
+        )
+    if steps < 1:
+        raise ValueError("Le nombre d'étapes doit être au moins 1.")
+
+    r = (target / start) ** (1 / steps)
+    values = [start * (r**i) for i in range(steps + 1)]
+    values_str = ", ".join(f"{v:.2f}" for v in values)
+    await ctx.send(f"Valeurs générées : {values_str}")
+
 
 bot.run(token)

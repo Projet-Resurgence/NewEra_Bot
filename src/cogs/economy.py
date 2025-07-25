@@ -164,6 +164,7 @@ class Economy(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(country=country_autocomplete)
     async def money_alias(
         self,
         ctx,
@@ -292,6 +293,7 @@ class Economy(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(country=country_autocomplete)
     async def add_money(
         self,
         ctx,
@@ -374,6 +376,7 @@ class Economy(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(country=country_autocomplete)
     async def remove_money(
         self,
         ctx,
@@ -464,6 +467,7 @@ class Economy(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
+    @app_commands.autocomplete(country=country_autocomplete)
     async def set_money(
         self,
         ctx,
