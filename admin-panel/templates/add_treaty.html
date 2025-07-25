@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+
+{% block title %}Add Treaty{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Add New Treaty</h5>
+                    <a href="/treaties" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="treaty_type" class="form-label">Treaty Type</label>
+                            <select class="form-select" id="treaty_type" name="treaty_type" required>
+                                <option value="">Select Treaty Type</option>
+                                <option value="non-aggression">Non-Aggression Pact</option>
+                                <option value="free trade">Free Trade Agreement</option>
+                                <option value="research pact">Research Pact</option>
+                                <option value="peace agreement">Peace Agreement</option>
+                                <option value="defensive alliance">Defensive Alliance</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="country_a" class="form-label">Country A</label>
+                            <select class="form-select" id="country_a" name="country_a" required>
+                                <option value="">Select Country A</option>
+                                {% for country in countries %}
+                                <option value="{{ country.country_id }}">{{ country.country_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="country_b" class="form-label">Country B</label>
+                            <select class="form-select" id="country_b" name="country_b" required>
+                                <option value="">Select Country B</option>
+                                {% for country in countries %}
+                                <option value="{{ country.country_id }}">{{ country.country_name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="start_date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="start_date" 
+                                   name="start_date" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="end_date" class="form-label">End Date (Optional)</label>
+                            <input type="date" class="form-control" id="end_date" 
+                                   name="end_date">
+                            <small class="text-muted">Leave empty for indefinite treaty</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status" required>
+                                <option value="">Select Status</option>
+                                <option value="active">Active</option>
+                                <option value="expired">Expired</option>
+                                <option value="terminated">Terminated</option>
+                            </select>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/treaties" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-plus"></i> Add Treaty
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Prevent selecting the same country for both country_a and country_b
+document.getElementById('country_a').addEventListener('change', function() {
+    const countryBSelect = document.getElementById('country_b');
+    const selectedValue = this.value;
+    
+    for (let option of countryBSelect.options) {
+        if (option.value === selectedValue && selectedValue !== '') {
+            option.disabled = true;
+        } else {
+            option.disabled = false;
+        }
+    }
+});
+
+document.getElementById('country_b').addEventListener('change', function() {
+    const countryASelect = document.getElementById('country_a');
+    const selectedValue = this.value;
+    
+    for (let option of countryASelect.options) {
+        if (option.value === selectedValue && selectedValue !== '') {
+            option.disabled = true;
+        } else {
+            option.disabled = false;
+        }
+    }
+});
+</script>
+{% endblock %}

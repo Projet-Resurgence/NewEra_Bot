@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+
+{% block title %}Add War Declaration{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Add New War Declaration</h5>
+                    <a href="/war_declarations" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="country_a" class="form-label">Declaring Country</label>
+                            <select class="form-select" id="country_a" name="country_a" required>
+                                <option value="">Select Declaring Country</option>
+                                {% for country in countries %}
+                                <option value="{{ country.country_id }}">{{ country.country_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">The country that declares war</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="country_b" class="form-label">Target Country</label>
+                            <select class="form-select" id="country_b" name="country_b" required>
+                                <option value="">Select Target Country</option>
+                                {% for country in countries %}
+                                <option value="{{ country.country_id }}">{{ country.country_name }}</option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">The country that war is declared upon</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="declaration_date" class="form-label">Declaration Date</label>
+                            <input type="date" class="form-control" id="declaration_date" 
+                                   name="declaration_date" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status" required>
+                                <option value="">Select Status</option>
+                                <option value="active">Active</option>
+                                <option value="resolved">Resolved</option>
+                                <option value="terminated">Terminated</option>
+                            </select>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/war_declarations" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-plus"></i> Add War Declaration
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// Prevent selecting the same country for both country_a and country_b
+document.getElementById('country_a').addEventListener('change', function() {
+    const countryBSelect = document.getElementById('country_b');
+    const selectedValue = this.value;
+    
+    for (let option of countryBSelect.options) {
+        if (option.value === selectedValue && selectedValue !== '') {
+            option.disabled = true;
+        } else {
+            option.disabled = false;
+        }
+    }
+});
+
+document.getElementById('country_b').addEventListener('change', function() {
+    const countryASelect = document.getElementById('country_a');
+    const selectedValue = this.value;
+    
+    for (let option of countryASelect.options) {
+        if (option.value === selectedValue && selectedValue !== '') {
+            option.disabled = true;
+        } else {
+            option.disabled = false;
+        }
+    }
+});
+</script>
+{% endblock %}

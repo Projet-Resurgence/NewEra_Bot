@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Inventory Units{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Inventory Units</h2>
+        <a href="/inventory_units/add" class="btn btn-primary">Add Inventory Unit</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Country</th>
+                    <th>Unit Type</th>
+                    <th>Quantity</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for unit in units %}
+                <tr>
+                    <td>
+                        {% for country in countries %}
+                            {% if country.country_id == unit.country_id %}
+                                {{ country.name }}
+                            {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>{{ unit.unit_type }}</td>
+                    <td>{{ '{:,}'.format(unit.quantity) }}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="/inventory_units/edit/{{ unit.country_id }}/{{ unit.unit_type }}" class="btn btn-outline-primary" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <form method="POST" action="/inventory_units/delete/{{ unit.country_id }}/{{ unit.unit_type }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this unit entry?')">
+                                <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if not units %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> No inventory units found. <a href="/inventory_units/add">Add the first one</a>.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

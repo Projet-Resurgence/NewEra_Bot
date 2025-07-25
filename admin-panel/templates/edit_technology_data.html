@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Technology Data{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Edit Technology Data: {{ tech_data.type }}</h5>
+                    <a href="/technology_datas" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="type" class="form-label">Technology Type</label>
+                                    <input type="text" class="form-control" id="type" name="type" 
+                                           value="{{ tech_data.type }}" readonly>
+                                    <small class="text-muted">Type cannot be changed after creation</small>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="specialisation" class="form-label">Specialisation</label>
+                                    <select class="form-select" id="specialisation" name="specialisation" required>
+                                        <option value="Terrestre" {{ 'selected' if tech_data.specialisation == 'Terrestre' else '' }}>Terrestre</option>
+                                        <option value="Aerienne" {{ 'selected' if tech_data.specialisation == 'Aerienne' else '' }}>Aérienne</option>
+                                        <option value="Navale" {{ 'selected' if tech_data.specialisation == 'Navale' else '' }}>Navale</option>
+                                        <option value="NA" {{ 'selected' if tech_data.specialisation == 'NA' else '' }}>NA</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="minimum_slots_taken" class="form-label">Minimum Slots Taken</label>
+                                    <input type="number" step="0.1" class="form-control" id="minimum_slots_taken" 
+                                           name="minimum_slots_taken" value="{{ tech_data.minimum_slots_taken }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="maximum_slots_taken" class="form-label">Maximum Slots Taken</label>
+                                    <input type="number" step="0.1" class="form-control" id="maximum_slots_taken" 
+                                           name="maximum_slots_taken" value="{{ tech_data.maximum_slots_taken }}" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="minimum_dev_cost" class="form-label">Min Dev Cost</label>
+                                    <input type="number" class="form-control" id="minimum_dev_cost" 
+                                           name="minimum_dev_cost" value="{{ tech_data.minimum_dev_cost }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="minimum_dev_time" class="form-label">Min Dev Time (days)</label>
+                                    <input type="number" class="form-control" id="minimum_dev_time" 
+                                           name="minimum_dev_time" value="{{ tech_data.minimum_dev_time }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="minimum_prod_cost" class="form-label">Min Prod Cost</label>
+                                    <input type="number" class="form-control" id="minimum_prod_cost" 
+                                           name="minimum_prod_cost" value="{{ tech_data.minimum_prod_cost }}" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="maximum_dev_cost" class="form-label">Max Dev Cost</label>
+                                    <input type="number" class="form-control" id="maximum_dev_cost" 
+                                           name="maximum_dev_cost" value="{{ tech_data.maximum_dev_cost }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="maximum_dev_time" class="form-label">Max Dev Time (days)</label>
+                                    <input type="number" class="form-control" id="maximum_dev_time" 
+                                           name="maximum_dev_time" value="{{ tech_data.maximum_dev_time }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    <label for="maximum_prod_cost" class="form-label">Max Prod Cost</label>
+                                    <input type="number" class="form-control" id="maximum_prod_cost" 
+                                           name="maximum_prod_cost" value="{{ tech_data.maximum_prod_cost }}" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/technology_datas" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Update Technology Data
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

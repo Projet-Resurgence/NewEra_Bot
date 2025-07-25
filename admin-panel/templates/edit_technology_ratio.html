@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Technology Ratio{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Edit Technology Ratio: {{ tech_ratio.type }} Level {{ tech_ratio.level }}</h5>
+                    <a href="/technology_ratios" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="type" class="form-label">Technology Type</label>
+                            <input type="text" class="form-control" id="type" name="type" 
+                                   value="{{ tech_ratio.type }}" readonly>
+                            <small class="text-muted">Type and level cannot be changed after creation</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="level" class="form-label">Level</label>
+                            <input type="number" class="form-control" id="level" name="level" 
+                                   value="{{ tech_ratio.level }}" readonly>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="ratio_cost" class="form-label">Cost Ratio</label>
+                            <input type="number" class="form-control" id="ratio_cost" 
+                                   name="ratio_cost" value="{{ tech_ratio.ratio_cost }}" required>
+                            <small class="text-muted">Multiplier for development cost at this level</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="ratio_time" class="form-label">Time Ratio</label>
+                            <input type="number" class="form-control" id="ratio_time" 
+                                   name="ratio_time" value="{{ tech_ratio.ratio_time }}" required>
+                            <small class="text-muted">Multiplier for development time at this level</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="ratio_slots" class="form-label">Slots Ratio</label>
+                            <input type="number" step="0.1" class="form-control" id="ratio_slots" 
+                                   name="ratio_slots" value="{{ tech_ratio.ratio_slots }}" required>
+                            <small class="text-muted">Multiplier for slots taken at this level</small>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/technology_ratios" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Update Technology Ratio
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -31,8 +31,6 @@
           <th>Balance</th>
           <th>Political Points</th>
           <th>Diplomatic Points</th>
-          <th>Soldiers</th>
-          <th>Reserves</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -49,8 +47,6 @@
           <td><span class="badge bg-warning text-dark">{{ "{:,}".format(inventory.balance) }}</span></td>
           <td><span class="badge bg-primary">{{ inventory.pol_points }}</span></td>
           <td><span class="badge bg-info">{{ inventory.diplo_points }}</span></td>
-          <td><span class="badge bg-success">{{ "{:,}".format(inventory.soldiers) }}</span></td>
-          <td><span class="badge bg-secondary">{{ "{:,}".format(inventory.reserves) }}</span></td>
           <td>
             <a href="/inventory/edit/{{ inventory.country_id }}" class="btn btn-outline-warning btn-sm">
               <i class="bi bi-pencil"></i>
@@ -59,7 +55,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="7" class="text-center text-muted">No inventories found</td>
+          <td colspan="5" class="text-center text-muted">No inventories found</td>
         </tr>
         {% endfor %}
       </tbody>

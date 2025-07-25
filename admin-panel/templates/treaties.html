@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% block title %}Treaties{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Treaties</h2>
+        <a href="/treaties/add" class="btn btn-primary">Add Treaty</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Type</th>
+                    <th>Country A</th>
+                    <th>Country B</th>
+                    <th>Start Date</th>
+                    <th>End Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for treaty in treaties %}
+                <tr>
+                    <td>{{ treaty.treaty_id }}</td>
+                    <td>{{ treaty.treaty_type }}</td>
+                    <td>
+                        {% for country in countries %}
+                            {% if country.country_id == treaty.country_a %}
+                                {{ country.name }}
+                            {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>
+                        {% for country in countries %}
+                            {% if country.country_id == treaty.country_b %}
+                                {{ country.name }}
+                            {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>{{ treaty.start_date }}</td>
+                    <td>{{ treaty.end_date or 'N/A' }}</td>
+                    <td>
+                        <span class="badge {% if treaty.status == 'active' %}bg-success{% elif treaty.status == 'expired' %}bg-warning{% else %}bg-danger{% endif %}">
+                            {{ treaty.status }}
+                        </span>
+                    </td>
+                    <td>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="/treaties/edit/{{ treaty.treaty_id }}" class="btn btn-outline-primary" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <form method="POST" action="/treaties/delete/{{ treaty.treaty_id }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this treaty?')">
+                                <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if not treaties %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> No treaties found.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

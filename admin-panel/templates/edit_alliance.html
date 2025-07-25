@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Alliance{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Edit Alliance</h5>
+                    <a href="/alliances" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="alliance_name" class="form-label">Alliance Name</label>
+                            <input type="text" class="form-control" id="alliance_name" 
+                                   name="alliance_name" value="{{ alliance.alliance_name }}" required>
+                            <small class="text-muted">Descriptive name for this alliance</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="alliance_type" class="form-label">Alliance Type</label>
+                            <select class="form-select" id="alliance_type" name="alliance_type" required>
+                                <option value="military" {{ 'selected' if alliance.alliance_type == 'military' else '' }}>Military</option>
+                                <option value="economic" {{ 'selected' if alliance.alliance_type == 'economic' else '' }}>Economic</option>
+                                <option value="political" {{ 'selected' if alliance.alliance_type == 'political' else '' }}>Political</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="country_a" class="form-label">Country A</label>
+                            <select class="form-select" id="country_a" name="country_a" required>
+                                {% for country in countries %}
+                                <option value="{{ country.country_id }}" {{ 'selected' if country.country_id == alliance.country_a else '' }}>
+                                    {{ country.country_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="country_b" class="form-label">Country B</label>
+                            <select class="form-select" id="country_b" name="country_b" required>
+                                {% for country in countries %}
+                                <option value="{{ country.country_id }}" {{ 'selected' if country.country_id == alliance.country_b else '' }}>
+                                    {{ country.country_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="start_date" class="form-label">Start Date</label>
+                            <input type="date" class="form-control" id="start_date" 
+                                   name="start_date" value="{{ alliance.start_date }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="end_date" class="form-label">End Date (Optional)</label>
+                            <input type="date" class="form-control" id="end_date" 
+                                   name="end_date" value="{{ alliance.end_date or '' }}">
+                            <small class="text-muted">Leave empty for indefinite alliance</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="status" class="form-label">Status</label>
+                            <select class="form-select" id="status" name="status" required>
+                                <option value="active" {{ 'selected' if alliance.status == 'active' else '' }}>Active</option>
+                                <option value="expired" {{ 'selected' if alliance.status == 'expired' else '' }}>Expired</option>
+                                <option value="terminated" {{ 'selected' if alliance.status == 'terminated' else '' }}>Terminated</option>
+                            </select>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/alliances" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Update Alliance
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

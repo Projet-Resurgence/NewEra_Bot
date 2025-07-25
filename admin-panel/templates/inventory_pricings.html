@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Inventory Pricings{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Inventory Pricings</h2>
+        <a href="/inventory_pricings/add" class="btn btn-primary">Add Inventory Pricing</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Item</th>
+                    <th>Price</th>
+                    <th>Maintenance</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for pricing in pricings %}
+                <tr>
+                    <td>{{ pricing.item }}</td>
+                    <td>${{ '{:,}'.format(pricing.price) }}</td>
+                    <td>${{ '{:,}'.format(pricing.maintenance) }}</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if not pricings %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> No inventory pricings found. <a href="/inventory_pricings/add">Add the first one</a>.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

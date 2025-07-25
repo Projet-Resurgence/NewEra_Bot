@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Country Technology Inventory{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Edit Country Technology Inventory</h5>
+                    <a href="/country-tech-inventory" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="country_id" class="form-label">Country</label>
+                            <select class="form-select" id="country_id" name="country_id" disabled>
+                                {% for country in countries %}
+                                <option value="{{ country.country_id }}" {{ 'selected' if country.country_id == inventory.country_id else '' }}>
+                                    {{ country.country_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Country cannot be changed after creation</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="tech_id" class="form-label">Technology</label>
+                            <select class="form-select" id="tech_id" name="tech_id" disabled>
+                                {% for tech in technologies %}
+                                <option value="{{ tech.tech_id }}" {{ 'selected' if tech.tech_id == inventory.tech_id else '' }}>
+                                    {{ tech.name }} (Level {{ tech.technology_level }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Technology cannot be changed after creation</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="quantity" class="form-label">Quantity</label>
+                            <input type="number" class="form-control" id="quantity" 
+                                   name="quantity" value="{{ inventory.quantity }}" min="0" required>
+                            <small class="text-muted">Number of units of this technology the country owns</small>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/country-tech-inventory" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Update Inventory
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

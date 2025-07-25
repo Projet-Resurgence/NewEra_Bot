@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Inventory Unit{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Edit Inventory Unit</h5>
+                    <a href="/inventory_units" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="country_id" class="form-label">Country</label>
+                            <select class="form-select" id="country_id" name="country_id" disabled>
+                                {% for country in countries %}
+                                <option value="{{ country.country_id }}" {{ 'selected' if country.country_id == unit.country_id else '' }}>
+                                    {{ country.country_name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Country cannot be changed after creation</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="unit_type" class="form-label">Unit Type</label>
+                            <input type="text" class="form-control" id="unit_type" 
+                                   name="unit_type" value="{{ unit.unit_type }}" readonly>
+                            <small class="text-muted">Unit type cannot be changed after creation</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="quantity" class="form-label">Quantity</label>
+                            <input type="number" class="form-control" id="quantity" 
+                                   name="quantity" value="{{ unit.quantity }}" min="0" required>
+                            <small class="text-muted">Number of units of this type</small>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/inventory_units" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Update Unit
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% block title %}Technology Data{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Technology Data</h2>
+        <a href="/technology_datas/add" class="btn btn-primary">Add Technology Data</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>Type</th>
+                    <th>Specialisation</th>
+                    <th>Min Slots</th>
+                    <th>Max Slots</th>
+                    <th>Min Dev Cost</th>
+                    <th>Max Dev Cost</th>
+                    <th>Min Dev Time</th>
+                    <th>Max Dev Time</th>
+                    <th>Min Prod Cost</th>
+                    <th>Max Prod Cost</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for tech_data in tech_datas %}
+                <tr>
+                    <td>{{ tech_data.type }}</td>
+                    <td>{{ tech_data.specialisation }}</td>
+                    <td>{{ tech_data.minimum_slots_taken }}</td>
+                    <td>{{ tech_data.maximum_slots_taken }}</td>
+                    <td>{{ '{:,}'.format(tech_data.minimum_dev_cost) }}</td>
+                    <td>{{ '{:,}'.format(tech_data.maximum_dev_cost) }}</td>
+                    <td>{{ tech_data.minimum_dev_time }}</td>
+                    <td>{{ tech_data.maximum_dev_time }}</td>
+                    <td>{{ '{:,}'.format(tech_data.minimum_prod_cost) }}</td>
+                    <td>{{ '{:,}'.format(tech_data.maximum_prod_cost) }}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="/technology_datas/edit/{{ tech_data.type }}" class="btn btn-outline-primary" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <form method="POST" action="/technology_datas/delete/{{ tech_data.type }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this technology data?')">
+                                <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {% if not tech_datas %}
+    <div class="alert alert-info">
+        <i class="fas fa-info-circle"></i> No technology data found. <a href="/technology_datas/add">Add the first one</a>.
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

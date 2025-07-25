@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Technology Attribute{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-6 offset-md-3">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Edit Technology Attribute</h5>
+                    <a href="/technology-attributes" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="tech_id" class="form-label">Technology</label>
+                            <select class="form-select" id="tech_id" name="tech_id" disabled>
+                                {% for tech in technologies %}
+                                <option value="{{ tech.tech_id }}" {{ 'selected' if tech.tech_id == attribute.tech_id else '' }}>
+                                    {{ tech.name }} (ID: {{ tech.tech_id }})
+                                </option>
+                                {% endfor %}
+                            </select>
+                            <small class="text-muted">Technology cannot be changed after creation</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="attribute_name" class="form-label">Attribute Name</label>
+                            <input type="text" class="form-control" id="attribute_name" 
+                                   name="attribute_name" value="{{ attribute.attribute_name }}" readonly>
+                            <small class="text-muted">Attribute name cannot be changed after creation</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="attribute_value" class="form-label">Attribute Value</label>
+                            <textarea class="form-control" id="attribute_value" name="attribute_value" 
+                                      rows="3" required>{{ attribute.attribute_value }}</textarea>
+                            <small class="text-muted">The value or description for this attribute</small>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/technology-attributes" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Update Attribute
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

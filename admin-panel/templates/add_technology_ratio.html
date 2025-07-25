@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block title %}Add Technology Ratio{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Add Technology Ratio</h3>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="type" class="form-label">Type *</label>
+                            <select class="form-select" id="type" name="type" required>
+                                <option value="">Select type</option>
+                                <option value="rifle">Rifle</option>
+                                <option value="vehicle">Vehicle</option>
+                                <option value="aircraft">Aircraft</option>
+                                <option value="ship">Ship</option>
+                                <option value="engine">Engine</option>
+                                <option value="electronics">Electronics</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="level" class="form-label">Level *</label>
+                            <input type="number" class="form-control" id="level" name="level" min="1" max="10" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="ratio_cost" class="form-label">Cost Ratio (%) *</label>
+                            <input type="number" class="form-control" id="ratio_cost" name="ratio_cost" min="1" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="ratio_time" class="form-label">Time Ratio (%) *</label>
+                            <input type="number" class="form-control" id="ratio_time" name="ratio_time" min="1" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="ratio_slots" class="form-label">Slots Ratio (%) *</label>
+                            <input type="number" class="form-control" id="ratio_slots" name="ratio_slots" step="0.1" min="1" required>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="/technology_ratios" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Add Technology Ratio</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

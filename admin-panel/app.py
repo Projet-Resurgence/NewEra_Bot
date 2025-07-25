@@ -80,7 +80,7 @@ class Government(db.Model):
     __bind_key__ = "game"
     __tablename__ = "Governments"
 
-    country_id = db.Column(db.String, primary_key=True)
+    country_id = db.Column(db.Integer, primary_key=True)
     slot = db.Column(db.Integer, primary_key=True)
     player_id = db.Column(db.String, nullable=False)
     can_spend_money = db.Column(db.Boolean, default=False)
@@ -116,8 +116,6 @@ class Inventory(db.Model):
     balance = db.Column(db.Integer, default=0, nullable=False)
     pol_points = db.Column(db.Integer, default=0, nullable=False)
     diplo_points = db.Column(db.Integer, default=0, nullable=False)
-    soldiers = db.Column(db.Integer, default=0, nullable=False)
-    reserves = db.Column(db.Integer, default=0, nullable=False)
 
 
 class Region(db.Model):
@@ -140,9 +138,9 @@ class Structure(db.Model):
     __tablename__ = "Structures"
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    region_id = db.Column(db.String, nullable=False)
+    region_id = db.Column(db.Integer, nullable=False)
     type = db.Column(db.String, nullable=False)
-    specialisation = db.Column(db.String, nullable=False)
+    specialization = db.Column(db.String, nullable=False)
     level = db.Column(db.Integer, default=1, nullable=False)
     capacity = db.Column(db.Integer, default=0, nullable=False)
     population = db.Column(db.Integer, default=0, nullable=False)
@@ -177,7 +175,9 @@ class Technology(db.Model):
     image_url = db.Column(db.String)
     developed_by = db.Column(db.Integer)
     exported = db.Column(db.Boolean, default=False)
+    is_secret = db.Column(db.Boolean, default=False)
     type = db.Column(db.String, nullable=False)
+    difficulty_rating = db.Column(db.Integer, default=1)
     description = db.Column(db.Text)
     created_at = db.Column(db.String)
 
@@ -201,6 +201,7 @@ class StructureData(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     type = db.Column(db.String, nullable=False)
+    specialization = db.Column(db.String, nullable=False)
     capacity = db.Column(db.Integer, default=0, nullable=False)
     population = db.Column(db.Integer, default=0, nullable=False)
     cout_construction = db.Column(db.Integer, nullable=False)
@@ -217,7 +218,7 @@ class StructureRatio(db.Model):
     level = db.Column(db.Integer, nullable=False)
     ratio_production = db.Column(db.Integer, nullable=False)
     ratio_population = db.Column(db.Integer, nullable=False)
-    ratio_capacity = db.Column(db.Integer, nullable=False)
+    ratio_cost = db.Column(db.Integer, nullable=False)
 
 
 class StructureProduction(db.Model):
@@ -263,9 +264,13 @@ class TechnologyLicense(db.Model):
     license_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     tech_id = db.Column(db.Integer, nullable=False)
     country_id = db.Column(db.Integer, nullable=False)
-    license_type = db.Column(db.String, nullable=False)
+    license_type = db.Column(
+        db.String, nullable=False
+    )  # Must be 'commercial' or 'personal' only
     granted_by = db.Column(db.Integer)
-    granted_at = db.Column(db.String)
+    granted_at = db.Column(
+        db.String, default=lambda: datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    )
 
 
 class CountryTechnologyInventory(db.Model):
@@ -342,6 +347,104 @@ class ServerSettings(db.Model):
 
     key = db.Column(db.String(100), primary_key=True)
     value = db.Column(db.String(500), nullable=False)
+
+
+# New models for updated schema
+class TechnologyData(db.Model):
+    """Technology Data - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "TechnologyDatas"
+
+    type = db.Column(db.String, primary_key=True)
+    specialisation = db.Column(db.String, nullable=False)
+    minimum_slots_taken = db.Column(db.Float, default=1.0, nullable=False)
+    maximum_slots_taken = db.Column(db.Float, default=1.0, nullable=False)
+    minimum_dev_cost = db.Column(db.Integer, default=0, nullable=False)
+    minimum_dev_time = db.Column(db.Integer, default=0, nullable=False)
+    minimum_prod_cost = db.Column(db.Integer, default=0, nullable=False)
+    maximum_dev_cost = db.Column(db.Integer, default=0, nullable=False)
+    maximum_dev_time = db.Column(db.Integer, default=0, nullable=False)
+    maximum_prod_cost = db.Column(db.Integer, default=0, nullable=False)
+
+
+class TechnologyRatio(db.Model):
+    """Technology Ratios - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "TechnologyRatios"
+
+    type = db.Column(db.String, primary_key=True)
+    level = db.Column(db.Integer, primary_key=True)
+    ratio_cost = db.Column(db.Integer, nullable=False)
+    ratio_time = db.Column(db.Integer, nullable=False)
+    ratio_slots = db.Column(db.Float, nullable=False)
+
+
+class InventoryUnit(db.Model):
+    """Inventory Units - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "InventoryUnits"
+
+    country_id = db.Column(db.Integer, primary_key=True)
+    unit_type = db.Column(db.String, primary_key=True)
+    quantity = db.Column(db.Integer, default=0, nullable=False)
+
+
+class InventoryPricing(db.Model):
+    """Inventory Pricings - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "InventoryPricings"
+
+    item = db.Column(db.String, primary_key=True)
+    price = db.Column(db.Integer, nullable=False)
+    maintenance = db.Column(db.Integer, nullable=False)
+
+
+class Treaty(db.Model):
+    """Treaties - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "Treaties"
+
+    treaty_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    treaty_type = db.Column(db.String(50), nullable=False)
+    country_a = db.Column(db.Integer, nullable=False)
+    country_b = db.Column(db.Integer, nullable=False)
+    start_date = db.Column(db.String, nullable=False)
+    end_date = db.Column(db.String)
+    status = db.Column(db.String(20), nullable=False)
+
+
+class Alliance(db.Model):
+    """Alliances - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "Alliances"
+
+    alliance_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    alliance_name = db.Column(db.String(100), nullable=False)
+    country_a = db.Column(db.Integer, nullable=False)
+    country_b = db.Column(db.Integer, nullable=False)
+    start_date = db.Column(db.String, nullable=False)
+    end_date = db.Column(db.String)
+    alliance_type = db.Column(db.String(50), nullable=False)
+    status = db.Column(db.String(20), nullable=False)
+
+
+class WarDeclaration(db.Model):
+    """War Declarations - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "WarDeclarations"
+
+    war_declaration_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    country_a = db.Column(db.Integer, nullable=False)
+    country_b = db.Column(db.Integer, nullable=False)
+    declaration_date = db.Column(db.String, nullable=False)
+    status = db.Column(db.String(20), nullable=False)
 
 
 # Authentication decorators
@@ -676,7 +779,7 @@ def add_government():
     if request.method == "POST":
         try:
             government = Government(
-                country_id=request.form["country_id"],
+                country_id=int(request.form["country_id"]),
                 slot=int(request.form["slot"]),
                 player_id=request.form["player_id"],
                 can_spend_money=bool(request.form.get("can_spend_money")),
@@ -697,7 +800,7 @@ def add_government():
     return render_template("add_government.html", countries=countries)
 
 
-@app.route("/governments/edit/<country_id>/<int:slot>", methods=["GET", "POST"])
+@app.route("/governments/edit/<int:country_id>/<int:slot>", methods=["GET", "POST"])
 @login_required
 def edit_government(country_id, slot):
     government = Government.query.filter_by(
@@ -724,7 +827,7 @@ def edit_government(country_id, slot):
     )
 
 
-@app.route("/governments/delete/<country_id>/<int:slot>", methods=["POST"])
+@app.route("/governments/delete/<int:country_id>/<int:slot>", methods=["POST"])
 @login_required
 def delete_government(country_id, slot):
     try:
@@ -760,8 +863,6 @@ def add_inventory():
                 balance=int(request.form["balance"]),
                 pol_points=int(request.form["pol_points"]),
                 diplo_points=int(request.form["diplo_points"]),
-                soldiers=int(request.form["soldiers"]),
-                reserves=int(request.form["reserves"]),
             )
             db.session.add(inventory)
             db.session.commit()
@@ -782,8 +883,6 @@ def edit_inventory(country_id):
             inventory.balance = int(request.form["balance"])
             inventory.pol_points = int(request.form["pol_points"])
             inventory.diplo_points = int(request.form["diplo_points"])
-            inventory.soldiers = int(request.form["soldiers"])
-            inventory.reserves = int(request.form["reserves"])
             db.session.commit()
             flash("Inventory updated successfully!", "success")
             return redirect("/inventory")
@@ -856,9 +955,9 @@ def add_structure():
     if request.method == "POST":
         try:
             structure = Structure(
-                region_id=request.form["region_id"],
+                region_id=int(request.form["region_id"]),
                 type=request.form["type"],
-                specialisation=request.form["specialisation"],
+                specialization=request.form["specialization"],
                 level=int(request.form["level"]),
                 capacity=int(request.form["capacity"]),
                 population=int(request.form["population"]),
@@ -1203,6 +1302,32 @@ def add_technology_attribute():
 
 
 @app.route(
+    "/technology-attributes/edit/<int:tech_id>/<attribute_name>",
+    methods=["GET", "POST"],
+)
+@login_required
+def edit_technology_attribute(tech_id, attribute_name):
+    """Edit technology attribute."""
+    attribute = TechnologyAttribute.query.filter_by(
+        tech_id=tech_id, attribute_name=attribute_name
+    ).first_or_404()
+
+    if request.method == "POST":
+        try:
+            attribute.attribute_value = request.form["attribute_value"]
+            db.session.commit()
+            flash("Technology attribute updated successfully!", "success")
+            return redirect("/technology-attributes")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+
+    technologies = Technology.query.all()
+    return render_template(
+        "edit_technology_attribute.html", attribute=attribute, technologies=technologies
+    )
+
+
+@app.route(
     "/technology-attributes/delete/<int:tech_id>/<attribute_name>", methods=["POST"]
 )
 @login_required
@@ -1239,16 +1364,28 @@ def technology_licenses():
 def add_technology_license():
     if request.method == "POST":
         try:
+            # Validate license_type
+            license_type = request.form["license_type"]
+            if license_type not in ["commercial", "personal"]:
+                flash("License type must be either 'commercial' or 'personal'", "error")
+                technologies = Technology.query.all()
+                countries = Country.query.all()
+                return render_template(
+                    "add_technology_license.html",
+                    technologies=technologies,
+                    countries=countries,
+                )
+
             license = TechnologyLicense(
                 tech_id=int(request.form["tech_id"]),
                 country_id=int(request.form["country_id"]),
-                license_type=request.form["license_type"],
+                license_type=license_type,
                 granted_by=(
                     int(request.form["granted_by"])
                     if request.form["granted_by"]
                     else None
                 ),
-                granted_at=request.form["granted_at"] or None,
+                granted_at=datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             )
             db.session.add(license)
             db.session.commit()
@@ -1311,6 +1448,36 @@ def add_country_tech_inventory():
     technologies = Technology.query.all()
     return render_template(
         "add_country_tech_inventory.html",
+        countries=countries,
+        technologies=technologies,
+    )
+
+
+@app.route(
+    "/country-tech-inventory/edit/<int:country_id>/<int:tech_id>",
+    methods=["GET", "POST"],
+)
+@login_required
+def edit_country_tech_inventory(country_id, tech_id):
+    """Edit country technology inventory."""
+    inventory = CountryTechnologyInventory.query.filter_by(
+        country_id=country_id, tech_id=tech_id
+    ).first_or_404()
+
+    if request.method == "POST":
+        try:
+            inventory.quantity = int(request.form["quantity"])
+            db.session.commit()
+            flash("Country technology inventory updated successfully!", "success")
+            return redirect("/country-tech-inventory")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+
+    countries = Country.query.all()
+    technologies = Technology.query.all()
+    return render_template(
+        "edit_country_tech_inventory.html",
+        inventory=inventory,
         countries=countries,
         technologies=technologies,
     )
@@ -1644,14 +1811,26 @@ def settings():
         # Get all settings
         settings_data = ServerSettings.query.all()
 
-        # Ensure default settings exist
+        # Define useful default settings for the game
         default_settings = {
-            "is_paused": "0",
-            "game_version": "1.0",
-            "maintenance_mode": "0",
-            "max_countries": "50",
-            "daily_income_rate": "1000",
-            "production_speed_multiplier": "1.0",
+            "is_paused": "0",  # Game pause state
+            "current_day": "1",  # Current game day
+            "current_season": "Spring",  # Current season (Spring, Summer, Autumn, Winter)
+            "current_year": "1900",  # Starting year
+            "day_duration_minutes": "60",  # How long each in-game day lasts in real minutes
+            "daily_income_base": "1000",  # Base daily income for countries
+            "research_speed_multiplier": "1.0",  # Research time multiplier
+            "production_speed_multiplier": "1.0",  # Production time multiplier
+            "max_active_countries": "50",  # Maximum number of active countries
+            "technology_transfer_cost": "5000",  # Cost to transfer technology
+            "max_tech_level": "11",  # Maximum technology level
+            "default_tech_slots": "3",  # Default technology slots per country
+            "war_declaration_cooldown": "7",  # Days between war declarations
+            "alliance_formation_cost": "2000",  # Cost to form alliances
+            "treaty_negotiation_time": "3",  # Days needed to negotiate treaties
+            "maintenance_mode": "0",  # Maintenance mode toggle
+            "allow_new_players": "1",  # Allow new player registration
+            "discord_notifications": "1",  # Enable Discord notifications
         }
 
         # Create missing default settings
@@ -1794,6 +1973,461 @@ def update_settings():
         flash(f"Error updating settings: {str(e)}", "error")
 
     return redirect("/settings")
+
+
+# New routes for updated schema tables
+
+
+# Technology Data routes
+@app.route("/technology_datas")
+@login_required
+def technology_datas():
+    """List all technology data entries."""
+    tech_datas = TechnologyData.query.all()
+    return render_template("technology_datas.html", tech_datas=tech_datas)
+
+
+@app.route("/technology_datas/add", methods=["GET", "POST"])
+@login_required
+def add_technology_data():
+    """Add new technology data."""
+    if request.method == "POST":
+        try:
+            tech_data = TechnologyData(
+                type=request.form["type"],
+                specialisation=request.form["specialisation"],
+                minimum_slots_taken=float(request.form["minimum_slots_taken"]),
+                maximum_slots_taken=float(request.form["maximum_slots_taken"]),
+                minimum_dev_cost=int(request.form["minimum_dev_cost"]),
+                minimum_dev_time=int(request.form["minimum_dev_time"]),
+                minimum_prod_cost=int(request.form["minimum_prod_cost"]),
+                maximum_dev_cost=int(request.form["maximum_dev_cost"]),
+                maximum_dev_time=int(request.form["maximum_dev_time"]),
+                maximum_prod_cost=int(request.form["maximum_prod_cost"]),
+            )
+            db.session.add(tech_data)
+            db.session.commit()
+            flash("Technology data added successfully!", "success")
+            return redirect("/technology_datas")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    return render_template("add_technology_data.html")
+
+
+@app.route("/technology_datas/edit/<string:tech_type>", methods=["GET", "POST"])
+@login_required
+def edit_technology_data(tech_type):
+    """Edit technology data."""
+    tech_data = TechnologyData.query.get_or_404(tech_type)
+    if request.method == "POST":
+        try:
+            tech_data.specialisation = request.form["specialisation"]
+            tech_data.minimum_slots_taken = float(request.form["minimum_slots_taken"])
+            tech_data.maximum_slots_taken = float(request.form["maximum_slots_taken"])
+            tech_data.minimum_dev_cost = int(request.form["minimum_dev_cost"])
+            tech_data.minimum_dev_time = int(request.form["minimum_dev_time"])
+            tech_data.minimum_prod_cost = int(request.form["minimum_prod_cost"])
+            tech_data.maximum_dev_cost = int(request.form["maximum_dev_cost"])
+            tech_data.maximum_dev_time = int(request.form["maximum_dev_time"])
+            tech_data.maximum_prod_cost = int(request.form["maximum_prod_cost"])
+            db.session.commit()
+            flash("Technology data updated successfully!", "success")
+            return redirect("/technology_datas")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    return render_template("edit_technology_data.html", tech_data=tech_data)
+
+
+@app.route("/technology_datas/delete/<string:tech_type>", methods=["POST"])
+@login_required
+def delete_technology_data(tech_type):
+    """Delete technology data."""
+    try:
+        tech_data = TechnologyData.query.get_or_404(tech_type)
+        db.session.delete(tech_data)
+        db.session.commit()
+        flash("Technology data deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/technology_datas")
+
+
+# Technology Ratio routes
+@app.route("/technology_ratios")
+@login_required
+def technology_ratios():
+    """List all technology ratios."""
+    tech_ratios = TechnologyRatio.query.all()
+    return render_template("technology_ratios.html", tech_ratios=tech_ratios)
+
+
+@app.route("/technology_ratios/add", methods=["GET", "POST"])
+@login_required
+def add_technology_ratio():
+    """Add new technology ratio."""
+    if request.method == "POST":
+        try:
+            tech_ratio = TechnologyRatio(
+                type=request.form["type"],
+                level=int(request.form["level"]),
+                ratio_cost=int(request.form["ratio_cost"]),
+                ratio_time=int(request.form["ratio_time"]),
+                ratio_slots=float(request.form["ratio_slots"]),
+            )
+            db.session.add(tech_ratio)
+            db.session.commit()
+            flash("Technology ratio added successfully!", "success")
+            return redirect("/technology_ratios")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    return render_template("add_technology_ratio.html")
+
+
+@app.route(
+    "/technology_ratios/edit/<string:tech_type>/<int:level>", methods=["GET", "POST"]
+)
+@login_required
+def edit_technology_ratio(tech_type, level):
+    """Edit technology ratio."""
+    tech_ratio = TechnologyRatio.query.filter_by(
+        type=tech_type, level=level
+    ).first_or_404()
+    if request.method == "POST":
+        try:
+            tech_ratio.ratio_cost = int(request.form["ratio_cost"])
+            tech_ratio.ratio_time = int(request.form["ratio_time"])
+            tech_ratio.ratio_slots = float(request.form["ratio_slots"])
+            db.session.commit()
+            flash("Technology ratio updated successfully!", "success")
+            return redirect("/technology_ratios")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    return render_template("edit_technology_ratio.html", tech_ratio=tech_ratio)
+
+
+@app.route("/technology_ratios/delete/<string:tech_type>/<int:level>", methods=["POST"])
+@login_required
+def delete_technology_ratio(tech_type, level):
+    """Delete technology ratio."""
+    try:
+        tech_ratio = TechnologyRatio.query.filter_by(
+            type=tech_type, level=level
+        ).first_or_404()
+        db.session.delete(tech_ratio)
+        db.session.commit()
+        flash("Technology ratio deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/technology_ratios")
+
+
+# Inventory Units routes
+@app.route("/inventory_units")
+@login_required
+def inventory_units():
+    """List all inventory units."""
+    units = InventoryUnit.query.all()
+    countries = Country.query.all()
+    return render_template("inventory_units.html", units=units, countries=countries)
+
+
+@app.route("/inventory_units/add", methods=["GET", "POST"])
+@login_required
+def add_inventory_unit():
+    """Add new inventory unit entry."""
+    if request.method == "POST":
+        try:
+            unit = InventoryUnit(
+                country_id=int(request.form["country_id"]),
+                unit_type=request.form["unit_type"],
+                quantity=int(request.form["quantity"]),
+            )
+            db.session.add(unit)
+            db.session.commit()
+            flash("Inventory unit added successfully!", "success")
+            return redirect("/inventory_units")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    countries = Country.query.all()
+    return render_template("add_inventory_unit.html", countries=countries)
+
+
+@app.route(
+    "/inventory_units/edit/<int:country_id>/<unit_type>", methods=["GET", "POST"]
+)
+@login_required
+def edit_inventory_unit(country_id, unit_type):
+    """Edit inventory unit entry."""
+    unit = InventoryUnit.query.filter_by(
+        country_id=country_id, unit_type=unit_type
+    ).first_or_404()
+
+    if request.method == "POST":
+        try:
+            unit.quantity = int(request.form["quantity"])
+            db.session.commit()
+            flash("Inventory unit updated successfully!", "success")
+            return redirect("/inventory_units")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+
+    countries = Country.query.all()
+    return render_template("edit_inventory_unit.html", unit=unit, countries=countries)
+
+
+@app.route("/inventory_units/delete/<int:country_id>/<unit_type>", methods=["POST"])
+@login_required
+def delete_inventory_unit(country_id, unit_type):
+    """Delete inventory unit entry."""
+    try:
+        unit = InventoryUnit.query.filter_by(
+            country_id=country_id, unit_type=unit_type
+        ).first_or_404()
+        db.session.delete(unit)
+        db.session.commit()
+        flash("Inventory unit deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/inventory_units")
+
+
+# Inventory Pricing routes
+@app.route("/inventory_pricings")
+@login_required
+def inventory_pricings():
+    """List all inventory pricings."""
+    pricings = InventoryPricing.query.all()
+    return render_template("inventory_pricings.html", pricings=pricings)
+
+
+@app.route("/inventory_pricings/add", methods=["GET", "POST"])
+@login_required
+def add_inventory_pricing():
+    """Add new inventory pricing."""
+    if request.method == "POST":
+        try:
+            pricing = InventoryPricing(
+                item=request.form["item"],
+                price=int(request.form["price"]),
+                maintenance=int(request.form["maintenance"]),
+            )
+            db.session.add(pricing)
+            db.session.commit()
+            flash("Inventory pricing added successfully!", "success")
+            return redirect("/inventory_pricings")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    return render_template("add_inventory_pricing.html")
+
+
+# Diplomacy routes
+@app.route("/treaties")
+@login_required
+def treaties():
+    """List all treaties."""
+    treaties = Treaty.query.all()
+    countries = Country.query.all()
+    return render_template("treaties.html", treaties=treaties, countries=countries)
+
+
+@app.route("/treaties/add", methods=["GET", "POST"])
+@login_required
+def add_treaty():
+    """Add new treaty."""
+    if request.method == "POST":
+        try:
+            treaty = Treaty(
+                treaty_type=request.form["treaty_type"],
+                country_a=int(request.form["country_a"]),
+                country_b=int(request.form["country_b"]),
+                start_date=request.form["start_date"],
+                end_date=request.form["end_date"] if request.form["end_date"] else None,
+                status=request.form["status"],
+            )
+            db.session.add(treaty)
+            db.session.commit()
+            flash("Treaty added successfully!", "success")
+            return redirect("/treaties")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    countries = Country.query.all()
+    return render_template("add_treaty.html", countries=countries)
+
+
+@app.route("/treaties/edit/<int:treaty_id>", methods=["GET", "POST"])
+@login_required
+def edit_treaty(treaty_id):
+    """Edit treaty."""
+    treaty = Treaty.query.get_or_404(treaty_id)
+    if request.method == "POST":
+        try:
+            treaty.treaty_type = request.form["treaty_type"]
+            treaty.country_a = int(request.form["country_a"])
+            treaty.country_b = int(request.form["country_b"])
+            treaty.start_date = request.form["start_date"]
+            treaty.end_date = (
+                request.form["end_date"] if request.form["end_date"] else None
+            )
+            treaty.status = request.form["status"]
+            db.session.commit()
+            flash("Treaty updated successfully!", "success")
+            return redirect("/treaties")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    countries = Country.query.all()
+    return render_template("edit_treaty.html", treaty=treaty, countries=countries)
+
+
+@app.route("/treaties/delete/<int:treaty_id>", methods=["POST"])
+@login_required
+def delete_treaty(treaty_id):
+    """Delete treaty."""
+    try:
+        treaty = Treaty.query.get_or_404(treaty_id)
+        db.session.delete(treaty)
+        db.session.commit()
+        flash("Treaty deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/treaties")
+
+
+@app.route("/alliances")
+@login_required
+def alliances():
+    """List all alliances."""
+    alliances = Alliance.query.all()
+    countries = Country.query.all()
+    return render_template("alliances.html", alliances=alliances, countries=countries)
+
+
+@app.route("/alliances/add", methods=["GET", "POST"])
+@login_required
+def add_alliance():
+    """Add new alliance."""
+    if request.method == "POST":
+        try:
+            alliance = Alliance(
+                alliance_name=request.form["alliance_name"],
+                country_a=int(request.form["country_a"]),
+                country_b=int(request.form["country_b"]),
+                start_date=request.form["start_date"],
+                end_date=request.form["end_date"] if request.form["end_date"] else None,
+                alliance_type=request.form["alliance_type"],
+                status=request.form["status"],
+            )
+            db.session.add(alliance)
+            db.session.commit()
+            flash("Alliance added successfully!", "success")
+            return redirect("/alliances")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    countries = Country.query.all()
+    return render_template("add_alliance.html", countries=countries)
+
+
+@app.route("/alliances/edit/<int:alliance_id>", methods=["GET", "POST"])
+@login_required
+def edit_alliance(alliance_id):
+    """Edit alliance."""
+    alliance = Alliance.query.get_or_404(alliance_id)
+    if request.method == "POST":
+        try:
+            alliance.alliance_name = request.form["alliance_name"]
+            alliance.country_a = int(request.form["country_a"])
+            alliance.country_b = int(request.form["country_b"])
+            alliance.start_date = request.form["start_date"]
+            alliance.end_date = (
+                request.form["end_date"] if request.form["end_date"] else None
+            )
+            alliance.alliance_type = request.form["alliance_type"]
+            alliance.status = request.form["status"]
+            db.session.commit()
+            flash("Alliance updated successfully!", "success")
+            return redirect("/alliances")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    countries = Country.query.all()
+    return render_template("edit_alliance.html", alliance=alliance, countries=countries)
+
+
+@app.route("/alliances/delete/<int:alliance_id>", methods=["POST"])
+@login_required
+def delete_alliance(alliance_id):
+    """Delete alliance."""
+    try:
+        alliance = Alliance.query.get_or_404(alliance_id)
+        db.session.delete(alliance)
+        db.session.commit()
+        flash("Alliance deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/alliances")
+
+
+@app.route("/war_declarations")
+@login_required
+def war_declarations():
+    """List all war declarations."""
+    wars = WarDeclaration.query.all()
+    countries = Country.query.all()
+    return render_template("war_declarations.html", wars=wars, countries=countries)
+
+
+@app.route("/war_declarations/add", methods=["GET", "POST"])
+@login_required
+def add_war_declaration():
+    """Add new war declaration."""
+    if request.method == "POST":
+        try:
+            war = WarDeclaration(
+                country_a=int(request.form["country_a"]),
+                country_b=int(request.form["country_b"]),
+                declaration_date=request.form["declaration_date"],
+                status=request.form["status"],
+            )
+            db.session.add(war)
+            db.session.commit()
+            flash("War declaration added successfully!", "success")
+            return redirect("/war_declarations")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    countries = Country.query.all()
+    return render_template("add_war_declaration.html", countries=countries)
+
+
+@app.route("/war_declarations/edit/<int:war_id>", methods=["GET", "POST"])
+@login_required
+def edit_war_declaration(war_id):
+    """Edit war declaration."""
+    war = WarDeclaration.query.get_or_404(war_id)
+    if request.method == "POST":
+        try:
+            war.country_a = int(request.form["country_a"])
+            war.country_b = int(request.form["country_b"])
+            war.declaration_date = request.form["declaration_date"]
+            war.status = request.form["status"]
+            db.session.commit()
+            flash("War declaration updated successfully!", "success")
+            return redirect("/war_declarations")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    countries = Country.query.all()
+    return render_template("edit_war_declaration.html", war=war, countries=countries)
+
+
+@app.route("/war_declarations/delete/<int:war_id>", methods=["POST"])
+@login_required
+def delete_war_declaration(war_id):
+    """Delete war declaration."""
+    try:
+        war = WarDeclaration.query.get_or_404(war_id)
+        db.session.delete(war)
+        db.session.commit()
+        flash("War declaration deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/war_declarations")
 
 
 @app.route("/settings/pause-toggle", methods=["POST"])

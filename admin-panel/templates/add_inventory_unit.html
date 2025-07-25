@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block title %}Add Inventory Unit{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3 class="card-title">Add Inventory Unit</h3>
+                </div>
+                <div class="card-body">
+                    {% with messages = get_flashed_messages(with_categories=true) %}
+                        {% if messages %}
+                            {% for category, message in messages %}
+                                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                                    {{ message }}
+                                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endwith %}
+
+                    <form method="POST">
+                        <div class="mb-3">
+                            <label for="country_id" class="form-label">Country *</label>
+                            <select class="form-select" id="country_id" name="country_id" required>
+                                <option value="">Select country</option>
+                                {% for country in countries %}
+                                <option value="{{ country.country_id }}">{{ country.name }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="unit_type" class="form-label">Unit Type *</label>
+                            <select class="form-select" id="unit_type" name="unit_type" required>
+                                <option value="">Select unit type</option>
+                                <option value="soldier">Soldier</option>
+                                <option value="reserve">Reserve</option>
+                                <option value="policemen">Policemen</option>
+                                <option value="secret">Secret Agent</option>
+                                <option value="engineer">Engineer</option>
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="quantity" class="form-label">Quantity *</label>
+                            <input type="number" class="form-control" id="quantity" name="quantity" min="0" required>
+                        </div>
+
+                        <div class="d-flex justify-content-between">
+                            <a href="/inventory_units" class="btn btn-secondary">Cancel</a>
+                            <button type="submit" class="btn btn-primary">Add Inventory Unit</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
