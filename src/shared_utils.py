@@ -422,6 +422,9 @@ async def technology_autocomplete(
 
         # Check if user is military admin first
         military_admin_role_id = 874869709223383091  # Hardcoded for testing
+        # User is a player, get their country
+        country_entity = CountryEntity(interaction.user, interaction.guild).to_dict()
+        country_id = country_entity.get("id")
         if military_admin_role_id:
             military_admin_role_id = int(military_admin_role_id)
             is_military_admin = any(
@@ -434,13 +437,25 @@ async def technology_autocomplete(
                 cursor = db_instance.cur
                 cursor.execute(
                     """
-                    SELECT tech_id, name, specialisation, technology_level, type
+                    SELECT name FROM Countries
+                    WHERE secret_channel_id = ?
+                """,
+                    (interaction.channel_id,),
+                )
+                secret_channel_techs = cursor.fetchall()
+                print(
+                    f"technology_autocomplete: Military admin found {len(secret_channel_techs)} secret channel technologies"
+                )
+                cursor.execute(
+                    """
+                    SELECT tech_id, name, developed_by, specialisation, technology_level, type, is_secret
                     FROM Technologies
                     WHERE name LIKE ?
+                    AND (is_secret = 0 OR ? = 1)
                     ORDER BY name
                     LIMIT 25
                 """,
-                    (f"%{current}%",),
+                    (f"%{current}%", 1 if len(secret_channel_techs) > 0 else 0),
                 )
                 technologies = cursor.fetchall()
                 print(
@@ -455,13 +470,14 @@ async def technology_autocomplete(
                 }
 
                 for tech in technologies:
-                    tech_id, tech_name, specialisation, tech_level, tech_type = tech
+                    tech_id, tech_name, tech_country_id, specialisation, tech_level, tech_type, is_secret = tech
 
                     if current_lower in tech_name.lower():
                         emoji = specialisation_emojis.get(specialisation, "🔧")
+                        secret_indicator = " 🔒 " if is_secret and tech_country_id == country_id else " 🔒 (ADMIN)" if is_secret and tech_country_id != country_id else ""
                         choices.append(
                             app_commands.Choice(
-                                name=f"{emoji} {tech_name} (Niv.{tech_level}) [ADMIN]",
+                                name=f"{emoji} {tech_name} (Niv.{tech_level}) {secret_indicator}",
                                 value=str(tech_id),
                             )
                         )
@@ -474,9 +490,6 @@ async def technology_autocomplete(
         # For now, let's assume everyone who isn't military admin is a player
         # You can add proper player role check here later
         f = open("test.txt", "w")
-        # User is a player, get their country
-        country_entity = CountryEntity(interaction.user, interaction.guild).to_dict()
-        country_id = country_entity.get("id")
         f.write(f"technology_autocomplete: Player country_id: {country_id}")
 
         if not country_id:
@@ -526,7 +539,7 @@ async def technology_autocomplete(
                 FROM Technologies
                 WHERE (developed_by = ? OR tech_id IN (
                     SELECT tech_id FROM TechnologyLicenses WHERE country_id = ?
-                ) OR exported = 1)
+                )) OR is_secret = 0
                 ORDER BY name
                 LIMIT 25
             """
@@ -536,14 +549,11 @@ async def technology_autocomplete(
             query = """
                 SELECT tech_id, name, specialisation, technology_level, type, is_secret
                 FROM Technologies
-                WHERE (developed_by = ? OR tech_id IN (
-                    SELECT tech_id FROM TechnologyLicenses WHERE country_id = ?
-                ) OR exported = 1)
-                AND is_secret = 0
+                WHERE is_secret = 0
                 ORDER BY name
                 LIMIT 25
             """
-            params = (country_id, country_id)
+            params = ()
 
         f.write(f"technology_autocomplete: Executing query with params: {params}")
         cursor.execute(query, params)
@@ -595,6 +605,7 @@ async def technology_autocomplete(
         f.close()
 
     except Exception as e:
+        f = open("error_log.txt", "a")
         f.write(f"Error in technology_autocomplete: {e}")
         f.close()
         import traceback
