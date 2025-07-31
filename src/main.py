@@ -244,7 +244,44 @@ async def polling_notion():
 async def update_rp_date():
     now = datetime.now(pytz.timezone("Europe/Paris"))  # ou "UTC"
     if now.hour == 7 and now.minute == 0:
+        # Advance the playday
         await db.advance_playday()
+
+        # Process production cycle
+        completed_productions = db.process_production_cycle()
+
+        # Notify countries of completed productions
+        for production in completed_productions:
+            try:
+                country_data = db.get_country_datas(production["country_id"])
+                if country_data and country_data.get("secret_channel_id"):
+                    channel = bot.get_channel(int(country_data["secret_channel_id"]))
+                    if channel:
+                        embed = discord.Embed(
+                            title="🏭 Production Completed!",
+                            description=f"**{production['quantity']}x {production['tech_name']}** has been completed and added to your inventory.",
+                            color=factory_color_int,
+                        )
+                        embed.add_field(
+                            name="Technology Type",
+                            value=production["tech_type"],
+                            inline=True,
+                        )
+                        embed.add_field(
+                            name="Structure ID",
+                            value=production["structure_id"],
+                            inline=True,
+                        )
+                        embed.add_field(
+                            name="Quantity",
+                            value=f"{production['quantity']:,}",
+                            inline=True,
+                        )
+                        await channel.send(embed=embed)
+            except Exception as e:
+                print(
+                    f"Error notifying country {production['country_id']} of completed production: {e}"
+                )
 
 
 @update_rp_date.before_loop
@@ -3212,6 +3249,301 @@ async def exponential(
     values = [start * (r**i) for i in range(steps + 1)]
     values_str = ", ".join(f"{v:.2f}" for v in values)
     await ctx.send(f"Valeurs générées : {values_str}")
+
+
+@bot.hybrid_command()
+async def date_difference(ctx, date):
+    """Calculer la différence en jours entre deux dates au format YYYY-MM."""
+    date_dict = db.get_current_date()
+    year, month = (
+        date_dict.get("year", 1),
+        date_dict.get("month", 1),
+    )
+    current_date = f"{year:04d}-{month:02d}"
+    date1 = current_date
+    date2 = date.strip()
+    try:
+        months_diff = get_date_difference(date1, date2)
+        await ctx.send(
+            f"La différence entre {date1} et {date2} est de {months_diff} mois."
+        )
+    except ValueError as e:
+        await ctx.send(f"Erreur : {e}")
+
+
+@bot.hybrid_command(
+    help="""Démarre la production d'une technologie dans une usine.
+
+    FONCTIONNALITÉ :
+    - Lance la production d'une technologie licenciée dans une usine
+    - Vérifie la capacité de l'usine, les ressources et les licences
+    - Démarre automatiquement le processus de production
+
+    ARGUMENTS :
+    - `<structure_id>` : ID de l'usine (structure)
+    - `<technology_id>` : ID de la technologie à produire
+    - `<quantity>` : Quantité à produire
+
+    EXEMPLE :
+    - `start_production 5 12 10` : Produit 10 unités de la technologie 12 dans l'usine 5
+    """,
+)
+async def start_production(
+    ctx,
+    structure_id: int = commands.parameter(description="ID de l'usine"),
+    technology_id: int = commands.parameter(description="ID de la technologie"),
+    quantity: int = commands.parameter(description="Quantité à produire"),
+):
+    """Démarre la production d'une technologie dans une usine."""
+    try:
+        # Get user's country
+        country_id = dUtils.get_country_id(ctx.author.id)
+        if not country_id:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Vous n'êtes membre d'aucun pays.",
+                color=error_color_int,
+            )
+            await ctx.send(embed=embed)
+            return
+
+        # Check if user can produce (needs permission check here if needed)
+
+        # Attempt to start production
+        success, message = db.start_production(
+            structure_id, technology_id, quantity, country_id
+        )
+
+        if success:
+            embed = discord.Embed(
+                title="✅ Production démarrée", description=message, color=all_color_int
+            )
+        else:
+            embed = discord.Embed(
+                title="❌ Erreur de production",
+                description=message,
+                color=error_color_int,
+            )
+
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        embed = discord.Embed(
+            title="❌ Erreur",
+            description=f"Une erreur s'est produite : {str(e)}",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
+
+
+@bot.hybrid_command(
+    help="""Vend des technologies de votre inventaire à un autre pays.
+
+    FONCTIONNALITÉ :
+    - Transfère des technologies de votre inventaire vers un autre pays
+    - Gère les paiements et les transactions sécurisées
+    - Supporte les prix par unité ou totaux
+
+    ARGUMENTS :
+    - `<buyer_country>` : Nom ou ID du pays acheteur
+    - `<technology_id>` : ID de la technologie à vendre
+    - `<quantity>` : Quantité à vendre
+    - `<price>` : Prix (optionnel)
+    - `<per_unit>` : True pour prix par unité, False pour prix total (défaut: False)
+
+    EXEMPLE :
+    - `sell_technology "France" 12 5 1000` : Vend 5 unités de tech 12 pour 1000 au total
+    - `sell_technology "France" 12 5 200 True` : Vend 5 unités à 200 par unité
+    """,
+)
+async def sell_technology(
+    ctx,
+    buyer_country: str = commands.parameter(description="Pays acheteur"),
+    technology_id: int = commands.parameter(description="ID de la technologie"),
+    quantity: int = commands.parameter(description="Quantité à vendre"),
+    price: float = commands.parameter(description="Prix de vente", default=0.0),
+    per_unit: bool = commands.parameter(
+        description="Prix par unité (True) ou total (False)", default=False
+    ),
+):
+    """Vend des technologies de votre inventaire à un autre pays."""
+    try:
+        # Get seller's country
+        seller_country_id = dUtils.get_country_id(ctx.author.id)
+        if not seller_country_id:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Vous n'êtes membre d'aucun pays.",
+                color=error_color_int,
+            )
+            await ctx.send(embed=embed)
+            return
+
+        # Get buyer's country ID
+        buyer_country_id = None
+
+        # Try to get by name first
+        countries = db.get_all_countries()
+        for country in countries:
+            if country["country_name"].lower() == buyer_country.lower():
+                buyer_country_id = country["country_id"]
+                break
+
+        # If not found by name, try by ID
+        if not buyer_country_id:
+            try:
+                buyer_country_id = int(buyer_country)
+                # Verify this country exists
+                buyer_data = db.get_country_datas(buyer_country_id)
+                if not buyer_data:
+                    buyer_country_id = None
+            except ValueError:
+                pass
+
+        if not buyer_country_id:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"Pays '{buyer_country}' non trouvé.",
+                color=error_color_int,
+            )
+            await ctx.send(embed=embed)
+            return
+
+        # Attempt to sell technology
+        success, message = db.sell_technology_inventory(
+            seller_country_id,
+            buyer_country_id,
+            technology_id,
+            quantity,
+            price,
+            per_unit,
+        )
+
+        if success:
+            embed = discord.Embed(
+                title="✅ Vente réussie", description=message, color=money_color_int
+            )
+        else:
+            embed = discord.Embed(
+                title="❌ Erreur de vente", description=message, color=error_color_int
+            )
+
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        embed = discord.Embed(
+            title="❌ Erreur",
+            description=f"Une erreur s'est produite : {str(e)}",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
+
+
+@bot.hybrid_command(
+    help="""Affiche les productions en cours pour votre pays.
+
+    FONCTIONNALITÉ :
+    - Liste toutes les productions actuellement en cours
+    - Affiche les détails : usine, technologie, quantité, date de fin
+    - Montre le temps restant pour chaque production
+
+    EXEMPLE :
+    - `view_productions` : Affiche toutes vos productions en cours
+    """,
+)
+async def view_productions(ctx):
+    """Affiche les productions en cours pour votre pays."""
+    try:
+        # Get user's country
+        country_id = dUtils.get_country_id(ctx.author.id)
+        if not country_id:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Vous n'êtes membre d'aucun pays.",
+                color=error_color_int,
+            )
+            await ctx.send(embed=embed)
+            return
+
+        # Get ongoing productions
+        productions = db.get_country_productions(country_id)
+
+        if not productions:
+            embed = discord.Embed(
+                title="📋 Productions en cours",
+                description="Aucune production en cours.",
+                color=all_color_int,
+            )
+            await ctx.send(embed=embed)
+            return
+
+        # Create embed with production details
+        embed = discord.Embed(
+            title="📋 Productions en cours",
+            description=f"Productions actives pour votre pays :",
+            color=all_color_int,
+        )
+
+        current_date = db.get_current_date()
+        current_year = current_date.get("year", 1)
+        current_month = current_date.get("month", 1)
+
+        for prod in productions:
+            # Calculate remaining time
+            end_year = prod.get("end_year", current_year)
+            end_month = prod.get("end_month", current_month)
+
+            remaining_months = (end_year - current_year) * 12 + (
+                end_month - current_month
+            )
+
+            if remaining_months <= 0:
+                time_str = "Terminé (en attente de traitement)"
+            elif remaining_months == 1:
+                time_str = "1 mois restant"
+            else:
+                time_str = f"{remaining_months} mois restants"
+
+            embed.add_field(
+                name=f"🏭 Usine {prod.get('structure_id', 'N/A')}",
+                value=f"**Technologie:** {prod.get('technology_name', 'N/A')} (ID: {prod.get('technology_id', 'N/A')})\n"
+                f"**Quantité:** {prod.get('quantity', 0)}\n"
+                f"**Fin prévue:** {end_month:02d}/{end_year}\n"
+                f"**Statut:** {time_str}",
+                inline=True,
+            )
+
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        embed = discord.Embed(
+            title="❌ Erreur",
+            description=f"Une erreur s'est produite : {str(e)}",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
+
+
+@bot.hybrid_command(
+    name="get_old_date", description="Récupère la date du jeu à partir d'une date IRL."
+)
+async def get_old_date(ctx, date):
+    date_dict = db.get_date_from_irl(date)
+    if date_dict:
+        year = date_dict.get("year", 1)
+        month = date_dict.get("month", 1)
+        playday = date_dict.get("playday", 1)
+        await ctx.send(f"Date du jeu : {year:04d}-{month:02d}-{playday:02d}")
+    else:
+        await ctx.send("Date non trouvée.")
+
+
+def get_date_difference(date1: str, date2: str) -> int:
+    """Calculate the difference in months between two dates."""
+    date_format = "%Y-%m"
+    d1 = datetime.strptime(date1, date_format)
+    d2 = datetime.strptime(date2, date_format)
+    return (d2.year - d1.year) * 12 + (d2.month - d1.month)
 
 
 bot.run(token)
