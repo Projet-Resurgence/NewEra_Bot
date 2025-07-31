@@ -3288,6 +3288,8 @@ async def date_difference(ctx, date):
     - `start_production 5 12 10` : Produit 10 unités de la technologie 12 dans l'usine 5
     """,
 )
+@app_commands.autocomplete(structure_id=structure_autocomplete)
+@app_commands.autocomplete(technology_id=technology_autocomplete)
 async def start_production(
     ctx,
     structure_id: int = commands.parameter(description="ID de l'usine"),
@@ -3295,9 +3297,11 @@ async def start_production(
     quantity: int = commands.parameter(description="Quantité à produire"),
 ):
     """Démarre la production d'une technologie dans une usine."""
+    await ctx.defer()  # Acknowledge the command to prevent timeout
     try:
-        # Get user's country
-        country_id = dUtils.get_country_id(ctx.author.id)
+        # Get user's country using CountryEntity pattern
+        country_entity = CountryEntity(ctx.author, ctx.guild).to_dict()
+        country_id = country_entity.get("id")
         if not country_id:
             embed = discord.Embed(
                 title="❌ Erreur",
@@ -3310,9 +3314,10 @@ async def start_production(
         # Check if user can produce (needs permission check here if needed)
 
         # Attempt to start production
-        success, message = db.start_production(
+        result = db.start_production(
             structure_id, technology_id, quantity, country_id
         )
+        success, message = result.get("success", False), result.get("message", "")
 
         if success:
             embed = discord.Embed(
@@ -3356,6 +3361,7 @@ async def start_production(
     - `sell_technology "France" 12 5 200 True` : Vend 5 unités à 200 par unité
     """,
 )
+@app_commands.autocomplete(technology_id=technology_autocomplete)
 async def sell_technology(
     ctx,
     buyer_country: str = commands.parameter(description="Pays acheteur"),
@@ -3368,8 +3374,9 @@ async def sell_technology(
 ):
     """Vend des technologies de votre inventaire à un autre pays."""
     try:
-        # Get seller's country
-        seller_country_id = dUtils.get_country_id(ctx.author.id)
+        # Get seller's country using CountryEntity pattern
+        country_entity = CountryEntity(ctx.author, ctx.guild).to_dict()
+        seller_country_id = country_entity.get("id")
         if not seller_country_id:
             embed = discord.Embed(
                 title="❌ Erreur",
@@ -3454,8 +3461,9 @@ async def sell_technology(
 async def view_productions(ctx):
     """Affiche les productions en cours pour votre pays."""
     try:
-        # Get user's country
-        country_id = dUtils.get_country_id(ctx.author.id)
+        # Get user's country using CountryEntity pattern
+        country_entity = CountryEntity(ctx.author, ctx.guild).to_dict()
+        country_id = country_entity.get("id")
         if not country_id:
             embed = discord.Embed(
                 title="❌ Erreur",

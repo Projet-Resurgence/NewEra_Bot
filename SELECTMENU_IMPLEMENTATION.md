@@ -12,7 +12,7 @@ Previously, the "Type de technologie" field was a text input where users had to 
 ## Solution Implemented
 
 The system now uses a Discord SelectMenu (dropdown) that:
-- Shows only valid technology types for each specialization
+- Shows only valid technology types for each specialisation
 - Prevents invalid type entries
 - Provides a better user experience with predefined options
 - Automatically formats the selected value consistently
@@ -26,7 +26,7 @@ class TechTypeSelectView(discord.ui.View):
     """View with a SelectMenu for choosing technology type."""
 ```
 
-This class creates a Discord View containing a SelectMenu populated with the `accepted_types` from the technology specialization configuration.
+This class creates a Discord View containing a SelectMenu populated with the `accepted_types` from the technology specialisation configuration.
 
 **Features:**
 - Converts snake_case values to Title Case for display (e.g., `char_leger` → `Char Leger`)
@@ -75,7 +75,7 @@ The form view now intelligently handles forms containing the type field:
 
 ## Configuration
 
-The system uses the `accepted_types` array from each specialization in `tech_form_datas.json`:
+The system uses the `accepted_types` array from each specialisation in `tech_form_datas.json`:
 
 ```json
 {

@@ -306,7 +306,7 @@ async def structure_autocomplete(
         cursor = db_instance.cur
         cursor.execute(
             """
-            SELECT s.id, s.type, s.specialization, s.level, r.name as region_name
+            SELECT s.id, s.type, s.specialisation, s.level, r.name as region_name
             FROM Structures s
             JOIN Regions r ON s.region_id = r.region_id
             WHERE r.country_id = ?
@@ -319,15 +319,15 @@ async def structure_autocomplete(
         structures = cursor.fetchall()
 
         for structure in structures:
-            structure_id, struct_type, specialization, level, region_name = structure
+            structure_id, struct_type, specialisation, level, region_name = structure
 
             # Create search text
-            search_text = f"{struct_type} {specialization} {region_name}".lower()
+            search_text = f"{struct_type} {specialisation} {region_name}".lower()
 
             if current_lower in search_text:
                 choices.append(
                     app_commands.Choice(
-                        name=f"{struct_type} {specialization} Niv.{level} ({region_name})",
+                        name=f"{struct_type} {specialisation} Niv.{level} ({region_name})",
                         value=str(structure_id),
                     )
                 )
@@ -470,11 +470,27 @@ async def technology_autocomplete(
                 }
 
                 for tech in technologies:
-                    tech_id, tech_name, tech_country_id, specialisation, tech_level, tech_type, is_secret = tech
+                    (
+                        tech_id,
+                        tech_name,
+                        tech_country_id,
+                        specialisation,
+                        tech_level,
+                        tech_type,
+                        is_secret,
+                    ) = tech
 
                     if current_lower in tech_name.lower():
                         emoji = specialisation_emojis.get(specialisation, "🔧")
-                        secret_indicator = " 🔒 " if is_secret and tech_country_id == country_id else " 🔒 (ADMIN)" if is_secret and tech_country_id != country_id else ""
+                        secret_indicator = (
+                            " 🔒 "
+                            if is_secret and tech_country_id == country_id
+                            else (
+                                " 🔒 (ADMIN)"
+                                if is_secret and tech_country_id != country_id
+                                else ""
+                            )
+                        )
                         choices.append(
                             app_commands.Choice(
                                 name=f"{emoji} {tech_name} (Niv.{tech_level}) {secret_indicator}",
@@ -516,7 +532,9 @@ async def technology_autocomplete(
         # Debug: First check if there are ANY technologies in the database
         cursor.execute("SELECT COUNT(*) FROM Technologies")
         total_techs = cursor.fetchone()[0]
-        f.write(f"technology_autocomplete: Total technologies in database: {total_techs}")
+        f.write(
+            f"technology_autocomplete: Total technologies in database: {total_techs}"
+        )
 
         # Debug: Check if there are exported technologies
         cursor.execute("SELECT COUNT(*) FROM Technologies WHERE exported = 1")
@@ -558,7 +576,9 @@ async def technology_autocomplete(
         f.write(f"technology_autocomplete: Executing query with params: {params}")
         cursor.execute(query, params)
         technologies = cursor.fetchall()
-        f.write(f"technology_autocomplete: Player found {len(technologies)} technologies")
+        f.write(
+            f"technology_autocomplete: Player found {len(technologies)} technologies"
+        )
 
         # Debug: If no results, try simpler query
         if not technologies:

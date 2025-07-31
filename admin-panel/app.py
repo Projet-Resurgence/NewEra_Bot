@@ -140,7 +140,7 @@ class Structure(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     region_id = db.Column(db.Integer, nullable=False)
     type = db.Column(db.String, nullable=False)
-    specialization = db.Column(db.String, nullable=False)
+    specialisation = db.Column(db.String, nullable=False)
     level = db.Column(db.Integer, default=1, nullable=False)
     capacity = db.Column(db.Integer, default=0, nullable=False)
     population = db.Column(db.Integer, default=0, nullable=False)
@@ -201,7 +201,7 @@ class StructureData(db.Model):
 
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     type = db.Column(db.String, nullable=False)
-    specialization = db.Column(db.String, nullable=False)
+    specialisation = db.Column(db.String, nullable=False)
     capacity = db.Column(db.Integer, default=0, nullable=False)
     population = db.Column(db.Integer, default=0, nullable=False)
     cout_construction = db.Column(db.Integer, nullable=False)
@@ -957,7 +957,7 @@ def add_structure():
             structure = Structure(
                 region_id=int(request.form["region_id"]),
                 type=request.form["type"],
-                specialization=request.form["specialization"],
+                specialisation=request.form["specialisation"],
                 level=int(request.form["level"]),
                 capacity=int(request.form["capacity"]),
                 population=int(request.form["population"]),

@@ -12,9 +12,9 @@ Updated the NEBot admin panel to work with the new database schema that includes
 ### Updated Models:
 1. **Government** - Fixed country_id type from STRING to INTEGER
 2. **Inventory** - Removed soldiers and reserves columns (now handled by InventoryUnits)
-3. **Structure** - Fixed specialisation → specialization column name
+3. **Structure** - Fixed specialisation → specialisation column name
 4. **Technology** - Added is_secret and difficulty_rating fields
-5. **StructureData** - Added specialization column
+5. **StructureData** - Added specialisation column
 6. **StructureRatio** - Fixed ratio_capacity → ratio_cost column name
 
 ### New Models Added:
@@ -31,7 +31,7 @@ Updated the NEBot admin panel to work with the new database schema that includes
 ### Fixed Existing Routes:
 - **Government routes** - Fixed country_id parameter types
 - **Inventory routes** - Removed soldiers/reserves fields
-- **Structure routes** - Fixed specialization field naming
+- **Structure routes** - Fixed specialisation field naming
 
 ### New Routes Added:
 - `/technology_datas` - Manage technology base data
@@ -56,7 +56,7 @@ Updated the NEBot admin panel to work with the new database schema that includes
 - **inventory.html** - Removed soldiers/reserves columns
 - **add_inventory.html** - Removed soldiers/reserves fields
 - **edit_inventory.html** - Removed soldiers/reserves fields
-- **add_structure.html** - Fixed specialization field naming
+- **add_structure.html** - Fixed specialisation field naming
 
 ## Navigation Updates
 
@@ -75,7 +75,7 @@ Updated the NEBot admin panel to work with the new database schema that includes
 ### Technology System:
 - Configurable base parameters per technology type
 - Level-based ratios for scaling costs, time, and complexity
-- Support for different specializations (Terrestre, Aerienne, Navale, NA)
+- Support for different specialisations (Terrestre, Aerienne, Navale, NA)
 
 ### Inventory System:
 - Separated unit management from basic inventory
