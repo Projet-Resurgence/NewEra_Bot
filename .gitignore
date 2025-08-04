@@ -2,6 +2,9 @@ __pycache__
 old
 commands
 datas
+!*db_schemas*
+!*csvs*
+!*tech_form_datas.json
 .env
 *db*
 !*db.py

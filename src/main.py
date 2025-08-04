@@ -159,11 +159,7 @@ POLLING_INTERVAL = 300  # en secondes (ici toutes les 5 minutes)
 # Maritime = 3
 # Ecole = 4
 
-
-with open("datas/usines.json") as f:
-    production_data = json.load(f)
-with open("datas/bases.json") as f:
-    base_data = json.load(f)
+production_data, base_data = {}, {}
 with open("datas/main.json") as f:
     json_data = json.load(f)
     bat_types = json_data["bat_types"]
