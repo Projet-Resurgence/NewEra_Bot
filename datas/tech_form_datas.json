@@ -1,0 +1,371 @@
+{
+    "common": {
+        "title": "Champs Communs",
+        "color": "blue",
+        "color_completed": "dark_blue",
+        "emoji": "📋",
+        "forms": [
+            {
+                "label": "Nom",
+                "placeholder": "Ex: AK-47, USS Enterprise, F-22 Raptor",
+                "key": "nom"
+            },
+            {
+                "label": "Niveau technologique",
+                "placeholder": "Entier entre 1 et 20 (Ex: 15)",
+                "key": "niveau_technologique"
+            },
+            {
+                "label": "Tech d'inspiration originelle",
+                "placeholder": "Ex: Kalashnikov, Enterprise Class, Lockheed design",
+                "key": "tech_inspiration"
+            },
+            {
+                "label": "Type de technologie",
+                "placeholder": "Ex: Char Moyen, Fusil d'Assaut, Destroyer",
+                "key": "type_technologie"
+            }
+        ]
+    },
+    "armes": {
+        "title": "Arme à Feu",
+        "color": "green",
+        "accepted_types": [
+            "fusil_dassaut",
+            "mitrailleuse",
+            "sniper"
+        ],
+        "color_completed": "dark_green",
+        "emoji": "🔫",
+        "forms": [
+            {
+                "label": "Manufacture(s)",
+                "placeholder": "Ex: Colt, HK, FN Herstal",
+                "key": "manufacture"
+            },
+            {
+                "label": "Masse (kg)",
+                "placeholder": "Ex: 3.5",
+                "key": "masse"
+            },
+            {
+                "label": "Dimensions (H x D cm)",
+                "placeholder": "Ex: 87 x 5.5",
+                "key": "dimensions"
+            },
+            {
+                "label": "Capacité du chargeur",
+                "placeholder": "Ex: 30 cartouches",
+                "key": "capacite"
+            },
+            {
+                "label": "Munitions (calibre)",
+                "placeholder": "Ex: 7.62x39mm",
+                "key": "munitions"
+            },
+            {
+                "label": "Portée efficace (m)",
+                "placeholder": "Ex: 400",
+                "key": "portee"
+            },
+            {
+                "label": "Cadence de tir (cpm)",
+                "placeholder": "Ex: 600",
+                "key": "cadence"
+            },
+            {
+                "label": "Vitesse projectile (m/s)",
+                "placeholder": "Ex: 715",
+                "key": "vitesse"
+            },
+            {
+                "label": "Mode de tir",
+                "placeholder": "Ex: Semi-auto, Auto, Rafale",
+                "key": "mode_tir"
+            },
+            {
+                "label": "Système de visée",
+                "placeholder": "Ex: Viseur optique, holographique",
+                "key": "visee"
+            },
+            {
+                "label": "Matériaux",
+                "placeholder": "Ex: Acier, alliage, polymère",
+                "key": "materiaux"
+            },
+            {
+                "label": "Variantes",
+                "placeholder": "Ex: Version courte, sniper",
+                "key": "variantes"
+            },
+            {
+                "label": "Autre",
+                "placeholder": "Ex: Informations supplémentaires",
+                "key": "autre"
+            },
+            {
+                "label": "Notes",
+                "placeholder": "Ex: Remarques spéciales",
+                "key": "notes"
+            }
+        ]
+    },
+    "navale": {
+        "title": "Navire",
+        "color": "blue",
+        "accepted_types": [
+            "destroyer",
+            "croiseur",
+            "porte_avions",
+            "sous_marin",
+            "corvette",
+            "fregate"
+        ],
+        "color_completed": "dark_blue",
+        "emoji": "🚢",
+        "forms": [
+            {
+                "label": "Constructeur(s)",
+                "placeholder": "Ex: Danish Pride Industries",
+                "key": "constructeur"
+            },
+            {
+                "label": "Masse (tonnes)",
+                "placeholder": "Ex: 5000",
+                "key": "masse"
+            },
+            {
+                "label": "Dimensions (L x l x T m)",
+                "placeholder": "Ex: 150 x 20 x 8",
+                "key": "dimensions"
+            },
+            {
+                "label": "Equipage",
+                "placeholder": "Ex: 200 personnes",
+                "key": "equipage"
+            },
+            {
+                "label": "Propulsion",
+                "placeholder": "Ex: Moteurs diesel, turbines",
+                "key": "propulsion"
+            },
+            {
+                "label": "Puissance",
+                "placeholder": "Ex: 50000 chevaux",
+                "key": "puissance"
+            },
+            {
+                "label": "Vitesse max (nœuds)",
+                "placeholder": "Ex: 30",
+                "key": "vitesse"
+            },
+            {
+                "label": "Autonomie (jours)",
+                "placeholder": "Ex: 45",
+                "key": "autonomie"
+            },
+            {
+                "label": "Rayon d'action (km)",
+                "placeholder": "Ex: 8000",
+                "key": "rayon"
+            },
+            {
+                "label": "Armement principal",
+                "placeholder": "Ex: Canons 127mm",
+                "key": "armement_principal"
+            },
+            {
+                "label": "Missiles",
+                "placeholder": "Ex: Surface-air, surface-surface",
+                "key": "missiles"
+            },
+            {
+                "label": "Défenses",
+                "placeholder": "Ex: CIWS, torpilles",
+                "key": "defenses"
+            },
+            {
+                "label": "Variantes",
+                "placeholder": "Ex: Version civile, militaire",
+                "key": "variantes"
+            },
+            {
+                "label": "Autre",
+                "placeholder": "Ex: Informations spéciales",
+                "key": "autre"
+            }
+        ]
+    },
+    "aerienne": {
+        "title": "Aéronef",
+        "color": "orange",
+        "accepted_types": [
+            "chasseur",
+            "bombardier",
+            "transport",
+            "drone",
+            "helicoptere",
+            "reconnaissance"
+        ],
+        "color_completed": "dark_orange",
+        "emoji": "✈️",
+        "forms": [
+            {
+                "label": "Constructeur(s)",
+                "placeholder": "Ex: Lockheed Martin, Boeing",
+                "key": "constructeur"
+            },
+            {
+                "label": "Masse à vide (kg)",
+                "placeholder": "Ex: 15000",
+                "key": "masse"
+            },
+            {
+                "label": "Dimensions (L x E x H m)",
+                "placeholder": "Ex: 18.9 x 13.6 x 5.1",
+                "key": "dimensions"
+            },
+            {
+                "label": "Equipage/Passagers",
+                "placeholder": "Ex: 2 pilotes",
+                "key": "equipage"
+            },
+            {
+                "label": "Moteurs",
+                "placeholder": "Ex: 2x turbofan",
+                "key": "moteurs"
+            },
+            {
+                "label": "Poussée (kN)",
+                "placeholder": "Ex: 156",
+                "key": "poussee"
+            },
+            {
+                "label": "Vitesse max (km/h)",
+                "placeholder": "Ex: 2410",
+                "key": "vitesse"
+            },
+            {
+                "label": "Plafond (m)",
+                "placeholder": "Ex: 19812",
+                "key": "plafond"
+            },
+            {
+                "label": "Rayon d'action (km)",
+                "placeholder": "Ex: 2960",
+                "key": "rayon"
+            },
+            {
+                "label": "Armement",
+                "placeholder": "Ex: Canons, missiles",
+                "key": "armement"
+            },
+            {
+                "label": "Avionique",
+                "placeholder": "Ex: Radar, contre-mesures",
+                "key": "avionique"
+            },
+            {
+                "label": "Matériaux",
+                "placeholder": "Ex: Aluminium, composites",
+                "key": "materiaux"
+            },
+            {
+                "label": "Variantes",
+                "placeholder": "Ex: Chasseur, bombardier",
+                "key": "variantes"
+            },
+            {
+                "label": "Autre",
+                "placeholder": "Ex: Capacités spéciales",
+                "key": "autre"
+            }
+        ]
+    },
+    "terrestre": {
+        "title": "Terrestre",
+        "color": "green",
+        "accepted_types": [
+            "char_leger",
+            "char_moyen",
+            "char_lourd",
+            "vehicule_blinde",
+            "transport_troupe",
+            "artillerie"
+        ],
+        "color_completed": "dark_green",
+        "emoji": "🚜",
+        "forms": [
+            {
+                "label": "Constructeur(s)",
+                "placeholder": "Ex: Lockheed Martin, Boeing",
+                "key": "constructeur"
+            },
+            {
+                "label": "Masse à vide (kg)",
+                "placeholder": "Ex: 15000",
+                "key": "masse"
+            },
+            {
+                "label": "Dimensions (L x E x H m)",
+                "placeholder": "Ex: 18.9 x 13.6 x 5.1",
+                "key": "dimensions"
+            },
+            {
+                "label": "Equipage/Passagers",
+                "placeholder": "Ex: 2 pilotes",
+                "key": "equipage"
+            },
+            {
+                "label": "Moteurs",
+                "placeholder": "Ex: 2x turbofan",
+                "key": "moteurs"
+            },
+            {
+                "label": "Poussée (kN)",
+                "placeholder": "Ex: 156",
+                "key": "poussee"
+            },
+            {
+                "label": "Vitesse max (km/h)",
+                "placeholder": "Ex: 2410",
+                "key": "vitesse"
+            },
+            {
+                "label": "Plafond (m)",
+                "placeholder": "Ex: 19812",
+                "key": "plafond"
+            },
+            {
+                "label": "Rayon d'action (km)",
+                "placeholder": "Ex: 2960",
+                "key": "rayon"
+            },
+            {
+                "label": "Armement",
+                "placeholder": "Ex: Canons, missiles",
+                "key": "armement"
+            },
+            {
+                "label": "Avionique",
+                "placeholder": "Ex: Radar, contre-mesures",
+                "key": "avionique"
+            },
+            {
+                "label": "Matériaux",
+                "placeholder": "Ex: Aluminium, composites",
+                "key": "materiaux"
+            },
+            {
+                "label": "Variantes",
+                "placeholder": "Ex: Chasseur, bombardier",
+                "key": "variantes"
+            },
+            {
+                "label": "Autre",
+                "placeholder": "Ex: Capacités spéciales",
+                "key": "autre"
+            }
+        ]
+    }
+}

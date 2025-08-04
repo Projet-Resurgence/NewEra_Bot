@@ -1,0 +1,81 @@
+{
+    "bat_types": {
+        "0": [
+            "usine_lvl",
+            7
+        ],
+        "1": [
+            "terrestre_",
+            7
+        ],
+        "2": [
+            "aerienne_",
+            4
+        ],
+        "3": [
+            "maritime_",
+            4
+        ],
+        "4": [
+            "ecole_",
+            4
+        ]
+    },
+    "query_types": {
+        "user": 400,
+        "trusted": 800,
+        "mod": 2000,
+        "admin": 8000
+    },
+    "bi_admins_id": [
+        293869524091142144,
+        557638191231008768,
+        1225576816958242877,
+        868399385149579274
+    ],
+    "code_list": [
+        "M1",
+        "M2",
+        "M3",
+        "M4",
+        "M5",
+        "MR",
+        "MRR",
+        "P1",
+        "P2",
+        "P3",
+        "P4",
+        "PR",
+        "PRR"
+    ],
+    "buildQuality": {
+        "walls": {
+            "1": "béton",
+            "2": "brique",
+            "3": "acier",
+            "4": "acier renforcé"
+        },
+        "price": {
+            "1": 1500,
+            "2": 2000,
+            "3": 2500,
+            "4": 3000
+        }
+    },
+    "bat_buffs": {
+        "1": 10,
+        "2": 25,
+        "3": 30,
+        "4": 50,
+        "5": 75,
+        "6": 85,
+        "7": 100
+    },
+    "unit_types": {
+        "soldat": "soldier",
+        "reserve": "reserve",
+        "policier": "policemen",
+        "secret": "secret",
+        "ingenieur": "engineer"
+    }
+}

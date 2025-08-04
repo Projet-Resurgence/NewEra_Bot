@@ -1,0 +1,10 @@
+Densité / 25 / Base €,Prix pour 1 personne,Style / Type de Construction / 50 / Mult €,Multiplicateur Prix,Prix pour 1 personne sans quali,Qualité / 25 / Mult €,Multiplicateur Prix,Prix pour 1 personne avec qualité,Total Confort / 100,,
+Densité Très Basse (25c),13,Archaique (5c),"0,1","0,2",Très bonne qualité (25c),"2,5","0,2",X / 100,Très confortable,75-100
+Densité Basse (20c),10,Traditionelle (30c),1,2,Bonne qualité (20c),"1,8",2,X / 100,Bon confort,50-74
+Densité Moyenne (15c),7,Industrielle (25c),"0,6","1,2",Qualité moyenne (15c),1,"1,2",X / 100,Confort moyen,25-49
+Densité Haute (10c),4,Victorienne (40c),2,4,Mauvaise qualité (10c),"0,7",4,X / 100,Mauvais confort,0-24
+Densité Très Haute (5c),2,Moderne Socialiste (20c),"0,4","0,8",Très mauvaise qualité (5c),"0,4","0,8",X / 100,,
+,,Moderne (40c),1,2,,,2,X / 100,,
+,,Contemporaine (45c),"1,5",3,,,3,X / 100,,
+,,Mobile (10c),"0,2","0,4",,,"0,4",X / 100,,
+,,Monumentale (50c),3,6,,,6,X / 100,,

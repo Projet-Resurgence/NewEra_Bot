@@ -1,10 +1,6 @@
 __pycache__
 old
 commands
-datas
-!*db_schemas*
-!*csvs*
-!*tech_form_datas.json
 .env
 *db*
 !*db.py
@@ -12,6 +8,13 @@ datas
 *txt
 *json
 *config*
+
+# Ignore specific files in datas directory but keep some subdirectories
+datas/*
+!datas/db_schemas/
+!datas/csvs/
+!datas/tech_form_datas.json
+!datas/main.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
