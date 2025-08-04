@@ -5,8 +5,10 @@ Contains helper functions for discord commands.
 
 import asyncio
 import discord
+import json
 
 # The bot instance must be set at runtime (e.g. by main.py)
+
 
 class discordUtils:
     """
@@ -78,8 +80,16 @@ class discordUtils:
                     users.append(user)
         return users
 
-    def parse_embed_json(json_file):
+    def parse_embed_json(self, json_file):
         embeds_json = json.loads(json_file)["embeds"]
+
+        for embed_json in embeds_json:
+            embed_desc = embed_json.get("description", "")
+            if not isinstance(embed_desc, str):
+                embed_desc = "\n".join(
+                    f"## {key}\n{value}" for key, value in embed_desc.items()
+                )
+                embed_json["description"] = embed_desc
 
         for embed_json in embeds_json:
             embed = discord.Embed().from_dict(embed_json)
@@ -100,10 +110,14 @@ class discordUtils:
 
             # Détermination du nom d’auteur
             author_name = (
-                message.author.name if message.webhook_id else message.author.display_name
+                message.author.name
+                if message.webhook_id
+                else message.author.display_name
             )
-            
-            if (message.content.startswith("[") or message.content.startswith("(")) and (message.content.endswith(")") or message.content.endswith("]")):
+
+            if (
+                message.content.startswith("[") or message.content.startswith("(")
+            ) and (message.content.endswith(")") or message.content.endswith("]")):
                 continue  # Ignore messages that are wrapped in brackets or parentheses
 
             # Contenu brut
@@ -127,7 +141,7 @@ class discordUtils:
 
             if context_included:
                 break
-            
+
             if len("\n".join(context_lines)) > 8000:
                 break
 

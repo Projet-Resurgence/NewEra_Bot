@@ -718,12 +718,12 @@ class AdminUtilities(commands.Cog):
                     avatar_url=self.bot.user.avatar.url,
                 )
                 await asyncio.sleep(1)  # Si nécessaire
-        announce_channel = discord.utils.get(ctx.guild.channels, id=873645600183287859)
-        with open("rules/announcing.json", "r") as file:
-            announce_embed = discord.Embed().from_dict(json.loads(file.read()))
-        await announce_channel.send(embed=announce_embed)
-        await announce_channel.send("@everyone")
-        await ctx.message.delete()
+        # announce_channel = discord.utils.get(ctx.guild.channels, id=1397579786901131374)
+        # with open("rules/announcing.json", "r") as file:
+        #     announce_embed = discord.Embed().from_dict(json.loads(file.read()))
+        # await announce_channel.send(embed=announce_embed)
+        # await announce_channel.send("@everyone")
+        # await ctx.message.delete()
 
     @commands.hybrid_command(
         name="groq_chat",
