@@ -1,0 +1,9 @@
+# Production requirements
+gunicorn>=21.2.0
+
+# Optional performance enhancements
+gevent>=23.0.0  # For async workers: gunicorn --worker-class gevent
+uvicorn[standard]>=0.23.0  # Alternative ASGI server
+
+# Development requirements (optional)
+watchdog>=3.0.0  # For file watching and auto-reload

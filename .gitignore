@@ -6,6 +6,7 @@ commands
 !*db.py
 *log
 *txt
+!*requirements.txt
 *json
 *config*
 
