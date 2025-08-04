@@ -1,6 +1,5 @@
 import discord
 from discord import app_commands
-import time
 from pyutil import filereplace
 from discord.ext import commands
 from datetime import datetime, timedelta, timezone
@@ -14,7 +13,6 @@ import urllib.request
 import random
 import aiohttp
 import os
-import re
 import sqlite3
 import events
 from construction import *
