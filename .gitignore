@@ -4,7 +4,7 @@ commands
 datas
 .env
 *db*
-!*.db.py
+!*db.py
 *log
 *txt
 *json
