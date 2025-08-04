@@ -25,7 +25,6 @@ from notion_handler import *
 from discord_utils import *
 from text_formatting import *
 from typing import Union
-import interactions
 from PIL import Image
 import pytz
 import io
@@ -3304,9 +3303,7 @@ async def start_production(
         # Check if user can produce (needs permission check here if needed)
 
         # Attempt to start production
-        result = db.start_production(
-            structure_id, technology_id, quantity, country_id
-        )
+        result = db.start_production(structure_id, technology_id, quantity, country_id)
         success, message = result.get("success", False), result.get("message", "")
 
         if success:

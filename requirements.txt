@@ -1,6 +1,5 @@
-aiohttp==3.10.10
+aiohttp==3.12.15
 discord.py==2.5.2
-discord_py_interactions==5.10.0
 groq==0.30.0
 notion_client==2.4.0
 Pillow==11.3.0
