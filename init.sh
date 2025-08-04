@@ -16,3 +16,4 @@ pip install --upgrade pip
 pip install -r requirements.txt
 
 echo "[✔] Setup complete. Virtual environment is active."
+echo "[i] To use the bot, run 'source venv/bin/activate' and then 'python src/main.py'."
