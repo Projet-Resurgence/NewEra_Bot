@@ -16,7 +16,6 @@ import aiohttp
 import os
 import re
 import sqlite3
-import shutil
 import events
 from construction import *
 from currency import *
@@ -27,7 +26,6 @@ from text_formatting import *
 from typing import Union
 from PIL import Image
 import pytz
-import io
 import string
 import locale
 import traceback
