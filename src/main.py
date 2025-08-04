@@ -179,8 +179,6 @@ usefulDatas = UsefulDatas(bat_types, bat_buffs)
 # Initialize utilities early for debug_init
 initialize_utilities(bot, bat_types, bat_buffs)
 db = get_db()
-db.init_settings()
-db.init_inventory_pricings()
 dUtils = get_discord_utils(bot, db)
 notion_handler = NotionHandler(notion_token, bot)
 
@@ -224,10 +222,6 @@ all_color_int = int("00FF44", 16)
 
 # tech_channel_id = db.get_setting("tech_channel_id")
 tech_channel_id = 1397693210310213672  # Waiting to move it into settings db table
-
-### DEBUG
-
-db.debug_init()
 
 # --- Task de polling ---
 
