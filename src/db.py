@@ -40,9 +40,14 @@ class Database:
                     dbs_content[filename] = content
                     cur.executescript(content)
         conn.commit()
-        with open("datas/init_data.sql", "r", encoding="utf-8") as f:
-            init_data = f.read()
-            cur.executescript(init_data)
+        cur.execute("""
+            SELECT country_id FROM Countries
+        """)
+        if cur.fetchone() is None:
+            with open("datas/init_data.sql", "r", encoding="utf-8") as f:
+                init_data = f.read()
+                cur.executescript(init_data)
+        conn.commit()
         global debug
         cur.execute("SELECT value FROM ServerSettings WHERE key = 'debug'")
         res = cur.fetchone()
@@ -1463,3 +1468,42 @@ class Database:
         except Exception as e:
             print(f"Error getting country productions: {e}")
             return []
+
+    async def get_country_gdp(self, country_id: str):
+        """Récupère le PIB d'un pays."""
+        self.cur.execute(
+            "SELECT gdp FROM Stats WHERE country_id = ?", (country_id,)
+        )
+        result = self.cur.fetchone()
+        return result[0] if result else 0
+
+    async def get_worlds_gdp(self):
+        self.cur.execute("SELECT gdp FROM Stats")
+        top_data = self.cur.fetchall()
+        tt = 0
+        if top_data:
+            for data_tuple in top_data:
+                data = data_tuple[0]  # Unpack the tuple to get the actual value
+                if isinstance(data, str):
+                    try:
+                        tt += int(data)
+                    except:
+                        pass
+                else:
+                    tt += data
+            return tt
+        else:
+            return 0
+
+    def update_country_stat(self, country_id: str, stat_name: str, value: int):
+        """Met à jour une statistique d'un pays."""
+        self.cur.execute(
+            f"""
+            INSERT INTO Stats (country_id, {stat_name})
+            VALUES (?, ?)
+            ON CONFLICT(country_id) DO UPDATE SET {stat_name} = ?
+        """,
+            (country_id, value, value),
+        )
+        self.conn.commit()
+        return True

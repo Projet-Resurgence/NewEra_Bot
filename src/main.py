@@ -82,7 +82,7 @@ intents = discord.Intents().all()
 bot = commands.Bot(
     intents=intents,
     activity=discord.Game(name="Aider le staff!"),
-    command_prefix=[".", "/"],
+    command_prefix=["."],
 )
 groq_client = Groq(api_key=groq_api_key)
 last_groq_query_time = datetime.now(timezone.utc)
@@ -3535,6 +3535,113 @@ def get_date_difference(date1: str, date2: str) -> int:
     d1 = datetime.strptime(date1, date_format)
     d2 = datetime.strptime(date2, date_format)
     return (d2.year - d1.year) * 12 + (d2.month - d1.month)
+
+
+async def counter_func():
+    cur.execute(f"SELECT PIB FROM country")
+    top_data = cur.fetchall()
+    tt = 0
+    embed = discord.Embed(title=f"Total PIBs cumulés :", description="")
+    if top_data:
+        for data in top_data:
+            value = data[0]
+            if isinstance(value, str):
+                try:
+                    tt += int(value)
+                except:
+                    pass
+            else:
+                tt += value
+        embed.description = f"{tt}\n{convert(str(tt))}"
+    else:
+        embed.title = "Aucune donnée trouvée pour la colonne spécifiée."
+    return embed
+
+
+async def counter_func2():
+    cur.execute("SELECT PIB FROM country")
+    top_data = cur.fetchall()
+    tt = 0
+    if top_data:
+        for data_tuple in top_data:
+            data = data_tuple[0]  # Unpack the tuple to get the actual value
+            if isinstance(data, str):
+                try:
+                    tt += int(data)
+                except:
+                    pass
+            else:
+                tt += data
+        return tt
+    else:
+        return 0
+
+
+@bot.hybrid_command()
+async def counter(ctx):
+    embed = await counter_func()  # Call the function to get the Embed object
+    await ctx.send(embed=embed)  # Send the Embed object as a message
+
+
+@bot.hybrid_command()
+@app_commands.autocomplete(country=country_autocomplete)
+async def power_checker(ctx, country: CountryConverter):
+    if not country:
+        return await ctx.send("Pays invalide.")
+    country_gdp = await db.get_country_gdp(country.get("id"))
+    state = "une Non Puissance"
+    if country_gdp:
+        total_value = await db.get_worlds_gdp()
+        states = {
+            int(0.15 * total_value): "une Superpuissance",
+            int(0.065 * total_value): "une Grande Puissance",
+            int(0.025 * total_value): "une Puissance majeure",
+            int(0.002 * total_value): "une Puissance mineure",
+        }
+        for i in states.keys():
+            if country_gdp > i:
+                state = states[i]
+                break
+    else:
+        state = "un Pays Invalide"
+    return await ctx.send(f"Le pays {country.get('name')} est **{state}**")
+
+
+@bot.hybrid_command()
+@app_commands.autocomplete(country=country_autocomplete)
+async def edit_country_stats(ctx, country: CountryConverter, stat: str, value: str):
+    """Modifie les statistiques d'un pays."""
+    if not country:
+        return await ctx.send("Pays invalide.")
+
+    # Validate stat
+    valid_stats = ["population", "gdp", "military_strength"]
+    if stat not in valid_stats:
+        return await ctx.send(
+            f"Statistique invalide. Choisissez parmi : {', '.join(valid_stats)}"
+        )
+
+    try:
+        # Convert value to appropriate type
+        if stat == "population":
+            value = int(value)
+        elif stat == "gdp":
+            value = float(value)
+        elif stat == "military_strength":
+            value = int(value)
+
+        # Update the country's stats in the database
+        success = db.update_country_stat(country.get("id"), stat, value)
+        if success:
+            return await ctx.send(
+                f"Statistique `{stat}` du pays {country.get('name')} mise à jour à {value}."
+            )
+        else:
+            return await ctx.send(
+                "Erreur lors de la mise à jour des statistiques du pays."
+            )
+    except ValueError:
+        return await ctx.send("Valeur invalide pour la statistique spécifiée.")
 
 
 bot.run(token)
