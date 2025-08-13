@@ -207,20 +207,6 @@ class StructureData(db.Model):
     cout_construction = db.Column(db.Integer, nullable=False)
 
 
-class StructureRatio(db.Model):
-    """Structure Ratios - stored in game database"""
-
-    __bind_key__ = "game"
-    __tablename__ = "StructuresRatios"
-
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    type = db.Column(db.String, nullable=False)
-    level = db.Column(db.Integer, nullable=False)
-    ratio_production = db.Column(db.Integer, nullable=False)
-    ratio_population = db.Column(db.Integer, nullable=False)
-    ratio_cost = db.Column(db.Integer, nullable=False)
-
-
 class StructureProduction(db.Model):
     """Structure Production - stored in game database"""
 
@@ -667,7 +653,6 @@ def index():
         "CountryTechnologies": CountryTechnology.query.count(),
         "Users": User.query.count(),
         "StructureData": StructureData.query.count(),
-        "StructureRatios": StructureRatio.query.count(),
         "Productions": StructureProduction.query.count(),
         "TechnologyAttributes": TechnologyAttribute.query.count(),
         "TechnologyLicenses": TechnologyLicense.query.count(),
@@ -1148,67 +1133,6 @@ def delete_structure_data(structure_id):
     except Exception as e:
         flash(f"Error: {str(e)}", "error")
     return redirect("/structure-data")
-
-
-# Structure Ratios Management
-@app.route("/structure-ratios")
-@login_required
-def structure_ratios():
-    structure_ratios = StructureRatio.query.all()
-    return render_template("structure_ratios.html", structure_ratios=structure_ratios)
-
-
-@app.route("/structure-ratios/add", methods=["GET", "POST"])
-@login_required
-def add_structure_ratio():
-    if request.method == "POST":
-        try:
-            structure_ratio = StructureRatio(
-                type=request.form["type"],
-                level=int(request.form["level"]),
-                ratio_production=int(request.form["ratio_production"]),
-                ratio_population=int(request.form["ratio_population"]),
-                ratio_capacity=int(request.form["ratio_capacity"]),
-            )
-            db.session.add(structure_ratio)
-            db.session.commit()
-            flash("Structure ratio added successfully!", "success")
-            return redirect("/structure-ratios")
-        except Exception as e:
-            flash(f"Error: {str(e)}", "error")
-    return render_template("add_structure_ratio.html")
-
-
-@app.route("/structure-ratios/edit/<int:ratio_id>", methods=["GET", "POST"])
-@login_required
-def edit_structure_ratio(ratio_id):
-    structure_ratio = StructureRatio.query.get_or_404(ratio_id)
-    if request.method == "POST":
-        try:
-            structure_ratio.type = request.form["type"]
-            structure_ratio.level = int(request.form["level"])
-            structure_ratio.ratio_production = int(request.form["ratio_production"])
-            structure_ratio.ratio_population = int(request.form["ratio_population"])
-            structure_ratio.ratio_capacity = int(request.form["ratio_capacity"])
-            db.session.commit()
-            flash("Structure ratio updated successfully!", "success")
-            return redirect("/structure-ratios")
-        except Exception as e:
-            flash(f"Error: {str(e)}", "error")
-    return render_template("edit_structure_ratio.html", structure_ratio=structure_ratio)
-
-
-@app.route("/structure-ratios/delete/<int:ratio_id>", methods=["POST"])
-@login_required
-def delete_structure_ratio(ratio_id):
-    try:
-        structure_ratio = StructureRatio.query.get_or_404(ratio_id)
-        db.session.delete(structure_ratio)
-        db.session.commit()
-        flash("Structure ratio deleted successfully!", "success")
-    except Exception as e:
-        flash(f"Error: {str(e)}", "error")
-    return redirect("/structure-ratios")
 
 
 # Structure Production Management

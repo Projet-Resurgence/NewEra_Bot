@@ -13,6 +13,8 @@ from db import Database, UsefulDatas
 from discord_utils import discordUtils
 from currency import convert, amount_converter
 
+import re
+
 # Global instances (will be initialized when bot is ready)
 db = None
 dUtils = None
@@ -142,7 +144,8 @@ async def country_autocomplete(
     """
     choices = []
     current_lower = current.lower()
-
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
     # Get database instance
     db_instance = get_db()
     if not db_instance or not interaction.guild:
@@ -227,6 +230,9 @@ async def country_autocomplete(
 STRUCTURE_TYPES = ["Usine", "Base", "Ecole", "Logement", "Centrale", "Technocentre"]
 SPECIALISATIONS = ["Terrestre", "Aerienne", "Navale", "NA"]
 
+# Combined types for unified handling
+ALL_BUILDABLE_TYPES = STRUCTURE_TYPES + ["Centrale électrique", "Infrastructure"]
+
 
 async def structure_type_autocomplete(
     interaction: discord.Interaction,
@@ -234,18 +240,148 @@ async def structure_type_autocomplete(
 ) -> List[app_commands.Choice[str]]:
     """
     Autocomplete function for structure type parameters in slash commands.
-    Returns a list of available structure types.
+    Returns a list of available structure types including power plants and infrastructures.
     """
     choices = []
     current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
 
+    # Add traditional structure types
     for structure_type in STRUCTURE_TYPES:
         if current_lower in structure_type.lower():
             choices.append(
-                app_commands.Choice(name=structure_type, value=structure_type)
+                app_commands.Choice(name=f"🏭 {structure_type}", value=structure_type)
             )
 
+    # Add power plants
+    if (
+        current_lower in "centrale électrique"
+        or current_lower in "centrale"
+        or current_lower in "électrique"
+    ):
+        choices.append(
+            app_commands.Choice(
+                name="⚡ Centrale électrique", value="Centrale électrique"
+            )
+        )
+
+    # Add infrastructures
+    if (
+        current_lower in "infrastructure"
+        or current_lower in "route"
+        or current_lower in "chemin"
+    ):
+        choices.append(
+            app_commands.Choice(name="🛣️ Infrastructure", value="Infrastructure")
+        )
+
     return choices
+
+
+async def power_plant_type_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for power plant types.
+    Dynamically loads available types from the database.
+    """
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance:
+        return choices
+
+    try:
+        # Get all distinct power plant types from the database
+        cursor = db_instance.cur
+        cursor.execute("SELECT DISTINCT type FROM PowerPlantsDatas ORDER BY type")
+        power_plant_types = [row[0] for row in cursor.fetchall()]
+
+        power_plant_emojis = {
+            "éolien onshore": "🌬️",
+            "éolien offshore": "🌊",
+            "Solaire": "☀️",
+            "Centrale solaire": "☀️",
+            "Nucléaire": "☢️",
+            "Nucléaire OCC": "☢️",
+            "Nucléaire ORT": "☢️",
+            "Hydroélectrique": "💧",
+            "Charbon": "⛏️",
+            "Pétrole": "🛢️",
+            "Gaz": "🔥",
+            "Géothermie": "🌋",
+            "Biomasse": "🌿",
+        }
+
+        for plant_type in power_plant_types:
+            if current_lower in plant_type.lower():
+                emoji = power_plant_emojis.get(plant_type, "⚡")
+                choices.append(
+                    app_commands.Choice(name=f"{emoji} {plant_type}", value=plant_type)
+                )
+
+        return choices
+
+    except Exception as e:
+        print(f"Error in power_plant_type_autocomplete: {e}")
+        return choices
+
+
+async def infrastructure_type_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for infrastructure types.
+    Dynamically loads available types from the database.
+    """
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance:
+        return choices
+
+    try:
+        # Get all infrastructure types from the database
+        cursor = db_instance.cur
+        cursor.execute("SELECT DISTINCT type FROM InfrastructureTypes ORDER BY type")
+        infrastructure_types = [row[0] for row in cursor.fetchall()]
+
+        infrastructure_emojis = {
+            "Route sommaire": "🛤️",
+            "Route": "🛣️",
+            "Autoroute": "🛣️",
+            "Tunnel route sommaire": "🚇",
+            "Tunnel route": "🚇",
+            "Tunnel autoroute": "🚇",
+            "Chemin de fer": "🚂",
+            "Chemin de fer électrifié": "🚄",
+            "Tunnel chemin de fer": "🚇",
+            "Tunnel chemin de fer électrifié": "🚇",
+        }
+
+        for infra_type in infrastructure_types:
+            if current_lower in infra_type.lower():
+                emoji = infrastructure_emojis.get(infra_type, "🛣️")
+                choices.append(
+                    app_commands.Choice(name=f"{emoji} {infra_type}", value=infra_type)
+                )
+
+        return choices
+
+    except Exception as e:
+        print(f"Error in infrastructure_type_autocomplete: {e}")
+        return choices
 
 
 async def specialisation_autocomplete(
@@ -258,6 +394,8 @@ async def specialisation_autocomplete(
     """
     choices = []
     current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
 
     specialisation_emojis = {
         "Terrestre": "🚗",
@@ -281,13 +419,16 @@ async def specialisation_autocomplete(
 async def structure_autocomplete(
     interaction: discord.Interaction,
     current: str,
-) -> List[app_commands.Choice[str]]:
+) -> List[app_commands.Choice[int]]:
     """
-    Autocomplete function for built structures in slash commands.
-    Returns a list of structures owned by the user's country.
+    Autocomplete function for structure IDs in slash commands.
+    Returns only traditional structures (Usine, Base, Ecole, etc.) that belong to the user's country.
+    Returns integer IDs for direct use in commands.
     """
     choices = []
     current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
 
     # Get database instance
     db_instance = get_db()
@@ -302,7 +443,7 @@ async def structure_autocomplete(
         if not country_id:
             return choices
 
-        # Get structures for this country
+        # Get only traditional structures for this country
         cursor = db_instance.cur
         cursor.execute(
             """
@@ -315,27 +456,155 @@ async def structure_autocomplete(
         """,
             (country_id,),
         )
-
         structures = cursor.fetchall()
 
+        # Process traditional structures
         for structure in structures:
             structure_id, struct_type, specialisation, level, region_name = structure
-
-            # Create search text
             search_text = f"{struct_type} {specialisation} {region_name}".lower()
 
-            if current_lower in search_text:
+            if not current_lower or current_lower in search_text:
                 choices.append(
                     app_commands.Choice(
-                        name=f"{struct_type} {specialisation} Niv.{level} ({region_name})",
-                        value=str(structure_id),
+                        name=f"🏭 {struct_type} {specialisation} Niv.{level} ({region_name})",
+                        value=structure_id,  # Return integer ID directly
                     )
                 )
 
     except Exception as e:
         print(f"Error in structure_autocomplete: {e}")
 
-    return choices
+    return choices[:25]  # Discord limit
+
+
+async def power_plant_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[int]]:
+    """
+    Autocomplete function for power plant IDs in slash commands.
+    Returns only power plants that belong to the user's country.
+    Returns integer IDs for direct use in commands.
+    """
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance or not interaction.guild:
+        return choices
+
+    try:
+        # Get the user's country
+        country_entity = CountryEntity(interaction.user, interaction.guild)
+        country_id = country_entity.get_country_id()
+
+        if not country_id:
+            return choices
+
+        # Get power plants for this country
+        cursor = db_instance.cur
+        cursor.execute(
+            """
+            SELECT p.id, p.type, p.level, r.name as region_name
+            FROM PowerPlants p
+            JOIN Regions r ON p.region_id = r.region_id
+            WHERE r.country_id = ?
+            ORDER BY p.type, p.level DESC
+            LIMIT 25
+        """,
+            (country_id,),
+        )
+
+        try:
+            power_plants = cursor.fetchall()
+        except:
+            power_plants = []  # Table might not exist yet
+
+        # Process power plants
+        for plant in power_plants:
+            plant_id, plant_type, level, region_name = plant
+            search_text = f"{plant_type} centrale {region_name}".lower()
+
+            if not current_lower or current_lower in search_text:
+                choices.append(
+                    app_commands.Choice(
+                        name=f"⚡ {plant_type} Niv.{level} ({region_name})",
+                        value=plant_id,  # Return integer ID directly
+                    )
+                )
+
+    except Exception as e:
+        print(f"Error in power_plant_autocomplete: {e}")
+
+    return choices[:25]  # Discord limit
+
+
+async def infrastructure_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[int]]:
+    """
+    Autocomplete function for infrastructure IDs in slash commands.
+    Returns only infrastructures that belong to the user's country.
+    Returns integer IDs for direct use in commands.
+    """
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance or not interaction.guild:
+        return choices
+
+    try:
+        # Get the user's country
+        country_entity = CountryEntity(interaction.user, interaction.guild)
+        country_id = country_entity.get_country_id()
+
+        if not country_id:
+            return choices
+
+        # Get infrastructures for this country
+        cursor = db_instance.cur
+        cursor.execute(
+            """
+            SELECT i.id, i.type, i.length_km, r.name as region_name
+            FROM Infrastructure i
+            JOIN Regions r ON i.region_id = r.region_id
+            WHERE r.country_id = ?
+            ORDER BY i.type
+            LIMIT 25
+        """,
+            (country_id,),
+        )
+
+        try:
+            infrastructures = cursor.fetchall()
+        except:
+            infrastructures = []  # Table might not exist yet
+
+        # Process infrastructures
+        for infra in infrastructures:
+            infra_id, infra_type, length_km, region_name = infra
+            search_text = f"{infra_type} {region_name}".lower()
+
+            if not current_lower or current_lower in search_text:
+                choices.append(
+                    app_commands.Choice(
+                        name=f"🛣️ {infra_type} {length_km}km ({region_name})",
+                        value=infra_id,  # Return integer ID directly
+                    )
+                )
+
+    except Exception as e:
+        print(f"Error in infrastructure_autocomplete: {e}")
+
+    return choices[:25]  # Discord limit
 
 
 async def region_autocomplete(
@@ -348,6 +617,8 @@ async def region_autocomplete(
     """
     choices = []
     current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
 
     # Get database instance
     db_instance = get_db()
@@ -394,6 +665,128 @@ async def region_autocomplete(
     return choices
 
 
+async def factory_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[int]]:
+    """
+    Autocomplete function for factory structures in production commands.
+    Returns only factories (Usine) that belong to the user's country.
+    Returns integer IDs for direct use in commands.
+    """
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance or not interaction.guild:
+        return choices
+
+    try:
+        # Get the user's country
+        country_entity = CountryEntity(interaction.user, interaction.guild)
+        country_id = country_entity.get_country_id()
+
+        if not country_id:
+            return choices
+
+        # Get only factories (Usine) for this country
+        cursor = db_instance.cur
+        cursor.execute(
+            """
+            SELECT s.id, s.specialisation, s.level, r.name as region_name
+            FROM Structures s
+            JOIN Regions r ON s.region_id = r.region_id
+            WHERE r.country_id = ? AND s.type = 'Usine'
+            ORDER BY s.specialisation, s.level DESC
+            LIMIT 25
+        """,
+            (country_id,),
+        )
+        factories = cursor.fetchall()
+
+        # Process factories
+        for factory in factories:
+            factory_id, specialisation, level, region_name = factory
+            search_text = f"usine {specialisation} {region_name}".lower()
+
+            if not current_lower or current_lower in search_text:
+                choices.append(
+                    app_commands.Choice(
+                        name=f"🏭 Usine {specialisation} Niv.{level} ({region_name})",
+                        value=factory_id,  # Return integer ID directly
+                    )
+                )
+
+    except Exception as e:
+        print(f"Error in factory_autocomplete: {e}")
+
+    return choices[:25]  # Discord limit
+
+
+async def technocentre_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[int]]:
+    """
+    Autocomplete function for technocentre structures in technology development commands.
+    Returns only technocentres that belong to the user's country.
+    Returns integer IDs for direct use in commands.
+    """
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance or not interaction.guild:
+        return choices
+
+    try:
+        # Get the user's country
+        country_entity = CountryEntity(interaction.user, interaction.guild)
+        country_id = country_entity.get_country_id()
+
+        if not country_id:
+            return choices
+
+        # Get only technocentres for this country
+        cursor = db_instance.cur
+        cursor.execute(
+            """
+            SELECT s.id, s.specialisation, s.level, r.name as region_name
+            FROM Structures s
+            JOIN Regions r ON s.region_id = r.region_id
+            WHERE r.country_id = ? AND s.type = 'Technocentre'
+            ORDER BY s.specialisation, s.level DESC
+            LIMIT 25
+        """,
+            (country_id,),
+        )
+        technocentres = cursor.fetchall()
+
+        # Process technocentres
+        for technocentre in technocentres:
+            technocentre_id, specialisation, level, region_name = technocentre
+            search_text = f"technocentre {specialisation} {region_name}".lower()
+
+            if not current_lower or current_lower in search_text:
+                choices.append(
+                    app_commands.Choice(
+                        name=f"🔬 Technocentre {specialisation} Niv.{level} ({region_name})",
+                        value=technocentre_id,  # Return integer ID directly
+                    )
+                )
+
+    except Exception as e:
+        print(f"Error in technocentre_autocomplete: {e}")
+
+    return choices[:25]  # Discord limit
+
+
 async def technology_autocomplete(
     interaction: discord.Interaction,
     current: str,
@@ -408,6 +801,8 @@ async def technology_autocomplete(
     """
     choices = []
     current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
 
     # Get database instance
     db_instance = get_db()
@@ -652,11 +1047,18 @@ __all__ = [
     "CountryConverter",
     "country_autocomplete",
     "structure_type_autocomplete",
+    "power_plant_type_autocomplete",
+    "infrastructure_type_autocomplete",
     "specialisation_autocomplete",
     "structure_autocomplete",
+    "power_plant_autocomplete",
+    "infrastructure_autocomplete",
+    "factory_autocomplete",
+    "technocentre_autocomplete",
     "region_autocomplete",
     "technology_autocomplete",
     "STRUCTURE_TYPES",
+    "ALL_BUILDABLE_TYPES",
     "SPECIALISATIONS",
     "convert",
     "amount_converter",

@@ -168,15 +168,13 @@ SELECT
     s.specialisation,
     s.level,
     sd.capacity AS base_capacity,
-    sr.ratio_production,
-    (sd.capacity * sr.ratio_production / 100) AS effective_capacity,
+    sd.capacity AS effective_capacity,  -- Use the direct capacity value from StructuresDatas
     SUM(
         t.slots_taken * (1 + (t.technology_level / 10.0)) * sp.quantity
     ) AS used_capacity
 FROM StructureProduction sp
 JOIN Structures s ON sp.structure_id = s.id
-JOIN StructuresDatas sd ON s.type = sd.type AND s.specialisation = sd.specialisation
-JOIN StructuresRatios sr ON sr.type = s.type AND sr.level = s.level
+JOIN StructuresDatas sd ON s.type = sd.type AND s.specialisation = sd.specialisation AND s.level = sd.level
 JOIN Technologies t ON sp.tech_id = t.tech_id
 JOIN Regions r ON s.region_id = r.region_id
 GROUP BY sp.structure_id;

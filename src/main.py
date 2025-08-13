@@ -46,7 +46,6 @@ from shared_utils import (
     specialisation_autocomplete,
     structure_autocomplete,
     region_autocomplete,
-    technology_autocomplete,
     STRUCTURE_TYPES,
     SPECIALISATIONS,
     convert,
@@ -103,6 +102,10 @@ async def load_cogs():
         await bot.load_extension("cogs.structures")
         print("✅ Structures cog loaded successfully")
 
+        print("🔄 Loading technology cog...")
+        await bot.load_extension("cogs.technology")
+        print("✅ Technology cog loaded successfully")
+
         print("🔄 Loading admin utilities cog...")
         await bot.load_extension("cogs.admin_utilities")
         print("✅ AdminUtilities cog loaded successfully")
@@ -113,11 +116,20 @@ async def load_cogs():
         structures_commands = [
             cmd for cmd in bot.commands if cmd.cog_name == "Structures"
         ]
+        technology_commands = [
+            cmd for cmd in bot.commands if cmd.cog_name == "Technology"
+        ]
         admin_commands = [
             cmd for cmd in bot.commands if cmd.cog_name == "AdminUtilities"
         ]
         print(f"📋 Loaded economy commands: {[cmd.name for cmd in economy_commands]}")
         print(f"📋 Loaded points commands: {[cmd.name for cmd in points_commands]}")
+        print(
+            f"📋 Loaded structures commands: {[cmd.name for cmd in structures_commands]}"
+        )
+        print(
+            f"📋 Loaded technology commands: {[cmd.name for cmd in technology_commands]}"
+        )
         print(
             f"📋 Loaded structures commands: {[cmd.name for cmd in structures_commands]}"
         )
@@ -204,15 +216,14 @@ Erreurs = {
     "Erreur 4": "La pause est déjà en cours\n",
     "Erreur 5": "Vous n'avez pas la permission de faire la commande.\n",
 }
-error_color_int = int("FF5733", 16)
-money_color_int = int("FFF005", 16)
-p_points_color_int = int("006AFF", 16)
-d_points_color_int = int("8b1bd1", 16)
-factory_color_int = int("6E472E", 16)
-all_color_int = int("00FF44", 16)
+error_color_int = int(db.get_setting("error_color_hex"), 16)
+money_color_int = int(db.get_setting("money_color_hex"), 16)
+p_points_color_int = int(db.get_setting("p_points_color_hex"), 16)
+d_points_color_int = int(db.get_setting("d_points_color_hex"), 16)
+factory_color_int = int(db.get_setting("factory_color_hex"), 16)
+all_color_int = int(db.get_setting("all_color_hex"), 16)
 
-# tech_channel_id = db.get_setting("tech_channel_id")
-tech_channel_id = 1397693210310213672  # Waiting to move it into settings db table
+tech_channel_id = db.get_setting("tech_channel_id")
 
 # --- Task de polling ---
 
@@ -379,14 +390,86 @@ async def date(ctx):
     )
 
 
+async def log_to_intel(bot, message):
+    chan = bot.get_channel(int(db.get_setting("intelligence_channel_id")))
+    if chan:
+        await chan.send(message)
+
+
 @bot.event
-async def on_message(message):
+async def on_user_update(before: discord.User, after: discord.User):
+    gravite = db.get_gravite_for_member_id(after.id)
+    if gravite and gravite >= 1:
+        if before.name != after.name:
+            await log_to_intel(
+                bot,
+                f"📝 **Pseudo modifié** : `{before.name}` → `{after.name}` ({after.id})",
+            )
+        if before.avatar != after.avatar:
+            await log_to_intel(bot, f"🖼️ **Avatar modifié** : {after.mention}")
+
+
+# 2️⃣ Log messages supprimés (gravité ≥ 2)
+@bot.event
+async def on_message_delete(message: discord.Message):
+    gravite = db.get_gravite_for_member_id(message.author.id)
+    if gravite and gravite >= 2:
+        await log_to_intel(
+            bot,
+            f"🗑️ **Message supprimé** de {message.author} ({message.author.id})\n```{message.content}```",
+        )
+
+
+# 3️⃣ Log messages modifiés (gravité ≥ 2)
+@bot.event
+async def on_message_edit(before: discord.Message, after: discord.Message):
+    if before.author.bot:
+        return
+    gravite = db.get_gravite_for_member_id(before.author.id)
+    if gravite and gravite >= 2:
+        await log_to_intel(
+            bot,
+            f"✏️ **Message modifié** de {before.author} ({before.author.id})\n"
+            f"Avant:\n```{before.content}```\nAprès:\n```{after.content}```",
+        )
+
+
+# 5️⃣ Log sanctions (mute / ban)
+@bot.event
+async def on_member_ban(guild, user):
+    gravite = db.get_gravite_for_member_id(user.id)
+    if gravite:
+        await log_to_intel(bot, f"⛔ **BAN** : {user} ({user.id})")
+
+
+@bot.event
+async def on_member_update(before: discord.Member, after: discord.Member):
+    # Check si un mute vocal ou timeout a été appliqué
+    gravite = db.get_gravite_for_member_id(after.id)
+    if gravite and before.timed_out_until != after.timed_out_until:
+        await log_to_intel(
+            bot,
+            f"🔇 **MUTE/TIMEOUT** : {after} ({after.id}) jusqu'à {after.timed_out_until}",
+        )
+
+
+# 4️⃣ Log tous les messages envoyés (gravité = 3)
+@bot.event
+async def on_message(message: discord.Message):
+    if message.author.bot:
+        return
+    gravite = db.get_gravite_for_member_id(message.author.id)
+    if gravite == 3:
+        await log_to_intel(
+            bot,
+            f"📨 **Message** de {message.author} ({message.author.id}) :\n```{message.content}```",
+        )
     if (
         isinstance(message.channel, discord.DMChannel)
         and message.author.id == 293869524091142144
         and message.content.startswith("!")
     ):
-        await bot.get_channel(db.get_setting("tchat_channel_id")).send(
+        await bot.get_channel(int(db.get_setting("tchat_channel_id"))).send(
             message.content[1:]
         )
     if (message.author == bot.user) or (not message.content):
@@ -401,6 +484,60 @@ async def on_message(message):
     if "soup" in message.content.lower():
         await message.add_reaction("🥣")
     await bot.process_commands(message)
+
+
+@bot.hybrid_command(name="info_intel", hidden=True)
+@commands.has_permissions(administrator=True)
+async def info_intel(ctx: commands.Context, user: discord.User):
+    # Vérifie que la commande est exécutée dans le bon salon
+    if ctx.channel.id != int(db.get_setting("intelligence_channel_id")):
+        return await ctx.send(
+            "❌ Cette commande ne peut être utilisée que dans le salon d'intelligence.",
+            delete_after=5,
+        )
+
+    # Récupère la personne
+    personne_data = db.get_personne_from_account_id(user.id)
+    if not personne_data:
+        return await ctx.send(
+            f"ℹ️ L'utilisateur {user} ({user.id}) n'est pas dans la fiche S."
+        )
+
+    personne_id = personne_data[0]  # id_personne
+    gravite = db.get_gravite_for_member_id(user.id)
+
+    # Comptes associés
+    accounts = [
+        acc[2] for acc in db.get_accounts_from_personne(personne_id)
+    ]  # colonne pseudo
+    comptes_str = ", ".join(accounts) if accounts else "Aucun"
+
+    # Sanctions
+    sanctions_data = db.get_sanctions_for_personne(personne_id)
+    sanctions_str = (
+        ", ".join(str(s[2]) for s in sanctions_data) if sanctions_data else "Aucune"
+    )
+
+    # Construction du message
+    message = (
+        f"📄 **Informations sur** {user.mention}\n"
+        f"🆔 **ID Personne** : `{personne_id}`\n"
+        f"👥 **Comptes associés** : {comptes_str}\n"
+        f"⚠️ **Gravité** : **{gravite if gravite is not None else 'Inconnue'}**\n"
+        f"🚫 **Sanctions** : {sanctions_str}"
+    )
+
+    colors = [discord.Color.yellow(), discord.Color.orange(), discord.Color.red()]
+    color = (
+        colors[gravite]
+        if gravite is not None and gravite < len(colors)
+        else discord.Color.yellow()
+    )
+
+    embed = discord.Embed(
+        title=f"Informations sur {user.name}", description=message, color=color
+    )
+    await ctx.send(embed=embed)
 
 
 async def insert_mention(
@@ -524,6 +661,24 @@ async def notion(ctx, req_type: str = "all"):
             await ctx.send(embed=embed)
     except Exception as e:
         await ctx.send(f"❌ Erreur lors de la récupération des données Notion : {e}")
+
+
+@bot.hybrid_command()
+async def notion_init_cache(ctx):
+    """Admin command to initialize Notion cache without sending notifications."""
+    if ctx.author.id not in bi_admins_id:
+        await ctx.send("❌ Cette commande est réservée aux administrateurs.")
+        return
+
+    await ctx.defer()
+    try:
+        await ctx.send("🔄 Initialisation du cache Notion en cours...")
+        await notion_handler.initialize_cache_silently()
+        await ctx.send(
+            "✅ Cache Notion initialisé avec succès. Les prochaines vérifications ne signaleront que les vraies mises à jour."
+        )
+    except Exception as e:
+        await ctx.send(f"❌ Erreur lors de l'initialisation du cache Notion : {e}")
 
 
 @bot.hybrid_command(
@@ -781,32 +936,6 @@ async def lead(ctx):
     await ctx.send(embed=embed, view=view)
 
 
-@bot.hybrid_command()
-async def appareil_info(ctx, appareil):
-    app_type = db.find_app_type(appareil)
-    if app_type is None:
-        await ctx.send("Appareil non trouvé.")
-        return
-    # Récupérer les données de production pour chaque niveau
-    prod_datas = []
-    for i in range(1, 8):
-        prod_datas.append(
-            production_data[f"{i}"]["production_mensuelle"][app_type][appareil]
-        )
-    # Construire la chaîne de caractères pour la production mensuelle
-    production_info = ""
-    for i in range(1, 8):
-        production_info += f"Niveau {i}: {convert(str(prod_datas[i-1]))}\n"
-    # Créer l'embed avec les informations de l'appareil
-    embed = discord.Embed(
-        title=f"Information sur l'appareil {appareil}",
-        description=f"Type: {app_type}\nProduction mensuelle par niveau d'usine:\n{production_info}",
-        color=0x00FF00,
-    )
-    # Envoyer l'embed
-    await ctx.send(embed=embed)
-
-
 def is_valid_lvl(type: int, lvl: int):
     if lvl < 0:
         return False
@@ -822,32 +951,6 @@ def is_valid_lvl(type: int, lvl: int):
         return True
     else:
         return False
-
-
-@bot.hybrid_command()
-async def production_time(ctx, app, qty, app_type=None, user: discord.Member = None):
-    if db.find_app_type(app, production_data) is None:
-        await ctx.send("Appareil non trouvé.")
-        return
-    app_type = db.find_app_type(app, production_data)
-    if not user:
-        user = ctx.author
-    await ctx.send(
-        db.calculer_temps_production(
-            user.id, app.lower(), qty, app_type, production_data
-        )
-    )
-
-
-@bot.hybrid_command()
-async def list_apparels(ctx):
-    app_types = ["terrestre", "navale", "aerienne", "explosif"]
-    apparels = []
-
-    for app_type in app_types:
-        for apparel in production_data["7"]["production_mensuelle"][app_type]:
-            apparels.append(apparel)
-    await dUtils.send_long_message(ctx, "\n- ".join(apparels))
 
 
 @bot.hybrid_command(
@@ -1599,401 +1702,6 @@ async def test_converter(ctx, country: CountryConverter):
     await ctx.send(f"Pays trouvé : {country.get('name')} (ID: {country.get('id')})")
 
 
-class TechFormData:
-    """Configuration data for different technology forms loaded from JSON"""
-
-    @staticmethod
-    def load_tech_configs():
-        """Load tech configurations from JSON file."""
-        import json
-
-        try:
-            with open("datas/tech_form_datas.json", "r", encoding="utf-8") as f:
-                raw_configs = json.load(f)
-
-            # Convert color strings to discord.Color objects
-            configs = {}
-            for tech_type, config in raw_configs.items():
-                configs[tech_type] = {
-                    "title": config["title"],
-                    "color": getattr(discord.Color, config["color"])(),
-                    "color_completed": getattr(
-                        discord.Color, config["color_completed"]
-                    )(),
-                    "emoji": config["emoji"],
-                    "forms": config["forms"],
-                    "accepted_types": config.get("accepted_types", []),
-                }
-            return configs
-        except FileNotFoundError:
-            print("⚠️ tech_form_datas.json not found, using empty config")
-            return {}
-        except Exception as e:
-            print(f"⚠️ Error loading tech_form_datas.json: {e}")
-            return {}
-
-    # Load configurations on class initialization
-    TECH_CONFIGS = load_tech_configs()
-
-
-class TechTypeSelectView(discord.ui.View):
-    """View with a SelectMenu for choosing technology type."""
-
-    def __init__(
-        self,
-        accepted_types: list,
-        tech_type: str,
-        form_index: int,
-        form_data: dict,
-        parent_view=None,
-        callback=None,
-    ):
-        super().__init__(timeout=300)
-        self.tech_type = tech_type
-        self.form_index = form_index
-        self.form_data = form_data
-        self.parent_view = parent_view
-        self.callback = callback
-
-        # Create options from accepted_types
-        options = []
-        for tech_type_option in accepted_types:
-            # Convert snake_case to human readable
-            display_name = tech_type_option.replace("_", " ").title()
-            options.append(
-                discord.SelectOption(
-                    label=display_name,
-                    value=tech_type_option,
-                    description=f"Choisir {display_name}",
-                )
-            )
-
-        self.type_select = discord.ui.Select(
-            placeholder="Choisissez le type de technologie...", options=options
-        )
-        self.type_select.callback = self.on_type_select
-        self.add_item(self.type_select)
-
-    async def on_type_select(self, interaction: discord.Interaction):
-        """Handle type selection and continue with the form."""
-        selected_type = self.type_select.values[0]
-
-        # Convert back to display name for storage
-        display_name = selected_type.replace("_", " ").title()
-        self.form_data["type_technologie"] = display_name
-
-        if self.callback:
-            await self.callback(interaction, selected_type)
-
-
-class UniversalTechForm(discord.ui.Modal):
-    """Universal modal form that adapts based on configuration."""
-
-    def __init__(
-        self, tech_type: str, form_index: int, form_data: dict, parent_view=None
-    ):
-        config = TechFormData.TECH_CONFIGS[tech_type]
-        common_config = TechFormData.TECH_CONFIGS.get("common", {"forms": []})
-
-        # Combine common fields first, then tech-specific fields
-        all_forms = common_config["forms"] + config["forms"]
-
-        # Auto-split forms into groups of 5
-        forms_per_page = 5
-        start_idx = form_index * forms_per_page
-        end_idx = start_idx + forms_per_page
-        current_forms = all_forms[start_idx:end_idx]
-
-        title = f"{config['title']} - Partie {form_index + 1}"
-        super().__init__(title=title, timeout=None)
-
-        self.tech_type = tech_type
-        self.form_index = form_index
-        self.form_data = form_data
-        self.parent_view = parent_view
-
-        # Create TextInput fields following ConstructionForm pattern
-        self.fields = []
-        self.has_type_field = False
-        self.type_field_config = None
-
-        for field_config in current_forms:
-            # Skip type_technologie field as it will be handled by SelectMenu
-            if field_config["key"] == "type_technologie":
-                self.has_type_field = True
-                self.type_field_config = field_config
-                continue
-
-            field = discord.ui.TextInput(
-                label=field_config["label"],
-                placeholder=field_config["placeholder"],
-                max_length=300,
-                style=discord.TextStyle.short,
-                required=False,
-            )
-            setattr(self, f"field_{field_config['key']}", field)
-            self.fields.append((field_config["key"], field))
-            self.add_item(field)
-
-    async def on_submit(self, interaction: discord.Interaction):
-        """Handle form submission and update parent view."""
-        # Collect field values
-        for key, field in self.fields:
-            self.form_data[key] = field.value
-
-        # Mark this form as completed in parent view
-        if self.parent_view:
-            self.parent_view.mark_form_completed(self.form_index)
-
-        embed = interaction.message.embeds[0] if interaction.message.embeds else None
-        if not embed:
-            embed = discord.Embed(
-                title=f"✅ Formulaire {self.form_index + 1} complété",
-                description="Données sauvegardées avec succès !",
-                color=TechFormData.TECH_CONFIGS[self.tech_type]["color_completed"],
-            )
-
-        await interaction.response.edit_message(embed=embed, view=self.parent_view)
-
-
-class MultiFormView(discord.ui.View):
-    """Universal view that handles tech types with auto-splitting forms."""
-
-    def __init__(self, specialisation: str, ctx: commands.Context, image_url: str):
-        super().__init__(timeout=300)
-        self.specialisation = specialisation
-        self.config = TechFormData.TECH_CONFIGS[specialisation]
-        self.common_config = TechFormData.TECH_CONFIGS.get("common", {"forms": []})
-        self.form_data = {}
-        self.ctx = ctx
-        self.image_url = image_url
-
-        # Calculate number of forms needed (auto-split by 5)
-        # Include common fields + tech-specific fields
-        total_fields = len(self.common_config["forms"]) + len(self.config["forms"])
-        self.num_forms = (total_fields + 4) // 5  # Ceiling division
-        self.completed_forms = set()
-
-        # Create buttons in a single row
-        for i in range(self.num_forms):
-            button = discord.ui.Button(
-                label=f"Partie {i + 1} / {self.num_forms}",
-                style=discord.ButtonStyle.green,
-                custom_id=f"form_{i}",
-                row=0,
-            )
-
-            # Create callback using closure
-            def create_callback(form_index):
-                async def button_callback(interaction):
-                    # Check if this form contains the type_technologie field
-                    config = TechFormData.TECH_CONFIGS[self.specialisation]
-                    common_config = TechFormData.TECH_CONFIGS.get(
-                        "common", {"forms": []}
-                    )
-                    all_forms = common_config["forms"] + config["forms"]
-
-                    forms_per_page = 5
-                    start_idx = form_index * forms_per_page
-                    end_idx = start_idx + forms_per_page
-                    current_forms = all_forms[start_idx:end_idx]
-
-                    # Check if any form in this page has type_technologie
-                    has_type_field = any(
-                        field["key"] == "type_technologie" for field in current_forms
-                    )
-
-                    if has_type_field and "type_technologie" not in self.form_data:
-                        # Show SelectMenu first for type selection
-                        accepted_types = config.get("accepted_types", [])
-                        if accepted_types:
-
-                            async def continue_with_form(
-                                select_interaction, selected_type
-                            ):
-                                # After type selection, show the modal
-                                await select_interaction.response.send_modal(
-                                    UniversalTechForm(
-                                        self.specialisation,
-                                        form_index,
-                                        self.form_data,
-                                        self,
-                                    )
-                                )
-
-                            embed = discord.Embed(
-                                title=f"🔧 Sélection du type - {config['title']}",
-                                description="Veuillez d'abord choisir le type de technologie :",
-                                color=config["color"],
-                            )
-
-                            view = TechTypeSelectView(
-                                accepted_types,
-                                self.specialisation,
-                                form_index,
-                                self.form_data,
-                                self,
-                                continue_with_form,
-                            )
-
-                            await interaction.response.send_message(
-                                embed=embed, view=view, ephemeral=True
-                            )
-                            return
-
-                    # Normal flow - show modal directly
-                    await interaction.response.send_modal(
-                        UniversalTechForm(
-                            self.specialisation, form_index, self.form_data, self
-                        )
-                    )
-
-                return button_callback
-
-            button.callback = create_callback(i)
-            self.add_item(button)
-
-    def mark_form_completed(self, form_index: int):
-        """Mark a form as completed and update button appearance."""
-        self.completed_forms.add(form_index)
-
-        # Update button to dark green and make unclickable
-        for item in self.children:
-            if hasattr(item, "custom_id") and item.custom_id == f"form_{form_index}":
-                item.style = discord.ButtonStyle.secondary
-                item.label = f"✅ Formulaire {form_index + 1}"
-                item.disabled = True
-                break
-
-        if self.all_forms_completed():
-            asyncio.create_task(
-                self.send_summary()
-            )  # Utiliser create_task car on n'est pas dans async
-
-    def all_forms_completed(self) -> bool:
-        """Check if all forms have been completed."""
-        return len(self.completed_forms) == self.num_forms
-
-    async def send_summary(self):
-        summary_lines = [
-            f"📦 **Résumé de la technologie `{self.config['title']}` :**\n"
-        ]
-
-        print(f"Form data collected: {self.form_data}")
-        print(f"Sending to ctx: {self.ctx.message.channel.id}")
-
-        try:
-            # Combine common and tech-specific fields for summary
-            all_fields = self.common_config["forms"] + self.config["forms"]
-            country_id = db.get_players_country(self.ctx.author.id)
-
-            # Get tech type and level from form data (not tech_data!)
-            tech_type = self.form_data.get(
-                "type_technologie"
-            )  # Fixed: was self.tech_data
-            tech_level_str = self.form_data.get("niveau_technologique", "1")
-
-            # Ensure tech_level is an integer
-            try:
-                tech_level = int(tech_level_str)
-            except (ValueError, TypeError):
-                tech_level = 1
-                print(
-                    f"Warning: Invalid tech_level '{tech_level_str}', defaulting to 1"
-                )
-
-            print(f"Getting tech data for type: {tech_type}, level: {tech_level}")
-
-            # Get costs with error handling
-            try:
-                dev_cost = await db.get_tech_datas(tech_type, tech_level, "dev_cost")
-                dev_time = await db.get_tech_datas(tech_type, tech_level, "dev_time")
-                prod_cost = await db.get_tech_datas(tech_type, tech_level, "prod_cost")
-                slots_taken = await db.get_tech_datas(
-                    tech_type, tech_level, "slots_taken"
-                )
-            except Exception as e:
-                print(f"Error getting tech data from database: {e}")
-                # Fallback values
-                dev_cost = [10000, 50000]
-                dev_time = [30, 90]
-                prod_cost = [1000, 5000]
-                slots_taken = 1
-
-            print(
-                f"dev_cost: {dev_cost}, dev_time: {dev_time}, prod_cost: {prod_cost}, slots_taken: {slots_taken}"
-            )
-
-            # Add form data to summary
-            for key, value in self.form_data.items():
-                label = next((f["label"] for f in all_fields if f["key"] == key), key)
-                summary_lines.append(f"• **{label}** : {value or '*Non renseigné*'}")
-
-            # Add cost information with safe formatting
-            try:
-                if isinstance(dev_cost, (list, tuple)) and len(dev_cost) >= 2:
-                    summary_lines.append(
-                        f"**Coût de développement** : entre {dev_cost[0]:,} et {dev_cost[1]:,}"
-                    )
-                else:
-                    summary_lines.append(f"**Coût de développement** : {dev_cost}")
-
-                if isinstance(dev_time, (list, tuple)) and len(dev_time) >= 2:
-                    summary_lines.append(
-                        f"**Temps de développement** : entre {dev_time[0]} et {dev_time[1]} jours"
-                    )
-                else:
-                    summary_lines.append(
-                        f"**Temps de développement** : {dev_time} jours"
-                    )
-
-                if isinstance(prod_cost, (list, tuple)) and len(prod_cost) >= 2:
-                    summary_lines.append(
-                        f"**Coût de production** : entre {prod_cost[0]:,} et {prod_cost[1]:,}"
-                    )
-                else:
-                    summary_lines.append(f"**Coût de production** : {prod_cost}")
-
-                summary_lines.append(f"**Slots occupés** : {slots_taken}")
-            except Exception as e:
-                print(f"Error formatting cost data: {e}")
-                summary_lines.append("**Coûts** : Données non disponibles")
-
-            print(f"Summary lines: {summary_lines}")
-
-            embed = discord.Embed(
-                title="🧪 Résumé de votre nouvelle technologie",
-                description="\n".join(summary_lines),
-                color=discord.Color.green(),
-            )
-
-            if hasattr(self, "image_url") and self.image_url:
-                embed.set_image(url=self.image_url)
-
-            print(f"Sending summary to channel {self.ctx.message.channel.id}")
-
-            await self.ctx.send(embed=embed)
-
-            confirmed = await dUtils.ask_confirmation(
-                self.ctx, country_id, "Souhaitez-vous créer cette technologie ?"
-            )
-            print(f"User confirmed: {confirmed}")
-            if confirmed:
-                await handle_new_tech(
-                    self.ctx, self.specialisation, self.form_data, self.image_url
-                )
-        except Exception as e:
-            print(f"Error in send_summary: {e}")
-            # Send a basic error message to the user
-            await self.ctx.send(f"❌ Erreur lors de la génération du résumé: {e}")
-            traceback.print_exc()
-
-    async def on_timeout(self):
-        """Disable all buttons when view times out."""
-        for item in self.children:
-            item.disabled = True
-
-
 @bot.hybrid_command()
 async def sync_tree(ctx):
     """Synchronize the command tree with Discord."""
@@ -2077,8 +1785,7 @@ async def handle_new_tech(ctx, specialisation: str, tech_datas: dict, image_url:
             )
 
     # 1. Send image to CDN channel and get new URL
-    cdn_channel_id = 1397862765028442183  # CDN channel for tech images
-    cdn_channel = ctx.guild.get_channel(cdn_channel_id)
+    cdn_channel = ctx.guild.get_channel(int(db.get_setting("cdn_channel_id")))
     if not cdn_channel:
         return await ctx.send(
             "Salon CDN non trouvé. Veuillez contacter un administrateur."
@@ -2151,8 +1858,7 @@ async def handle_new_tech(ctx, specialisation: str, tech_datas: dict, image_url:
     view = StaffTechConfirmationView(tech_data_complete, ctx)
 
     # Send to military admin notification channel
-    notification_channel_id = 1397693210310213672  # Military admin notification channel
-    notification_channel = ctx.guild.get_channel(notification_channel_id)
+    notification_channel = ctx.guild.get_channel(int(db.get_setting("tech_channel_id")))
 
     if notification_channel:
         # Ping military admin role
@@ -2701,240 +2407,6 @@ class FinalTechConfirmationView(discord.ui.View):
         await interaction.followup.send("❌ Création de la technologie annulée.")
 
 
-@bot.hybrid_command(
-    name="create_tech",
-    brief="Teste les formulaires multi-étapes pour les technologies.",
-    usage="create_tech [specialisation]",
-    description="POC pour tester les formulaires auto-divisés selon le type de technologie.",
-    help="""Teste les formulaires multi-étapes pour différents types de technologies.
-
-    FONCTIONNALITÉ :
-    - Divise automatiquement les champs en groupes de 5 maximum
-    - Chaque formulaire est adapté au type de technologie
-    - Boutons en ligne unique avec couleurs progressives
-
-    TYPES SUPPORTÉS :
-    - `armes` : Armes à feu et équipements d'armement
-    - `terrestre` : Véhicules et équipements terrestres
-    - `navale` : Navires et équipements navals  
-    - `aerienne` : Aéronefs et équipements aériens
-
-    CHAMPS COMMUNS :
-    - Nom de la technologie
-    - Niveau technologique (1-20)
-    - Technologie d'inspiration originelle
-
-    ARGUMENTS :
-    - `[specialisation]` : Optionnel. Type de technologie (armes/terrestre/navale/aerienne)
-
-    EXEMPLE :
-    - `create_tech` : Lance l'interface de sélection
-    - `create_tech armes` : Lance directement le formulaire d'armes
-    """,
-    hidden=False,
-    enabled=True,
-    case_insensitive=True,
-)
-@app_commands.choices(
-    specialisation=[
-        app_commands.Choice(name=k.capitalize(), value=k.lower())
-        for k in TechFormData.TECH_CONFIGS.keys()
-        if k != "common"
-    ]
-)
-async def create_tech(
-    ctx,
-    specialisation: str = commands.parameter(
-        default=None,
-        description="Type de technologie (terrestre/navale/aerienne/armes)",
-    ),
-    image_url: str = None,
-) -> None:
-    """Commande de test pour les formulaires multi-étapes selon le type de technologie."""
-    if not specialisation:
-        specialisation = await dUtils.discord_input(
-            ctx,
-            f"Bienvenue dans le programme de création de technologies!\nQuel type de technologie voulez-vous créer? ({'/'.join(k for k in TechFormData.TECH_CONFIGS.keys() if k != 'common')})",
-        )
-
-    image_url_finale = None
-    if ctx.message.attachments:
-        image_url_finale = ctx.message.attachments[0].url
-    elif image_url and image_url.startswith("http"):
-        image_url_finale = image_url
-
-    if not image_url_finale:
-        await ctx.send(
-            "Veuillez fournir une illustration pour la technologie (fichier ou lien)."
-        )
-        return
-
-    specialisation = specialisation.lower()
-    if (
-        specialisation not in TechFormData.TECH_CONFIGS.keys()
-        or specialisation == "common"
-    ):
-        valid_types = [k for k in TechFormData.TECH_CONFIGS.keys() if k != "common"]
-        await ctx.send("Veuillez répondre par " + ", ".join(valid_types) + ".")
-        return
-
-    # Get tech configuration
-    config = TechFormData.TECH_CONFIGS[specialisation]
-    common_config = TechFormData.TECH_CONFIGS.get("common", {"forms": []})
-
-    # Calculate number of forms (including common fields)
-    total_fields = len(common_config["forms"]) + len(config["forms"])
-    num_forms = (total_fields + 4) // 5  # Ceiling division
-
-    # Création de l'embed d'information
-    embed = discord.Embed(
-        title=f"{config['emoji']} Création de Technologie - {config['title']}",
-        description=f"Vous allez pouvoir créer une technologie de type **{config['title']}**.\n\n",
-        color=config["color"],
-    )
-
-    embed.set_footer(text="💡 Remplissez tous les formulaires pour terminer la saisie!")
-
-    await ctx.send(
-        embed=embed, view=MultiFormView(specialisation, ctx, image_url_finale)
-    )
-
-
-@bot.hybrid_command(
-    name="get_infos",
-    brief="Affiche les informations d'une technologie par son ID.",
-    usage="get_infos <tech_id>",
-    description="Récupère et affiche toutes les informations d'une technologie en utilisant son ID.",
-    help="""Affiche les informations complètes d'une technologie.
-
-    FONCTIONNALITÉ :
-    - Récupère les données de la technologie depuis la base de données
-    - Affiche les informations techniques et de développement
-    - Montre les attributs spécifiques de la technologie
-    - Inclut l'image et les coûts de production
-
-    INFORMATIONS AFFICHÉES :
-    - Nom et nom d'origine de la technologie
-    - Niveau et spécialisation
-    - Coûts de développement et production
-    - Temps de développement et slots utilisés
-    - Pays développeur
-    - Attributs techniques détaillés
-
-    RESTRICTIONS :
-    - Nécessite un ID de technologie valide
-    - Les technologies secrètes peuvent avoir des restrictions d'accès
-
-    ARGUMENTS :
-    - `<tech_id>` : ID numérique de la technologie
-
-    EXEMPLE :
-    - `get_infos 42` : Affiche les informations de la technologie avec l'ID 42
-    """,
-    hidden=False,
-    enabled=True,
-    case_insensitive=True,
-)
-@app_commands.autocomplete(tech_id=technology_autocomplete)
-async def get_infos(
-    ctx,
-    tech_id: str = commands.parameter(description="ID de la technologie à consulter"),
-) -> None:
-    """Affiche les informations d'une technologie par son ID."""
-
-    try:
-
-        tech = db.get_tech(tech_id)
-        if not tech:
-            return await ctx.send(f"❌ Aucune technologie trouvée avec l'ID {tech_id}.")
-
-        attributes = db.get_attributes_by_tech(tech_id)
-        # Create embed
-        embed = discord.Embed(
-            title=f"🔬 {tech['name']}",
-            description=f"**Technologie ID:** {tech_id}\n**Pays développeur:** {tech.get('country_name', 'Inconnu')}",
-            color=discord.Color.blue(),
-        )
-
-        # Basic information
-        embed.add_field(
-            name="📋 Informations de base",
-            value=f"**Nom original:** {tech.get('original_name', 'N/A')}\n"
-            f"**Type:** {tech.get('type', 'N/A')}\n"
-            f"**Spécialisation:** {tech.get('specialisation', 'N/A')}\n"
-            f"**Niveau technologique:** {tech.get('technology_level', 'N/A')}",
-            inline=False,
-        )
-
-        # Development and production costs
-        embed.add_field(
-            name="💰 Coûts et développement",
-            value=f"**Coût de développement:** {tech.get('development_cost', 0):,}\n"
-            f"**Temps de développement:** {tech.get('development_time', 0)} jours\n"
-            f"**Coût de production:** {tech.get('cost', 0):,}\n"
-            f"**Slots occupés:** {tech.get('slots_taken', 1.0)}",
-            inline=False,
-        )
-
-        # Technology attributes
-        if attributes:
-            attr_text = ""
-            for attr in attributes:
-                attr_text += (
-                    f"**{attr['attribute_name']}:** {attr['attribute_value']}\n"
-                )
-
-            if len(attr_text) > 1024:  # Discord field limit
-                # Split into multiple fields if too long
-                chunks = [
-                    attr_text[i : i + 1020] for i in range(0, len(attr_text), 1020)
-                ]
-                for i, chunk in enumerate(chunks):
-                    field_name = (
-                        f"⚙️ Attributs techniques"
-                        if i == 0
-                        else f"⚙️ Attributs techniques (suite {i+1})"
-                    )
-                    embed.add_field(name=field_name, value=chunk, inline=False)
-            else:
-                embed.add_field(
-                    name="⚙️ Attributs techniques", value=attr_text, inline=False
-                )
-
-        # Additional info
-        embed.add_field(
-            name="📊 Informations supplémentaires",
-            value=f"**Exporté:** {'Oui' if tech.get('exported') else 'Non'}\n"
-            f"**Créé le:** {tech.get('created_at', 'N/A')}",
-            inline=False,
-        )
-
-        # Add image if available
-        if tech.get("image_url"):
-            embed.set_image(url=tech["image_url"])
-
-        # Add description if available (stored tech_data)
-        if tech.get("description"):
-            try:
-                tech_data = json.loads(tech["description"])
-                if isinstance(tech_data, dict):
-                    # Add some key information from tech_data if present
-                    footer_text = f"ID: {tech_id}"
-                    if tech_data.get("channel_type"):
-                        footer_text += f" | Canal: {tech_data['channel_type']}"
-                    embed.set_footer(text=footer_text)
-            except:
-                pass
-
-        await ctx.send(embed=embed)
-
-    except Exception as e:
-        print(f"Error in get_infos command: {e}")
-        await ctx.send(
-            f"❌ Erreur lors de la récupération des informations de la technologie: {e}"
-        )
-
-
 @bot.hybrid_command()
 async def annex(ctx, region_id):
     return
@@ -2967,11 +2439,13 @@ async def add_region(
 
 
 @bot.hybrid_command()
+@app_commands.autocomplete(region_id=region_autocomplete)
 async def remove_region(ctx, region_id: int):
     return
 
 
 @bot.hybrid_command()
+@app_commands.autocomplete(region_id=region_autocomplete)
 async def set_region_data(ctx, region_id: int, key: str, value: str):
     return
 
@@ -3254,265 +2728,6 @@ async def date_difference(ctx, date):
         )
     except ValueError as e:
         await ctx.send(f"Erreur : {e}")
-
-
-@bot.hybrid_command(
-    help="""Démarre la production d'une technologie dans une usine.
-
-    FONCTIONNALITÉ :
-    - Lance la production d'une technologie licenciée dans une usine
-    - Vérifie la capacité de l'usine, les ressources et les licences
-    - Démarre automatiquement le processus de production
-
-    ARGUMENTS :
-    - `<structure_id>` : ID de l'usine (structure)
-    - `<technology_id>` : ID de la technologie à produire
-    - `<quantity>` : Quantité à produire
-
-    EXEMPLE :
-    - `start_production 5 12 10` : Produit 10 unités de la technologie 12 dans l'usine 5
-    """,
-)
-@app_commands.autocomplete(structure_id=structure_autocomplete)
-@app_commands.autocomplete(technology_id=technology_autocomplete)
-async def start_production(
-    ctx,
-    structure_id: int = commands.parameter(description="ID de l'usine"),
-    technology_id: int = commands.parameter(description="ID de la technologie"),
-    quantity: int = commands.parameter(description="Quantité à produire"),
-):
-    """Démarre la production d'une technologie dans une usine."""
-    await ctx.defer()  # Acknowledge the command to prevent timeout
-    try:
-        # Get user's country using CountryEntity pattern
-        country_entity = CountryEntity(ctx.author, ctx.guild).to_dict()
-        country_id = country_entity.get("id")
-        if not country_id:
-            embed = discord.Embed(
-                title="❌ Erreur",
-                description="Vous n'êtes membre d'aucun pays.",
-                color=error_color_int,
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Check if user can produce (needs permission check here if needed)
-
-        # Attempt to start production
-        result = db.start_production(structure_id, technology_id, quantity, country_id)
-        success, message = result.get("success", False), result.get("message", "")
-
-        if success:
-            embed = discord.Embed(
-                title="✅ Production démarrée", description=message, color=all_color_int
-            )
-        else:
-            embed = discord.Embed(
-                title="❌ Erreur de production",
-                description=message,
-                color=error_color_int,
-            )
-
-        await ctx.send(embed=embed)
-
-    except Exception as e:
-        embed = discord.Embed(
-            title="❌ Erreur",
-            description=f"Une erreur s'est produite : {str(e)}",
-            color=error_color_int,
-        )
-        await ctx.send(embed=embed)
-
-
-@bot.hybrid_command(
-    help="""Vend des technologies de votre inventaire à un autre pays.
-
-    FONCTIONNALITÉ :
-    - Transfère des technologies de votre inventaire vers un autre pays
-    - Gère les paiements et les transactions sécurisées
-    - Supporte les prix par unité ou totaux
-
-    ARGUMENTS :
-    - `<buyer_country>` : Nom ou ID du pays acheteur
-    - `<technology_id>` : ID de la technologie à vendre
-    - `<quantity>` : Quantité à vendre
-    - `<price>` : Prix (optionnel)
-    - `<per_unit>` : True pour prix par unité, False pour prix total (défaut: False)
-
-    EXEMPLE :
-    - `sell_technology "France" 12 5 1000` : Vend 5 unités de tech 12 pour 1000 au total
-    - `sell_technology "France" 12 5 200 True` : Vend 5 unités à 200 par unité
-    """,
-)
-@app_commands.autocomplete(technology_id=technology_autocomplete)
-async def sell_technology(
-    ctx,
-    buyer_country: str = commands.parameter(description="Pays acheteur"),
-    technology_id: int = commands.parameter(description="ID de la technologie"),
-    quantity: int = commands.parameter(description="Quantité à vendre"),
-    price: float = commands.parameter(description="Prix de vente", default=0.0),
-    per_unit: bool = commands.parameter(
-        description="Prix par unité (True) ou total (False)", default=False
-    ),
-):
-    """Vend des technologies de votre inventaire à un autre pays."""
-    try:
-        # Get seller's country using CountryEntity pattern
-        country_entity = CountryEntity(ctx.author, ctx.guild).to_dict()
-        seller_country_id = country_entity.get("id")
-        if not seller_country_id:
-            embed = discord.Embed(
-                title="❌ Erreur",
-                description="Vous n'êtes membre d'aucun pays.",
-                color=error_color_int,
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Get buyer's country ID
-        buyer_country_id = None
-
-        # Try to get by name first
-        countries = db.get_all_countries()
-        for country in countries:
-            if country["country_name"].lower() == buyer_country.lower():
-                buyer_country_id = country["country_id"]
-                break
-
-        # If not found by name, try by ID
-        if not buyer_country_id:
-            try:
-                buyer_country_id = int(buyer_country)
-                # Verify this country exists
-                buyer_data = db.get_country_datas(buyer_country_id)
-                if not buyer_data:
-                    buyer_country_id = None
-            except ValueError:
-                pass
-
-        if not buyer_country_id:
-            embed = discord.Embed(
-                title="❌ Erreur",
-                description=f"Pays '{buyer_country}' non trouvé.",
-                color=error_color_int,
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Attempt to sell technology
-        success, message = db.sell_technology_inventory(
-            seller_country_id,
-            buyer_country_id,
-            technology_id,
-            quantity,
-            price,
-            per_unit,
-        )
-
-        if success:
-            embed = discord.Embed(
-                title="✅ Vente réussie", description=message, color=money_color_int
-            )
-        else:
-            embed = discord.Embed(
-                title="❌ Erreur de vente", description=message, color=error_color_int
-            )
-
-        await ctx.send(embed=embed)
-
-    except Exception as e:
-        embed = discord.Embed(
-            title="❌ Erreur",
-            description=f"Une erreur s'est produite : {str(e)}",
-            color=error_color_int,
-        )
-        await ctx.send(embed=embed)
-
-
-@bot.hybrid_command(
-    help="""Affiche les productions en cours pour votre pays.
-
-    FONCTIONNALITÉ :
-    - Liste toutes les productions actuellement en cours
-    - Affiche les détails : usine, technologie, quantité, date de fin
-    - Montre le temps restant pour chaque production
-
-    EXEMPLE :
-    - `view_productions` : Affiche toutes vos productions en cours
-    """,
-)
-async def view_productions(ctx):
-    """Affiche les productions en cours pour votre pays."""
-    try:
-        # Get user's country using CountryEntity pattern
-        country_entity = CountryEntity(ctx.author, ctx.guild).to_dict()
-        country_id = country_entity.get("id")
-        if not country_id:
-            embed = discord.Embed(
-                title="❌ Erreur",
-                description="Vous n'êtes membre d'aucun pays.",
-                color=error_color_int,
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Get ongoing productions
-        productions = db.get_country_productions(country_id)
-
-        if not productions:
-            embed = discord.Embed(
-                title="📋 Productions en cours",
-                description="Aucune production en cours.",
-                color=all_color_int,
-            )
-            await ctx.send(embed=embed)
-            return
-
-        # Create embed with production details
-        embed = discord.Embed(
-            title="📋 Productions en cours",
-            description=f"Productions actives pour votre pays :",
-            color=all_color_int,
-        )
-
-        current_date = db.get_current_date()
-        current_year = current_date.get("year", 1)
-        current_month = current_date.get("month", 1)
-
-        for prod in productions:
-            # Calculate remaining time
-            end_year = prod.get("end_year", current_year)
-            end_month = prod.get("end_month", current_month)
-
-            remaining_months = (end_year - current_year) * 12 + (
-                end_month - current_month
-            )
-
-            if remaining_months <= 0:
-                time_str = "Terminé (en attente de traitement)"
-            elif remaining_months == 1:
-                time_str = "1 mois restant"
-            else:
-                time_str = f"{remaining_months} mois restants"
-
-            embed.add_field(
-                name=f"🏭 Usine {prod.get('structure_id', 'N/A')}",
-                value=f"**Technologie:** {prod.get('technology_name', 'N/A')} (ID: {prod.get('technology_id', 'N/A')})\n"
-                f"**Quantité:** {prod.get('quantity', 0)}\n"
-                f"**Fin prévue:** {end_month:02d}/{end_year}\n"
-                f"**Statut:** {time_str}",
-                inline=True,
-            )
-
-        await ctx.send(embed=embed)
-
-    except Exception as e:
-        embed = discord.Embed(
-            title="❌ Erreur",
-            description=f"Une erreur s'est produite : {str(e)}",
-            color=error_color_int,
-        )
-        await ctx.send(embed=embed)
 
 
 @bot.hybrid_command(

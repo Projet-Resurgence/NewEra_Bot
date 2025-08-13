@@ -40,9 +40,11 @@ class Database:
                     dbs_content[filename] = content
                     cur.executescript(content)
         conn.commit()
-        cur.execute("""
+        cur.execute(
+            """
             SELECT country_id FROM Countries
-        """)
+        """
+        )
         if cur.fetchone() is None:
             with open("datas/init_data.sql", "r", encoding="utf-8") as f:
                 init_data = f.read()
@@ -261,19 +263,40 @@ class Database:
         return self.cur.fetchall()
 
     def get_structure_capacity(self, structure_id: int) -> int:
-        """Get the effective capacity of a structure."""
+        """Get the effective capacity of a structure with technology boost."""
         self.cur.execute(
             """
-            SELECT sd.capacity * sr.ratio_production / 100.0 as effective_capacity
+            SELECT s.type, s.specialisation, s.level, r.country_id
             FROM Structures s
-            JOIN StructuresDatas sd ON s.type = sd.type AND s.specialisation = sd.specialisation
-            JOIN StructuresRatios sr ON s.type = sr.type AND s.level = sr.level
+            JOIN Regions r ON s.region_id = r.region_id
             WHERE s.id = ?
         """,
             (structure_id,),
         )
-        result = self.cur.fetchone()
-        return int(result[0]) if result else 0
+        structure_info = self.cur.fetchone()
+        if not structure_info:
+            return 0
+
+        structure_type, specialisation, level, country_id = structure_info
+
+        # Get base capacity from new StructuresDatas table
+        self.cur.execute(
+            """
+            SELECT capacity FROM StructuresDatas 
+            WHERE type = ? AND specialisation = ? AND level = ?
+        """,
+            (structure_type, specialisation, level),
+        )
+        capacity_result = self.cur.fetchone()
+        base_capacity = capacity_result[0] if capacity_result else 0
+
+        # Apply technology boost for factories
+        if structure_type == "Usine":
+            country_tech_level = self.get_country_technology_level(country_id)
+            tech_boost = self.get_technology_boost(country_tech_level)
+            return int(base_capacity * tech_boost)
+
+        return base_capacity
 
     def get_structure_used_capacity(self, structure_id: int) -> float:
         """Get the currently used capacity of a structure."""
@@ -298,8 +321,9 @@ class Database:
         region_id: int,
         amount: int = 1,
     ) -> bool:
-        """Construct structures in a region."""
+        """Construct structures in a region using new data system."""
         try:
+            # Verify region belongs to country
             self.cur.execute(
                 """
                 SELECT region_id FROM Regions WHERE region_id = ? AND country_id = ?
@@ -309,18 +333,20 @@ class Database:
             if not self.cur.fetchone():
                 return False
 
-            # Get base capacity from StructuresDatas and apply level ratio
+            # Get structure data from new StructuresDatas table
             self.cur.execute(
                 """
-                SELECT sd.capacity * sr.ratio_production / 100.0
-                FROM StructuresDatas sd
-                JOIN StructuresRatios sr ON sd.type = sr.type
-                WHERE sd.type = ? AND sd.specialisation = ? AND sr.level = ?
+                SELECT capacity, population, cout_construction
+                FROM StructuresDatas 
+                WHERE type = ? AND specialisation = ? AND level = ?
             """,
                 (structure_type, specialisation, level),
             )
-            capacity_result = self.cur.fetchone()
-            capacity = int(capacity_result[0]) if capacity_result else 0
+            structure_data = self.cur.fetchone()
+            if not structure_data:
+                return False
+
+            capacity, required_population, construction_cost = structure_data
 
             # Insert structures
             for _ in range(amount):
@@ -336,18 +362,20 @@ class Database:
             return True
         except Exception as e:
             print(f"Error constructing structure: {e}")
+            self.conn.rollback()
             return False
 
-    def get_construction_cost(self, structure_type: str, level: int) -> int:
-        """Get construction cost for a structure type and level."""
+    def get_construction_cost(
+        self, structure_type: str, level: int, specialisation: str = "NA"
+    ) -> int:
+        """Get construction cost for a structure type, level, and specialisation using new data system."""
         self.cur.execute(
             """
-            SELECT sd.cout_construction * sr.ratio_cost / 100.0
-            FROM StructuresDatas sd
-            JOIN StructuresRatios sr ON sd.type = sr.type
-            WHERE sd.type = ? AND sr.level = ?
+            SELECT cout_construction
+            FROM StructuresDatas 
+            WHERE type = ? AND level = ? AND specialisation = ?
         """,
-            (structure_type, level),
+            (structure_type, level, specialisation),
         )
         result = self.cur.fetchone()
         return int(result[0]) if result else 0
@@ -879,6 +907,7 @@ class Database:
         slots_taken,
         image_url,
         tech_data,
+        structure_id=None,  # Add structure_id parameter
     ):
         temp_datas = tech_data.copy()
         temp_datas.pop("nom", None)
@@ -896,8 +925,8 @@ class Database:
         """Ajoute une technologie à la base de données."""
         self.cur.execute(
             """
-            INSERT INTO Technologies (name, original_name, type, is_secret, technology_level, developed_by, development_cost, development_time, cost, slots_taken, image_url, specialisation)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO Technologies (name, original_name, type, is_secret, technology_level, developed_by, development_cost, development_time, cost, slots_taken, image_url, specialisation, developed_at_structure_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
             (
                 name,
@@ -912,6 +941,7 @@ class Database:
                 slots_taken,
                 image_url,
                 specialisation,
+                structure_id,  # Add structure_id to the insert
             ),
         )
         for key, value in temp_datas.items():
@@ -1471,9 +1501,7 @@ class Database:
 
     async def get_country_gdp(self, country_id: str):
         """Récupère le PIB d'un pays."""
-        self.cur.execute(
-            "SELECT gdp FROM Stats WHERE country_id = ?", (country_id,)
-        )
+        self.cur.execute("SELECT gdp FROM Stats WHERE country_id = ?", (country_id,))
         result = self.cur.fetchone()
         return result[0] if result else 0
 
@@ -1507,3 +1535,612 @@ class Database:
         )
         self.conn.commit()
         return True
+
+    def get_personne_info(self, id_personne: int):
+        """Récupère les informations d'une personne."""
+        self.cur.execute("SELECT * FROM Personne WHERE id = ?", (id_personne,))
+        return self.cur.fetchone()
+
+    def get_accounts_from_personne(self, id_personne: int):
+        """Récupère les comptes d'une personne."""
+        self.cur.execute("SELECT * FROM Compte WHERE id_personne = ?", (id_personne,))
+        return self.cur.fetchall()
+
+    def get_all_accounts_with_type(self, id_personne: int, gravite_list: list[int]):
+        """Récupère tous les comptes d'une personne avec un niveau de gravité spécifique."""
+        self.cur.execute(
+            "SELECT * FROM Compte WHERE id_personne = ? AND gravite IN ({seq})".format(
+                seq=",".join(["?"] * len(gravite_list))
+            ),
+            (id_personne, *gravite_list),
+        )
+        return self.cur.fetchall()
+
+    def get_gravite_for_member_id(self, id_personne: str):
+        """Récupère le niveau de gravité d'un membre."""
+        self.cur.execute(
+            "SELECT p.gravite FROM Personne p JOIN Compte c ON p.id = c.id_personne WHERE c.id_discord = ?",
+            (id_personne,),
+        )
+        result = self.cur.fetchone()
+        return result[0] if result else None
+
+    def get_personne_from_account_id(self, discord_id: int):
+        """Récupère la personne associée à un compte Discord."""
+        self.cur.execute(
+            "SELECT p.* FROM Personne p JOIN Compte c ON p.id = c.id_personne WHERE c.id_discord = ?",
+            (discord_id,),
+        )
+        return self.cur.fetchone()
+
+    def get_sanctions_for_personne(self, id_personne: str):
+        """Récupère les sanctions d'une personne."""
+        self.cur.execute(
+            "SELECT * FROM Sanctions WHERE id_personne = ?", (id_personne,)
+        )
+        return self.cur.fetchall()
+
+    # New methods for the updated structure system
+
+    def get_technology_boost(self, tech_level: int) -> float:
+        """Get technology boost coefficient for a given tech level."""
+        self.cur.execute(
+            "SELECT boost_coefficient FROM TechnologyBoosts WHERE tech_level = ?",
+            (tech_level,),
+        )
+        result = self.cur.fetchone()
+        return result[0] if result else 1.0
+
+    def get_country_technology_level(self, country_id: int) -> int:
+        """Get the current technology level of a country."""
+        # This would depend on how you track technology levels
+        # For now, returning a default value - you'll need to implement this based on your system
+        self.cur.execute(
+            "SELECT tech_level FROM Countries WHERE country_id = ?", (country_id,)
+        )
+        result = self.cur.fetchone()
+        return result[0] if result else 1
+
+    def get_structure_data(
+        self, structure_type: str, specialisation: str, level: int
+    ) -> dict:
+        """Get complete structure data for given type, specialisation, and level."""
+        self.cur.execute(
+            """
+            SELECT capacity, population, cout_construction
+            FROM StructuresDatas 
+            WHERE type = ? AND specialisation = ? AND level = ?
+        """,
+            (structure_type, specialisation, level),
+        )
+        result = self.cur.fetchone()
+        if result:
+            return {
+                "capacity": result[0],
+                "required_population": result[1],
+                "construction_cost": result[2],
+            }
+        return None
+
+    def get_infrastructure_cost(self, infrastructure_type: str) -> int:
+        """Get cost per kilometer for an infrastructure type."""
+        self.cur.execute(
+            "SELECT cost_per_km FROM InfrastructureTypes WHERE type = ?",
+            (infrastructure_type,),
+        )
+        result = self.cur.fetchone()
+        return result[0] if result else 0
+
+    def construct_infrastructure(
+        self,
+        country_id: int,
+        region_id: int,
+        infrastructure_type: str,
+        length_km: float,
+    ) -> bool:
+        """Construct infrastructure in a region."""
+        try:
+            # Verify region belongs to country
+            self.cur.execute(
+                "SELECT region_id FROM Regions WHERE region_id = ? AND country_id = ?",
+                (region_id, country_id),
+            )
+            if not self.cur.fetchone():
+                return False
+
+            # Get cost per km
+            cost_per_km = self.get_infrastructure_cost(infrastructure_type)
+            if cost_per_km == 0:
+                return False
+
+            total_cost = int(cost_per_km * length_km)
+
+            # Check if country has enough money
+            if not self.has_enough_balance(country_id, total_cost):
+                return False
+
+            # Deduct cost
+            self.take_balance(country_id, total_cost)
+
+            # Insert infrastructure
+            self.cur.execute(
+                """
+                INSERT INTO Infrastructure (region_id, type, length_km, cost_per_km, total_cost)
+                VALUES (?, ?, ?, ?, ?)
+            """,
+                (region_id, infrastructure_type, length_km, cost_per_km, total_cost),
+            )
+
+            self.conn.commit()
+            return True
+
+        except Exception as e:
+            print(f"Error constructing infrastructure: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_power_plant_data(self, plant_type: str, level: int) -> dict:
+        """Get power plant data for given type and level."""
+        self.cur.execute(
+            """
+            SELECT production_mwh, construction_cost, danger_rate, 
+                   resource_type, resource_consumption, price_per_mwh
+            FROM PowerPlantsDatas 
+            WHERE type = ? AND level = ?
+        """,
+            (plant_type, level),
+        )
+        result = self.cur.fetchone()
+        if result:
+            return {
+                "production_mwh": result[0],
+                "construction_cost": result[1],
+                "danger_rate": result[2],
+                "resource_type": result[3],
+                "resource_consumption": result[4],
+                "price_per_mwh": result[5],
+            }
+        return None
+
+    def get_housing_cost(
+        self, density_type: str, style_type: str, quality_type: str
+    ) -> dict:
+        """Get housing cost calculation based on density, style, and quality."""
+        self.cur.execute(
+            """
+            SELECT density_multiplier, style_multiplier, quality_multiplier, base_cost_per_person
+            FROM HousingDatas 
+            WHERE density_type = ? AND style_type = ? AND quality_type = ?
+        """,
+            (density_type, style_type, quality_type),
+        )
+        result = self.cur.fetchone()
+        if result:
+            base_cost = result[3]
+            total_multiplier = result[1] * result[2]  # style * quality
+            final_cost = int(base_cost * total_multiplier)
+            return {
+                "density_multiplier": result[0],
+                "style_multiplier": result[1],
+                "quality_multiplier": result[2],
+                "base_cost_per_person": base_cost,
+                "final_cost_per_person": final_cost,
+            }
+        return None
+
+    # Power Plant management methods
+    def construct_power_plant(
+        self, country_id: int, plant_type: str, amount: int, level: int, region_id: int
+    ) -> bool:
+        """Construct a power plant in a region."""
+        try:
+            # Get construction cost
+            base_cost = self.get_power_plant_cost(plant_type, level)
+            if not base_cost:
+                return False
+
+            # Calculate total cost
+            cost = base_cost * amount
+
+            # Check if country has enough money
+            if not self.has_enough_balance(country_id, cost):
+                return False
+
+            # Check if region belongs to country
+            if not self.verify_region_ownership(country_id, region_id):
+                return False
+
+            # Deduct cost
+            self.take_balance(country_id, cost)
+
+            for _ in range(amount):
+                # Create power plant (only store instance-specific data)
+                self.cur.execute(
+                    """
+                    INSERT INTO PowerPlants (region_id, type, level)
+                    VALUES (?, ?, ?)
+                """,
+                    (region_id, plant_type, level),
+                )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error constructing power plant: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_power_plant_cost(self, plant_type: str, level: int) -> int:
+        """Get construction cost for a power plant."""
+        self.cur.execute(
+            """
+            SELECT construction_cost
+            FROM PowerPlantsDatas 
+            WHERE type = ? AND level = ?
+        """,
+            (plant_type, level),
+        )
+        result = self.cur.fetchone()
+        return result[0] if result else 0
+
+    def get_power_plant_available_levels(self, plant_type: str) -> dict:
+        """Get available levels for a specific power plant type."""
+        self.cur.execute(
+            """
+            SELECT MIN(level) as min_level, MAX(level) as max_level
+            FROM PowerPlantsDatas 
+            WHERE type = ? AND construction_cost > 0
+        """,
+            (plant_type,),
+        )
+        result = self.cur.fetchone()
+        if result and result[0] is not None:
+            return {"min_level": result[0], "max_level": result[1]}
+        return {"min_level": None, "max_level": None}
+
+    def get_power_plants_by_country(self, country_id: int) -> list:
+        """Get all power plants owned by a country."""
+        self.cur.execute(
+            """
+            SELECT p.id, p.type, p.level, ppd.production_mwh, ppd.danger_rate, 
+                   ppd.construction_cost, ppd.resource_type, ppd.resource_consumption, ppd.price_per_mwh,
+                   r.name as region_name, r.region_id
+            FROM PowerPlants p
+            JOIN Regions r ON p.region_id = r.region_id
+            JOIN PowerPlantsDatas ppd ON p.type = ppd.type AND p.level = ppd.level
+            WHERE r.country_id = ?
+            ORDER BY p.type, p.level
+        """,
+            (country_id,),
+        )
+        return [dict(row) for row in self.cur.fetchall()]
+
+    def remove_power_plant(self, plant_id: int) -> bool:
+        """Remove a power plant by ID."""
+        try:
+            self.cur.execute("DELETE FROM PowerPlants WHERE id = ?", (plant_id,))
+            self.conn.commit()
+            return self.cur.rowcount > 0
+        except Exception as e:
+            print(f"Error removing power plant: {e}")
+            return False
+
+    def get_available_power_plant_types(self) -> list:
+        """Get all available power plant types."""
+        self.cur.execute("SELECT DISTINCT type FROM PowerPlantsDatas ORDER BY type")
+        return [row[0] for row in self.cur.fetchall()]
+
+    def get_power_plant_levels(self, plant_type: str) -> list:
+        """Get available levels for a power plant type."""
+        self.cur.execute(
+            "SELECT DISTINCT level FROM PowerPlantsDatas WHERE type = ? ORDER BY level",
+            (plant_type,),
+        )
+        return [row[0] for row in self.cur.fetchall()]
+
+    # Infrastructure management methods
+    def construct_infrastructure(
+        self, country_id: int, infra_type: str, length_km: float, region_id: int
+    ) -> bool:
+        """Construct infrastructure in a region."""
+        try:
+            # Get cost per km
+            cost_per_km = self.get_infrastructure_cost_per_km(infra_type)
+            if not cost_per_km:
+                return False
+
+            total_cost = int(cost_per_km * length_km)
+
+            # Check if country has enough money
+            if not self.has_enough_balance(country_id, total_cost):
+                return False
+
+            # Check if region belongs to country
+            if not self.verify_region_ownership(country_id, region_id):
+                return False
+
+            # Deduct cost
+            self.take_balance(country_id, total_cost)
+
+            # Create infrastructure
+            self.cur.execute(
+                """
+                INSERT INTO Infrastructure (region_id, type, length_km, cost_per_km, total_cost)
+                VALUES (?, ?, ?, ?, ?)
+            """,
+                (region_id, infra_type, length_km, cost_per_km, total_cost),
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error constructing infrastructure: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_infrastructure_cost_per_km(self, infra_type: str) -> int:
+        """Get cost per kilometer for an infrastructure type."""
+        self.cur.execute(
+            """
+            SELECT cost_per_km
+            FROM InfrastructureTypes 
+            WHERE type = ?
+        """,
+            (infra_type,),
+        )
+        result = self.cur.fetchone()
+        return result[0] if result else 0
+
+    def get_infrastructures_by_country(self, country_id: int) -> list:
+        """Get all infrastructures owned by a country."""
+        self.cur.execute(
+            """
+            SELECT i.id, i.type, i.length_km, i.total_cost, 
+                   r.name as region_name, r.region_id
+            FROM Infrastructure i
+            JOIN Regions r ON i.region_id = r.region_id
+            WHERE r.country_id = ?
+            ORDER BY i.type
+        """,
+            (country_id,),
+        )
+        return [dict(row) for row in self.cur.fetchall()]
+
+    def remove_infrastructure(self, infra_id: int) -> bool:
+        """Remove infrastructure by ID."""
+        try:
+            self.cur.execute("DELETE FROM Infrastructure WHERE id = ?", (infra_id,))
+            self.conn.commit()
+            return self.cur.rowcount > 0
+        except Exception as e:
+            print(f"Error removing infrastructure: {e}")
+            return False
+
+    def get_available_infrastructure_types(self) -> list:
+        """Get all available infrastructure types."""
+        self.cur.execute("SELECT DISTINCT type FROM InfrastructureTypes ORDER BY type")
+        return [row[0] for row in self.cur.fetchall()]
+
+    def verify_region_ownership(self, country_id: int, region_id: int) -> bool:
+        """Verify that a region belongs to a country."""
+        self.cur.execute(
+            "SELECT country_id FROM Regions WHERE region_id = ?", (region_id,)
+        )
+        result = self.cur.fetchone()
+        return result and result[0] == country_id
+
+    # Technology Development Methods
+    def start_technology_development(
+        self,
+        structure_id: int,
+        tech_id: int,
+        country_id: int,
+        development_time: int,
+        development_cost: int,
+        slots_used: float = 1.0,
+    ) -> bool:
+        """Start developing a technology at a technocentre."""
+        try:
+            # Check if structure is a technocentre and belongs to the country
+            self.cur.execute(
+                """
+                SELECT s.type, r.country_id 
+                FROM Structures s 
+                JOIN Regions r ON s.region_id = r.region_id 
+                WHERE s.id = ?
+            """,
+                (structure_id,),
+            )
+            result = self.cur.fetchone()
+            if not result or result[0] != "Technocentre" or result[1] != country_id:
+                return False
+
+            # Check if technocentre is available (not already developing something)
+            self.cur.execute(
+                "SELECT development_id FROM TechnocentreDevelopment WHERE structure_id = ?",
+                (structure_id,),
+            )
+            if self.cur.fetchone():
+                return False  # Technocentre already in use
+
+            # Start development
+            self.cur.execute(
+                """
+                INSERT INTO TechnocentreDevelopment 
+                (structure_id, tech_id, country_id, days_remaining, total_development_time, development_cost, slots_used)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+                (
+                    structure_id,
+                    tech_id,
+                    country_id,
+                    development_time,
+                    development_time,
+                    development_cost,
+                    slots_used,
+                ),
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error starting technology development: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_technocentre_development(self, structure_id: int) -> dict:
+        """Get current development at a technocentre."""
+        self.cur.execute(
+            """
+            SELECT td.*, t.name, t.specialisation 
+            FROM TechnocentreDevelopment td
+            JOIN Technologies t ON td.tech_id = t.tech_id
+            WHERE td.structure_id = ?
+        """,
+            (structure_id,),
+        )
+        result = self.cur.fetchone()
+        if result:
+            return {
+                "development_id": result[0],
+                "structure_id": result[1],
+                "tech_id": result[2],
+                "country_id": result[3],
+                "days_remaining": result[4],
+                "total_development_time": result[5],
+                "development_cost": result[6],
+                "slots_used": result[7],
+                "started_at": result[8],
+                "tech_name": result[9],
+                "tech_specialisation": result[10],
+            }
+        return None
+
+    def get_all_technocentre_developments(self, country_id: int = None) -> list:
+        """Get all ongoing technology developments, optionally filtered by country."""
+        query = """
+            SELECT td.*, t.name, t.specialisation, s.id as structure_id, r.name as region_name
+            FROM TechnocentreDevelopment td
+            JOIN Technologies t ON td.tech_id = t.tech_id
+            JOIN Structures s ON td.structure_id = s.id
+            JOIN Regions r ON s.region_id = r.region_id
+        """
+        params = ()
+        if country_id:
+            query += " WHERE td.country_id = ?"
+            params = (country_id,)
+
+        self.cur.execute(query, params)
+        results = []
+        for row in self.cur.fetchall():
+            results.append(
+                {
+                    "development_id": row[0],
+                    "structure_id": row[1],
+                    "tech_id": row[2],
+                    "country_id": row[3],
+                    "days_remaining": row[4],
+                    "total_development_time": row[5],
+                    "development_cost": row[6],
+                    "slots_used": row[7],
+                    "started_at": row[8],
+                    "tech_name": row[9],
+                    "tech_specialisation": row[10],
+                    "region_name": row[13],
+                }
+            )
+        return results
+
+    def complete_technology_development(self, development_id: int) -> bool:
+        """Complete a technology development and add it to the country's technologies."""
+        try:
+            # Get development info
+            self.cur.execute(
+                """
+                SELECT structure_id, tech_id, country_id 
+                FROM TechnocentreDevelopment 
+                WHERE development_id = ?
+            """,
+                (development_id,),
+            )
+            result = self.cur.fetchone()
+            if not result:
+                return False
+
+            structure_id, tech_id, country_id = result
+
+            # Update the technology to mark where it was developed
+            self.cur.execute(
+                """
+                UPDATE Technologies 
+                SET developed_at_structure_id = ? 
+                WHERE tech_id = ?
+            """,
+                (structure_id, tech_id),
+            )
+
+            # Add technology to country inventory (if not already present)
+            self.cur.execute(
+                """
+                INSERT OR IGNORE INTO CountryTechnologyInventory (country_id, tech_id, quantity)
+                VALUES (?, ?, 0)
+            """,
+                (country_id, tech_id),
+            )
+
+            # Remove from development
+            self.cur.execute(
+                "DELETE FROM TechnocentreDevelopment WHERE development_id = ?",
+                (development_id,),
+            )
+
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error completing technology development: {e}")
+            self.conn.rollback()
+            return False
+
+    def cancel_technology_development(self, development_id: int) -> bool:
+        """Cancel an ongoing technology development."""
+        try:
+            self.cur.execute(
+                "DELETE FROM TechnocentreDevelopment WHERE development_id = ?",
+                (development_id,),
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error canceling technology development: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_available_technocentres(
+        self, country_id: int, specialisation: str = None
+    ) -> list:
+        """Get available technocentres for technology development."""
+        query = """
+            SELECT s.id, s.level, s.specialisation, r.name as region_name
+            FROM Structures s
+            JOIN Regions r ON s.region_id = r.region_id
+            LEFT JOIN TechnocentreDevelopment td ON s.id = td.structure_id
+            WHERE s.type = 'Technocentre' 
+            AND r.country_id = ? 
+            AND td.structure_id IS NULL
+        """
+        params = [country_id]
+
+        if specialisation and specialisation != "NA":
+            query += " AND s.specialisation = ?"
+            params.append(specialisation)
+
+        self.cur.execute(query, params)
+
+        results = []
+        for row in self.cur.fetchall():
+            results.append(
+                {
+                    "structure_id": row[0],
+                    "level": row[1],
+                    "specialisation": row[2],
+                    "region_name": row[3],
+                }
+            )
+        return results

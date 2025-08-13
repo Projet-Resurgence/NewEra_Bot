@@ -196,7 +196,7 @@ class Points(commands.Cog):
     async def _remove_points_generic(
         self,
         ctx,
-        cible,
+        target,
         amount: str,
         point_type: int,
         emoji: str,
@@ -211,7 +211,7 @@ class Points(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        if not cible or not cible.get("id"):
+        if not target or not target.get("id"):
             embed = discord.Embed(
                 title="Erreur",
                 description=f"{emoji} Utilisateur ou pays invalide.",
@@ -220,11 +220,11 @@ class Points(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        cible_id = str(cible["id"])
-        cible_nom = cible["name"]
-        cible_obj = cible["role"]
+        target_id = str(target["id"])
+        target_name = target["name"]
+        target_obj = target["role"]
 
-        current_points = self.db.get_points(cible_id, point_type) or 0
+        current_points = self.db.get_points(target_id, point_type) or 0
 
         if not amount_converter(amount, current_points):
             embed = discord.Embed(
@@ -237,29 +237,29 @@ class Points(commands.Cog):
 
         payment_amount = amount_converter(amount, current_points)
 
-        if not self.db.has_enough_points(cible_id, payment_amount, point_type):
+        if not self.db.has_enough_points(target_id, payment_amount, point_type):
             embed = discord.Embed(
                 title="Erreur de retrait de points",
-                description=f"{emoji} {cible_nom} n'a pas assez de points.",
+                description=f"{emoji} {target_name} n'a pas assez de points.",
                 color=self.error_color_int,
             )
             await ctx.send(embed=embed)
             return
 
-        self.db.take_points(cible_id, payment_amount, point_type)
+        self.db.take_points(target_id, payment_amount, point_type)
 
         embed = discord.Embed(
             title="Opération réussie",
-            description=f"{emoji} **{payment_amount}** ont été retirés des points de {cible_nom}.",
+            description=f"{emoji} **{payment_amount}** ont été retirés des points de {target_name}.",
             color=color,
         )
-        await self.eco_logger("P4", payment_amount, cible_obj, ctx.author, point_type)
+        await self.eco_logger("P4", payment_amount, target_obj, ctx.author, point_type)
         await ctx.send(embed=embed)
 
     async def _show_points_generic(
-        self, ctx, cible, point_type: int, emoji: str, color: int, lead_type: int
+        self, ctx, target, point_type: int, emoji: str, color: int, lead_type: int
     ):
-        if not cible or not cible.get("id"):
+        if not target or not target.get("id"):
             embed = discord.Embed(
                 title=f"{emoji} Utilisateur ou pays invalide.",
                 color=self.error_color_int,
@@ -267,31 +267,31 @@ class Points(commands.Cog):
             await ctx.send(embed=embed)
             return
 
-        cible_id = str(cible["id"])
-        cible_nom = cible["name"]
-        cible_obj = cible["role"]
+        target_id = str(target["id"])
+        target_name = target["name"]
+        target_obj = target["role"]
 
-        balance = self.db.get_points(cible_id, point_type) or 0
+        balance = self.db.get_points(target_id, point_type) or 0
 
         if balance == 0:
             embed = discord.Embed(
-                title=f"{emoji} {cible_nom} n'a pas de points de ce type.",
+                title=f"{emoji} {target_name} n'a pas de points de ce type.",
                 color=color,
             )
         else:
             embed = discord.Embed(
-                title=f"Nombre de points de {cible_nom}",
-                description=f"{emoji} {cible_nom} a **{balance} points**.",
+                title=f"Nombre de points de {target_name}",
+                description=f"{emoji} {target_name} a **{balance} points**.",
                 color=color,
             )
             embed.set_footer(
-                text=f"Classement: {self.db.get_leads(lead_type, cible_id)}"
+                text=f"Classement: {self.db.get_leads(lead_type, target_id)}"
             )
 
         await ctx.send(embed=embed)
 
     async def _set_points_generic(
-        self, ctx, cible, amount: int, point_type: int, emoji: str, color: int
+        self, ctx, target, amount: int, point_type: int, emoji: str, color: int
     ):
         if not self.dUtils.is_authorized(ctx):
             embed = discord.Embed(
@@ -303,27 +303,27 @@ class Points(commands.Cog):
             return
 
         # Extraction des données du CountryConverter
-        cible_id = str(cible["id"])
-        cible_nom = cible["name"]
-        cible_obj = cible["role"]
+        target_id = str(target["id"])
+        target_name = target["name"]
+        target_obj = target["role"]
 
         # Définition des points
-        self.db.set_points(cible_id, amount, point_type)
+        self.db.set_points(target_id, amount, point_type)
 
         # Création de l'embed de confirmation
         embed = discord.Embed(
             title="Opération réussie",
-            description=f"{emoji} **{amount}** points ont été définis pour {cible_nom}.",
+            description=f"{emoji} **{amount}** points ont été définis pour {target_name}.",
             color=color,
         )
 
         # Journalisation de l'opération
-        await self.eco_logger("P2", amount, cible_obj, ctx.author, point_type)
+        await self.eco_logger("P2", amount, target_obj, ctx.author, point_type)
 
         await ctx.send(embed=embed)
 
     async def _add_points_generic(
-        self, ctx, cible, amount: int, point_type: int, emoji: str, color: int
+        self, ctx, target, amount: int, point_type: int, emoji: str, color: int
     ):
         if not self.dUtils.is_authorized(ctx):
             embed = discord.Embed(
@@ -335,20 +335,20 @@ class Points(commands.Cog):
             return
 
         # Extraction des données depuis le CountryConverter
-        cible_id = str(cible["id"])
-        cible_nom = cible["name"]
-        cible_obj = cible["role"]
+        target_id = str(target["id"])
+        target_name = target["name"]
+        target_obj = target["role"]
 
         # On donne les points
-        self.db.give_points(cible_id, amount, point_type)
+        self.db.give_points(target_id, amount, point_type)
 
         # Embed de confirmation
         embed = discord.Embed(
             title="Opération réussie",
-            description=f"{emoji} **{amount}** ont été ajoutés à l'utilisateur {cible_nom}.",
+            description=f"{emoji} **{amount}** ont été ajoutés à l'utilisateur {target_name}.",
             color=color,
         )
-        await self.eco_logger("P1", amount, cible_obj, ctx.author, point_type)
+        await self.eco_logger("P1", amount, target_obj, ctx.author, point_type)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(
@@ -387,11 +387,11 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
-    @app_commands.autocomplete(cible=country_autocomplete)
+    @app_commands.autocomplete(target=country_autocomplete)
     async def remove_pp(
         self,
         ctx,
-        cible: CountryConverter = commands.parameter(
+        target: CountryConverter = commands.parameter(
             description="Pays dont retirer les points politiques (mention, nom ou ID)"
         ),
         amount: str = commands.parameter(
@@ -400,7 +400,7 @@ class Points(commands.Cog):
     ):
         """Remove political points from a country (Staff only)."""
         await self._remove_points_generic(
-            ctx, cible, amount, 1, ":blue_circle:", self.p_points_color_int
+            ctx, target, amount, 1, ":blue_circle:", self.p_points_color_int
         )
 
     @commands.hybrid_command(
@@ -439,11 +439,11 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
-    @app_commands.autocomplete(cible=country_autocomplete)
+    @app_commands.autocomplete(target=country_autocomplete)
     async def remove_pd(
         self,
         ctx,
-        cible: CountryConverter = commands.parameter(
+        target: CountryConverter = commands.parameter(
             description="Pays dont retirer les points diplomatiques (mention, nom ou ID)"
         ),
         amount: str = commands.parameter(
@@ -452,7 +452,7 @@ class Points(commands.Cog):
     ):
         """Remove diplomatic points from a country (Staff only)."""
         await self._remove_points_generic(
-            ctx, cible, amount, 2, ":purple_circle:", self.d_points_color_int
+            ctx, target, amount, 2, ":purple_circle:", self.d_points_color_int
         )
 
     @commands.hybrid_command(
@@ -484,20 +484,20 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
-    @app_commands.autocomplete(cible=country_autocomplete)
+    @app_commands.autocomplete(target=country_autocomplete)
     async def points_p(
         self,
         ctx,
-        cible: CountryConverter = commands.parameter(
+        target: CountryConverter = commands.parameter(
             default=None,
             description="Pays dont afficher les points politiques (optionnel, votre pays par défaut)",
         ),
     ):
         """Check political points of a country or user."""
-        if cible is None:
-            cible = CountryEntity(ctx.author, ctx.guild).to_dict()
+        if target is None:
+            target = CountryEntity(ctx.author, ctx.guild).to_dict()
         await self._show_points_generic(
-            ctx, cible, 1, ":blue_circle:", self.p_points_color_int, 2
+            ctx, target, 1, ":blue_circle:", self.p_points_color_int, 2
         )
 
     @commands.hybrid_command(
@@ -530,20 +530,20 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
-    @app_commands.autocomplete(cible=country_autocomplete)
+    @app_commands.autocomplete(target=country_autocomplete)
     async def points_d(
         self,
         ctx,
-        cible: CountryConverter = commands.parameter(
+        target: CountryConverter = commands.parameter(
             default=None,
             description="Pays dont afficher les points diplomatiques (optionnel, votre pays par défaut)",
         ),
     ):
         """Check diplomatic points of a country or user."""
-        if cible is None:
-            cible = CountryEntity(ctx.author, ctx.guild).to_dict()
+        if target is None:
+            target = CountryEntity(ctx.author, ctx.guild).to_dict()
         await self._show_points_generic(
-            ctx, cible, 2, ":purple_circle:", self.d_points_color_int, 3
+            ctx, target, 2, ":purple_circle:", self.d_points_color_int, 3
         )
 
     @commands.hybrid_command(
@@ -576,11 +576,11 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
-    @app_commands.autocomplete(cible=country_autocomplete)
+    @app_commands.autocomplete(target=country_autocomplete)
     async def set_pp(
         self,
         ctx,
-        cible: CountryConverter = commands.parameter(
+        target: CountryConverter = commands.parameter(
             description="Pays dont définir les points politiques (mention, nom ou ID)"
         ),
         amount: int = commands.parameter(
@@ -589,7 +589,7 @@ class Points(commands.Cog):
     ):
         """Set political points for a country (Staff only)."""
         await self._set_points_generic(
-            ctx, cible, amount, 1, ":blue_circle:", self.p_points_color_int
+            ctx, target, amount, 1, ":blue_circle:", self.p_points_color_int
         )
 
     @commands.hybrid_command(
@@ -622,11 +622,11 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
-    @app_commands.autocomplete(cible=country_autocomplete)
+    @app_commands.autocomplete(target=country_autocomplete)
     async def set_pd(
         self,
         ctx,
-        cible: CountryConverter = commands.parameter(
+        target: CountryConverter = commands.parameter(
             description="Pays dont définir les points diplomatiques (mention, nom ou ID)"
         ),
         amount: int = commands.parameter(
@@ -635,7 +635,7 @@ class Points(commands.Cog):
     ):
         """Set diplomatic points for a country (Staff only)."""
         await self._set_points_generic(
-            ctx, cible, amount, 2, ":purple_circle:", self.d_points_color_int
+            ctx, target, amount, 2, ":purple_circle:", self.d_points_color_int
         )
 
     @commands.hybrid_command(
@@ -671,11 +671,11 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
-    @app_commands.autocomplete(cible=country_autocomplete)
+    @app_commands.autocomplete(target=country_autocomplete)
     async def add_pp(
         self,
         ctx,
-        cible: CountryConverter = commands.parameter(
+        target: CountryConverter = commands.parameter(
             description="Pays qui recevra les points politiques (mention, nom ou ID)"
         ),
         amount: int = commands.parameter(
@@ -684,7 +684,7 @@ class Points(commands.Cog):
     ):
         """Add political points to a country (Staff only)."""
         await self._add_points_generic(
-            ctx, cible, amount, 1, ":blue_circle:", self.p_points_color_int
+            ctx, target, amount, 1, ":blue_circle:", self.p_points_color_int
         )
 
     @commands.hybrid_command(
@@ -720,11 +720,11 @@ class Points(commands.Cog):
         enabled=True,
         case_insensitive=True,
     )
-    @app_commands.autocomplete(cible=country_autocomplete)
+    @app_commands.autocomplete(target=country_autocomplete)
     async def add_pd(
         self,
         ctx,
-        cible: CountryConverter = commands.parameter(
+        target: CountryConverter = commands.parameter(
             description="Pays qui recevra les points diplomatiques (mention, nom ou ID)"
         ),
         amount: int = commands.parameter(
@@ -733,7 +733,7 @@ class Points(commands.Cog):
     ):
         """Add diplomatic points to a country (Staff only)."""
         await self._add_points_generic(
-            ctx, cible, amount, 2, ":purple_circle:", self.d_points_color_int
+            ctx, target, amount, 2, ":purple_circle:", self.d_points_color_int
         )
 
     @commands.hybrid_command(

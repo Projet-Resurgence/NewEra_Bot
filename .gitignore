@@ -9,6 +9,7 @@ commands
 !*requirements.txt
 *json
 *config*
+mapping-library/
 
 # Ignore specific files in datas directory but keep some subdirectories
 datas/*

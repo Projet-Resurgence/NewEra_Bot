@@ -58,17 +58,6 @@ async def balance(
     # Command implementation
 ```
 
-## Commands Currently Updated
-
-The following commands have been updated with autocomplete functionality:
-
-### Economy Cog (`economy.py`)
-- `bal` / `balance` - Check country balance
-- `give` - Transfer money to another country
-
-### Points Cog (`points.py`)
-- `points_p` - Check political points
-
 ### How to Add to More Commands
 
 To add autocomplete to other commands that use `CountryConverter`:
@@ -90,29 +79,6 @@ async def transfer_command(self, ctx, sender_country: CountryConverter, receiver
     # Implementation
 ```
 
-## User Experience
-
-### Before (Text Commands Only)
-- Users had to type exact country names, role mentions, or IDs
-- No visual feedback for available countries
-- Prone to typos and invalid inputs
-
-### After (With Autocomplete)
-- Real-time suggestions as users type
-- Visual icons to distinguish countries (🏛️) from players (👤)
-- Easy discovery of available countries
-- Reduced typos and invalid inputs
-
-## Technical Details
-
-The autocomplete function:
-- Queries the database for all countries
-- Fetches government players from the `Governments` table
-- Filters results based on user input
-- Returns up to 25 suggestions (Discord limit)
-- Shows country roles first, then players
-- Includes fallback to guild roles if database queries fail
-
 ## Troubleshooting
 
 If autocomplete doesn't work:
@@ -121,11 +87,3 @@ If autocomplete doesn't work:
 2. **Verify decorator syntax** - The parameter name must match exactly
 3. **Database connection** - Ensure the database is accessible
 4. **Guild context** - Autocomplete only works in servers, not DMs
-
-## Future Enhancements
-
-Potential improvements:
-- Add icons or emojis for different country types
-- Include country information in descriptions
-- Cache frequently used results for better performance
-- Add autocomplete for other parameter types (regions, technologies, etc.)

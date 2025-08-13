@@ -46,8 +46,11 @@ CREATE TABLE IF NOT EXISTS Technologies (
     type TEXT NOT NULL, -- 'rifle', 'ship', 'engine', etc.
     difficulty_rating INTEGER DEFAULT 1 CHECK (difficulty_rating >= 1 AND difficulty_rating <= 10), -- Échelle de difficulté de 1 à 10
     description TEXT,
+    developed_at_structure_id INTEGER, -- ID de la structure où la technologie a été développée
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (developed_by) REFERENCES Countries(country_id)
+        ON DELETE SET NULL,
+    FOREIGN KEY (developed_at_structure_id) REFERENCES Structures(id)
         ON DELETE SET NULL
 );
 
@@ -111,4 +114,19 @@ CREATE TABLE IF NOT EXISTS TechnologyRatios (
     ratio_time INTEGER NOT NULL,  -- Ratio de temps de développement
     ratio_slots FLOAT NOT NULL,  -- Ratio de slots occupés
     PRIMARY KEY (type, level)
+);
+
+CREATE TABLE IF NOT EXISTS TechnocentreDevelopment (
+    development_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    structure_id INTEGER NOT NULL, -- ID du technocentre utilisé pour le développement
+    tech_id INTEGER NOT NULL, -- ID de la technologie en cours de développement
+    country_id INTEGER NOT NULL, -- Pays qui développe la technologie
+    days_remaining INTEGER NOT NULL, -- Jours restants pour terminer le développement
+    total_development_time INTEGER NOT NULL, -- Durée totale de développement
+    development_cost INTEGER NOT NULL, -- Coût total de développement
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(structure_id, tech_id), -- Un technocentre ne peut développer qu'une technologie à la fois
+    FOREIGN KEY (structure_id) REFERENCES Structures(id) ON DELETE CASCADE,
+    FOREIGN KEY (tech_id) REFERENCES Technologies(tech_id) ON DELETE CASCADE,
+    FOREIGN KEY (country_id) REFERENCES Countries(country_id) ON DELETE CASCADE
 );
