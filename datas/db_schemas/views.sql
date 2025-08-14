@@ -30,7 +30,9 @@ SELECT
     c.name,
     IFNULL(p.population, 0) AS population,
     IFNULL(pc.population_capacity, 0) AS population_capacity,
-    IFNULL(s.tech_level, 1) AS tech_level,
+    -- Tech levels are stored per-domain in CountryTechnologies (Terrestre, Aerienne, Navale, Global)
+    -- The view should not assume a single tech_level column in Stats (it doesn't exist).
+    -- Consumers should query CountryTechnologies for domain-specific levels.
     IFNULL(s.gdp, 0) AS gdp
 FROM Countries c
 LEFT JOIN Stats s ON c.country_id = s.country_id
@@ -53,101 +55,6 @@ FROM Structures s
 JOIN Regions r ON s.region_id = r.region_id
 JOIN Countries c ON r.country_id = c.country_id;
 
-CREATE VIEW IF NOT EXISTS CrossTechLevelsView AS
-SELECT country_id, 'Armes improvisées' AS tech_name,
-    MIN(level) AS level
-FROM CountryTechnologies
-WHERE tech_field IN ('Survie & Agronomie', 'Armement')
-GROUP BY country_id
-
-UNION ALL
-
-SELECT country_id, 'Armes à feu lourdes',
-    MIN(level)
-FROM CountryTechnologies
-WHERE tech_field IN ('Industrie & Ingénierie', 'Armement')
-GROUP BY country_id
-
-UNION ALL
-
-SELECT country_id, 'Véhicules terrestres armés/blindés',
-    MIN(level)
-FROM CountryTechnologies
-WHERE tech_field IN ('Mécanique Terrestre', 'Armement')
-GROUP BY country_id
-
-UNION ALL
-
-SELECT country_id, 'Véhicules terrestres lourds armés/blindés',
-    MIN(level)
-FROM CountryTechnologies
-WHERE tech_field IN ('Mécanique Terrestre', 'Armement', 'Industrie & Ingénierie')
-GROUP BY country_id
-
-UNION ALL
-
-SELECT country_id, 'Véhicules aéronavals armés',
-    MIN(level)
-FROM CountryTechnologies
-WHERE tech_field IN ('Aéronaval', 'Armement')
-GROUP BY country_id
-
-UNION ALL
-
-SELECT country_id, 'Moteurs à Réaction',
-    MIN(level)
-FROM CountryTechnologies
-WHERE tech_field IN ('Industrie & Ingénierie', 'TIC & Sciences')
-GROUP BY country_id
-
-UNION ALL
-
-SELECT country_id, 'Armes Explosives, Biologiques et Chimiques',
-    MIN(level)
-FROM CountryTechnologies
-WHERE tech_field IN ('Santé & Sciences', 'Armement')
-GROUP BY country_id
-
-UNION ALL
-
-SELECT country_id, 'Nucléaire',
-    MIN(level)
-FROM CountryTechnologies
-WHERE tech_field IN ('Santé & Sciences', 'Industrie & Ingénierie', 'TIC & Sciences')
-GROUP BY country_id
-
-UNION ALL
-
-SELECT country_id, 'Cyber-Armes',
-    MIN(level)
-FROM CountryTechnologies
-WHERE tech_field IN ('TIC & Sciences', 'Armement')
-GROUP BY country_id
-
-UNION ALL
-
-SELECT country_id, 'Géologie',
-    MIN(level)
-FROM CountryTechnologies
-WHERE tech_field IN ('Industrie & Ingénierie', 'Survie & Agronomie')
-GROUP BY country_id
-
-UNION ALL
-
-SELECT country_id, 'Logistique',
-    MIN(level)
-FROM CountryTechnologies
-WHERE tech_field IN ('Mécanique Terrestre', 'Aéronaval', 'Industrie & Ingénierie')
-GROUP BY country_id
-
-UNION ALL
-
-SELECT country_id, 'Spatial',
-    MIN(level)
-FROM CountryTechnologies
-WHERE tech_field IN ('Aéronaval', 'Industrie & Ingénierie', 'TIC & Sciences')
-GROUP BY country_id;
-
 CREATE VIEW IF NOT EXISTS CountryProductionView AS
 SELECT
     p.country_id,
@@ -169,14 +76,20 @@ SELECT
     s.level,
     sd.capacity AS base_capacity,
     sd.capacity AS effective_capacity,  -- Use the direct capacity value from StructuresDatas
+    -- Use the country/domain-specific technology level when computing production slot usage.
+    -- Prefer a technology level matching the technology's specialisation (e.g. 'Terrestre'),
+    -- else fall back to the country's 'Global' tech level, else default to 1.
     SUM(
-        t.slots_taken * (1 + (t.technology_level / 10.0)) * sp.quantity
+        t.slots_taken * (1 + (COALESCE(ct.level, 1) / 10.0)) * sp.quantity
     ) AS used_capacity
 FROM StructureProduction sp
 JOIN Structures s ON sp.structure_id = s.id
 JOIN StructuresDatas sd ON s.type = sd.type AND s.specialisation = sd.specialisation AND s.level = sd.level
 JOIN Technologies t ON sp.tech_id = t.tech_id
-JOIN Regions r ON s.region_id = r.region_id
+-- join country tech levels for the owning country of the structure
+LEFT JOIN Regions r ON s.region_id = r.region_id
+LEFT JOIN CountryTechnologies ct ON ct.country_id = r.country_id AND ct.tech_field = t.specialisation
+LEFT JOIN CountryTechnologies cg ON cg.country_id = r.country_id AND cg.tech_field = 'Global'
 GROUP BY sp.structure_id;
 
 CREATE VIEW IF NOT EXISTS StructureFreeCapacityView AS

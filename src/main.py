@@ -235,6 +235,19 @@ async def polling_notion():
     except Exception as e:
         print(f"Erreur lors du polling Notion: {e}")
 
+async def update_map():
+    return
+
+@tasks.loop(hours=1)
+async def daily_update():
+    current_hour = datetime.now(pytz.timezone("Europe/Paris")).hour
+    if current_hour != 6:
+        return
+    if db.get_setting("is_paused"):
+        return
+    await db.update_production()
+    await db.update_development()
+    await update_map()
 
 @tasks.loop(minutes=1)
 async def update_rp_date():

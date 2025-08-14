@@ -1045,7 +1045,6 @@ class FinalTechConfirmationView(discord.ui.View):
                 country_id = self.tech_data.get("country_id")
                 dev_time = self.tech_data.get("final_dev_time")
                 dev_cost = self.tech_data.get("final_dev_cost")
-                slots_used = self.tech_data.get("final_slots_taken")
 
                 # Check if country has enough money for development
                 if db.has_enough_balance(country_id, dev_cost):
@@ -1054,8 +1053,7 @@ class FinalTechConfirmationView(discord.ui.View):
                         tech_id,
                         country_id,
                         dev_time,
-                        dev_cost,
-                        slots_used,
+                        dev_cost
                     )
 
                     if dev_started:
@@ -1209,11 +1207,6 @@ class Technology(commands.Cog):
                     embed.add_field(
                         name="Coût total",
                         value=convert(str(dev["development_cost"])),
-                        inline=True,
-                    )
-                    embed.add_field(
-                        name="Slots utilisés",
-                        value=f"{dev['slots_used']:.1f}",
                         inline=True,
                     )
         else:
@@ -1749,7 +1742,7 @@ class Technology(commands.Cog):
             result = self.db.start_production(
                 structure_id, technology_id, quantity, country_id
             )
-            success, message = result.get("success", False), result.get("message", "")
+            success, message = result.get("success", False), result.get("error", "")
 
             if success:
                 embed = discord.Embed(

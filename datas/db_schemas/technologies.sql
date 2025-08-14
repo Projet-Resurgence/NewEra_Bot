@@ -2,14 +2,10 @@ CREATE TABLE IF NOT EXISTS CountryTechnologies (
     country_id INTEGER NOT NULL,
     tech_field TEXT NOT NULL CHECK (
         tech_field IN (
-            'Armement',
-            'Mécanique Terrestre',
-            'Aéronaval',
-            'Industrie & Ingénierie',
-            'Culture & Connaissance',
-            'Santé & Sciences',
-            'Survie & Agronomie',
-            'TIC & Sciences'
+            'Aerospatial',
+            'Terrestre',
+            'Maritime',
+            'Global'
         )
     ),
     level INTEGER NOT NULL DEFAULT 1,
@@ -121,7 +117,7 @@ CREATE TABLE IF NOT EXISTS TechnocentreDevelopment (
     structure_id INTEGER NOT NULL, -- ID du technocentre utilisé pour le développement
     tech_id INTEGER NOT NULL, -- ID de la technologie en cours de développement
     country_id INTEGER NOT NULL, -- Pays qui développe la technologie
-    days_remaining INTEGER NOT NULL, -- Jours restants pour terminer le développement
+    end_date VARCHAR(20) NOT NULL, -- Format : YYYY-MM-DD
     total_development_time INTEGER NOT NULL, -- Durée totale de développement
     development_cost INTEGER NOT NULL, -- Coût total de développement
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

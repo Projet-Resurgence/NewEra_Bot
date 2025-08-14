@@ -2,6 +2,7 @@ import sqlite3
 import math
 import os
 from datetime import datetime, timezone
+from import_csv_data import import_all_datas
 
 debug = False
 bat_types = {}
@@ -69,6 +70,7 @@ class Database:
                     f.write("\n\n")
             for name, sql in dbs_content.items():
                 print(f"{name}:\n{sql}\n")
+        import_all_datas()
         print("Database initialized.", flush=True)
         return conn, cur
 
@@ -292,7 +294,13 @@ class Database:
 
         # Apply technology boost for factories
         if structure_type == "Usine":
-            country_tech_level = self.get_country_technology_level(country_id)
+            # Use domain-specific tech level based on specialisation (Terrestre/Aerospatial/Maritime)
+            domain = {
+                "Terrestre": "Terrestre",
+                "Aerienne": "Aerospatial",  # Map Aerienne to Aerospatial
+                "Navale": "Maritime",  # Map Navale to Maritime
+            }.get(specialisation, "Global")
+            country_tech_level = self.get_country_technology_level(country_id, domain)
             tech_boost = self.get_technology_boost(country_tech_level)
             return int(base_capacity * tech_boost)
 
@@ -300,17 +308,38 @@ class Database:
 
     def get_structure_used_capacity(self, structure_id: int) -> float:
         """Get the currently used capacity of a structure."""
+        # We need to compute used capacity using the technology's specialisation and
+        # the owning country's domain-specific tech level (or Global fallback)
         self.cur.execute(
             """
-            SELECT SUM(t.slots_taken * (1 + t.technology_level / 10.0) * sp.quantity) as used_capacity
+            SELECT t.slots_taken, t.specialisation, sp.quantity, r.country_id
             FROM StructureProduction sp
             JOIN Technologies t ON sp.tech_id = t.tech_id
+            JOIN Structures s ON sp.structure_id = s.id
+            JOIN Regions r ON s.region_id = r.region_id
             WHERE sp.structure_id = ?
         """,
             (structure_id,),
         )
-        result = self.cur.fetchone()
-        return float(result[0]) if result and result[0] else 0.0
+        rows = self.cur.fetchall()
+        total = 0.0
+        for row in rows:
+            slots_taken = row[0]
+            tech_specialisation = row[1] or "NA"
+            quantity = row[2]
+            country_id = row[3]
+
+            # Map specialisation to domain
+            domain_mapping = {
+                "Terrestre": "Terrestre",
+                "Aerienne": "Aerospatial",
+                "Navale": "Maritime",
+            }
+            domain = domain_mapping.get(tech_specialisation, "Global")
+            tech_level = self.get_country_technology_level(country_id, domain)
+            total += slots_taken * (1 + tech_level / 10.0) * quantity
+
+        return float(total)
 
     def construct_structure(
         self,
@@ -408,12 +437,14 @@ class Database:
 
     def list_bats(self, country_id, bat_type: str = "all"):
         """Retourne la liste des bâtiments d’un type donné pour un pays."""
-
+        # Query Structures joined with Regions to get country ownership
         if bat_type.lower() == "all":
             self.cur.execute(
                 """
-                SELECT * FROM CountryStructuresView
-                WHERE country_id = ?
+                SELECT s.* FROM Structures s
+                JOIN Regions r ON s.region_id = r.region_id
+                WHERE r.country_id = ?
+                ORDER BY s.type, s.level DESC
                 """,
                 (country_id,),
             )
@@ -427,8 +458,10 @@ class Database:
                 raise ValueError(f"Type de bâtiment inconnu : {bat_type}")
             self.cur.execute(
                 """
-                SELECT * FROM CountryStructuresView
-                WHERE country_id = ? AND type = ?
+                SELECT s.* FROM Structures s
+                JOIN Regions r ON s.region_id = r.region_id
+                WHERE r.country_id = ? AND s.type = ?
+                ORDER BY s.type, s.level DESC
                 """,
                 (country_id, matched),
             )
@@ -589,11 +622,11 @@ class Database:
         """Get the leaderboard of players based on their political points."""
         if size <= 0:
             self.cur.execute(
-                "SELECT player_id, pol_points FROM inventory ORDER BY pol_points DESC"
+                "SELECT country_id, pol_points FROM Inventory ORDER BY pol_points DESC"
             )
         else:
             self.cur.execute(
-                "SELECT player_id, pol_points FROM inventory ORDER BY pol_points DESC LIMIT ?",
+                "SELECT country_id, pol_points FROM Inventory ORDER BY pol_points DESC LIMIT ?",
                 (size,),
             )
         leaderboard = self.cur.fetchall()
@@ -604,11 +637,11 @@ class Database:
         """Get the leaderboard of players based on their diplomatic points."""
         if size <= 0:
             self.cur.execute(
-                "SELECT player_id, diplo_points FROM inventory ORDER BY diplo_points DESC"
+                "SELECT country_id, diplo_points FROM Inventory ORDER BY diplo_points DESC"
             )
         else:
             self.cur.execute(
-                "SELECT player_id, diplo_points FROM inventory ORDER BY diplo_points DESC LIMIT ?",
+                "SELECT country_id, diplo_points FROM Inventory ORDER BY diplo_points DESC LIMIT ?",
                 (size,),
             )
         leaderboard = self.cur.fetchall()
@@ -619,11 +652,11 @@ class Database:
         """Get the leaderboard of players based on their total points (balance + political points + diplomatic points)."""
         if size <= 0:
             self.cur.execute(
-                "SELECT player_id, balance + pol_points + diplo_points FROM inventory ORDER BY balance + pol_points + diplo_points DESC"
+                "SELECT country_id, (balance + pol_points + diplo_points) as total FROM Inventory ORDER BY total DESC"
             )
         else:
             self.cur.execute(
-                "SELECT player_id, balance + pol_points + diplo_points FROM inventory ORDER BY balance + pol_points + diplo_points DESC LIMIT ?",
+                "SELECT country_id, (balance + pol_points + diplo_points) as total FROM Inventory ORDER BY total DESC LIMIT ?",
                 (size,),
             )
         leaderboard = self.cur.fetchall()
@@ -832,18 +865,20 @@ class Database:
     def get_population_by_country(self, country_id: str) -> int:
         """Récupère la population totale d'un pays."""
         self.cur.execute(
-            "SELECT * FROM PopulationView WHERE country_id = ?", (country_id,)
+            "SELECT IFNULL(SUM(population),0) as pop FROM Regions WHERE country_id = ?",
+            (country_id,),
         )
         result = self.cur.fetchone()
-        return result[0] if result and result[0] is not None else 0
+        return int(result[0]) if result and result[0] is not None else 0
 
     def get_population_capacity_by_country(self, country_id: str) -> int:
         """Récupère la capacité d'accueil totale d'un pays."""
         self.cur.execute(
-            "SELECT * FROM PopulationCapacityView WHERE country_id = ?", (country_id,)
+            "SELECT IFNULL(SUM(s.capacity),0) as cap FROM Structures s JOIN Regions r ON s.region_id = r.region_id WHERE r.country_id = ? AND s.type = 'Logement'",
+            (country_id,),
         )
         result = self.cur.fetchone()
-        return result[0] if result and result[0] is not None else 0
+        return int(result[0]) if result and result[0] is not None else 0
 
     def set_paused(self, is_paused: bool):
         """Met à jour l'état de pause du temps RP."""
@@ -873,24 +908,48 @@ class Database:
 
     def get_stats_by_country(self, country_id: str) -> dict:
         """Récupère les stats d'un pays."""
-        self.cur.execute("SELECT * FROM StatsView WHERE country_id = ?", (country_id,))
-        result = self.cur.fetchone()
-        if result:
+        # Build stats from canonical tables to avoid depending on fragile views
+        self.cur.execute(
+            "SELECT c.country_id, c.name, IFNULL(s.gdp, 0) as gdp "
+            "FROM Countries c LEFT JOIN Stats s ON c.country_id = s.country_id WHERE c.country_id = ?",
+            (country_id,),
+        )
+        base = self.cur.fetchone()
+
+        if not base:
             return {
-                "country_id": result["country_id"],
-                "name": result["name"],
-                "population": result["population"],
-                "population_capacity": result["population_capacity"],
-                "tech_level": result["tech_level"],
-                "gdp": result["gdp"],
+                "country_id": country_id,
+                "name": None,
+                "population": 0,
+                "population_capacity": 0,
+                "tech_level": 1,
+                "gdp": 0,
             }
+
+        # population: sum Regions.population where country_id
+        self.cur.execute(
+            "SELECT IFNULL(SUM(population),0) FROM Regions WHERE country_id = ?",
+            (country_id,),
+        )
+        population = self.cur.fetchone()[0]
+
+        # population capacity: sum Structures.capacity joined to Regions
+        self.cur.execute(
+            "SELECT IFNULL(SUM(s.capacity),0) FROM Structures s JOIN Regions r ON s.region_id = r.region_id WHERE r.country_id = ? AND s.type = 'Logement'",
+            (country_id,),
+        )
+        population_capacity = self.cur.fetchone()[0]
+
+        # Get Global tech level as the default "tech_level" for backward compatibility
+        global_tech_level = self.get_country_technology_level(country_id, "Global")
+
         return {
-            "country_id": country_id,
-            "name": None,
-            "population": 0,
-            "population_capacity": 0,
-            "tech_level": 1,
-            "gdp": 0,
+            "country_id": base["country_id"],
+            "name": base["name"],
+            "population": int(population),
+            "population_capacity": int(population_capacity),
+            "tech_level": global_tech_level,
+            "gdp": int(base["gdp"]),
         }
 
     def add_technology(
@@ -944,16 +1003,17 @@ class Database:
                 structure_id,  # Add structure_id to the insert
             ),
         )
+        tech_id = self.cur.lastrowid
         for key, value in temp_datas.items():
             self.cur.execute(
                 """
                 INSERT INTO TechnologyAttributes (tech_id, attribute_name, attribute_value)
-                VALUES ((SELECT tech_id FROM Technologies WHERE name = ? AND type = ? AND technology_level = ?), ?, ?)
+                VALUES (?, ?, ?)
             """,
-                (name, tech_type, tech_level, key, value),
+                (tech_id, key, value),
             )
         self.conn.commit()
-        return self.cur.lastrowid
+        return tech_id
 
     def get_current_date(self) -> dict:
         """Récupère la date actuelle du jeu."""
@@ -1169,9 +1229,14 @@ class Database:
             self.conn.rollback()
 
     def get_structure_informations(self, structure_id: int) -> dict:
+        # Retrieve full structure information (join Regions to get country ownership)
         return self.cur.execute(
             """
-            SELECT * FROM CountryStructuresView WHERE country_id = ?
+            SELECT s.id as structure_id, s.type, s.specialisation, s.level, s.capacity, s.population,
+                   r.region_id, r.country_id, r.name as region_name
+            FROM Structures s
+            JOIN Regions r ON s.region_id = r.region_id
+            WHERE s.id = ?
             """,
             (structure_id,),
         ).fetchone()
@@ -1224,6 +1289,7 @@ class Database:
                     "success": False,
                     "error": f"Not enough free slots. Need: {slots_needed:.1f}, Available: {capacity_info['remaining_capacity']:.1f}",
                 }
+            print("Hello World!", flush=True)
 
             # Calculate total cost
             total_cost = tech["cost"] * quantity
@@ -1247,29 +1313,56 @@ class Database:
             # Start production
             self.take_balance(country_id, total_cost)
 
-            # Add to StructureProduction table (replacing if exists)
+            # Add to StructureProduction table (concatenate quantity if exists)
             self.cur.execute(
                 """
-                INSERT OR REPLACE INTO StructureProduction 
-                (structure_id, tech_id, quantity, days_remaining, started_at)
-                VALUES (?, ?, ?, ?, ?)
-            """,
-                (
-                    structure_id,
-                    tech_id,
-                    quantity,
-                    production_time * 30,
-                    datetime.now().isoformat(),
-                ),
+                SELECT quantity FROM StructureProduction
+                WHERE structure_id = ? AND tech_id = ?
+                """,
+                (structure_id, tech_id),
             )
+            existing = self.cur.fetchone()
+            if existing:
+                new_quantity = existing["quantity"] + quantity
+                self.cur.execute(
+                    """
+                    UPDATE StructureProduction
+                    SET quantity = ?, days_remaining = ?, started_at = ?
+                    WHERE structure_id = ? AND tech_id = ?
+                    """,
+                    (
+                        new_quantity,
+                        production_time * 30,
+                        datetime.now().isoformat(),
+                        structure_id,
+                        tech_id,
+                    ),
+                )
+            else:
+                self.cur.execute(
+                    """
+                    INSERT INTO StructureProduction 
+                    (structure_id, tech_id, quantity, days_remaining, started_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (
+                        structure_id,
+                        tech_id,
+                        quantity,
+                        production_time * 30,
+                        datetime.now().isoformat(),
+                    ),
+                )
 
             self.conn.commit()
+            slots_remaining = capacity_info["remaining_capacity"] - slots_needed
 
             return {
                 "success": True,
                 "cost": total_cost,
                 "production_time": production_time,
                 "slots_used": slots_needed,
+                "slots_remaining": slots_remaining,
             }
 
         except Exception as e:
@@ -1591,15 +1684,32 @@ class Database:
         result = self.cur.fetchone()
         return result[0] if result else 1.0
 
-    def get_country_technology_level(self, country_id: int) -> int:
-        """Get the current technology level of a country."""
-        # This would depend on how you track technology levels
-        # For now, returning a default value - you'll need to implement this based on your system
+    def get_country_technology_level(
+        self, country_id: int, domain: str = "Global"
+    ) -> int:
+        """Get the technology level of a country for a specific domain."""
+        # Tech levels are now stored per-domain in CountryTechnologies
+        # Valid domains: 'Terrestre', 'Aerospatial', 'Maritime', 'Global'
         self.cur.execute(
-            "SELECT tech_level FROM Countries WHERE country_id = ?", (country_id,)
+            "SELECT level FROM CountryTechnologies WHERE country_id = ? AND tech_field = ?",
+            (country_id, domain),
         )
         result = self.cur.fetchone()
-        return result[0] if result else 1
+        if result:
+            return int(result[0])
+
+        # If no specific domain level found, try Global as fallback
+        if domain != "Global":
+            self.cur.execute(
+                "SELECT level FROM CountryTechnologies WHERE country_id = ? AND tech_field = 'Global'",
+                (country_id,),
+            )
+            result = self.cur.fetchone()
+            if result:
+                return int(result[0])
+
+        # Default to level 1 if no tech levels found
+        return 1
 
     def get_structure_data(
         self, structure_type: str, specialisation: str, level: int
@@ -1935,7 +2045,6 @@ class Database:
         country_id: int,
         development_time: int,
         development_cost: int,
-        slots_used: float = 1.0,
     ) -> bool:
         """Start developing a technology at a technocentre."""
         try:
@@ -1965,17 +2074,16 @@ class Database:
             self.cur.execute(
                 """
                 INSERT INTO TechnocentreDevelopment 
-                (structure_id, tech_id, country_id, days_remaining, total_development_time, development_cost, slots_used)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                (structure_id, tech_id, country_id, end_date, total_development_time, development_cost)
+                VALUES (?, ?, ?, ?, ?, ?)
             """,
                 (
                     structure_id,
                     tech_id,
                     country_id,
-                    development_time,
+                    "2024-02-01", # FOR FUTURE REFERENCE. TO UPDATE.
                     development_time,
                     development_cost,
-                    slots_used,
                 ),
             )
             self.conn.commit()
@@ -1991,7 +2099,7 @@ class Database:
             """
             SELECT td.*, t.name, t.specialisation 
             FROM TechnocentreDevelopment td
-            JOIN Technologies t ON td.tech_id = t.tech_id
+            LEFT JOIN Technologies t ON td.tech_id = t.tech_id
             WHERE td.structure_id = ?
         """,
             (structure_id,),
@@ -2006,10 +2114,9 @@ class Database:
                 "days_remaining": result[4],
                 "total_development_time": result[5],
                 "development_cost": result[6],
-                "slots_used": result[7],
-                "started_at": result[8],
-                "tech_name": result[9],
-                "tech_specialisation": result[10],
+                "started_at": result[7],
+                "tech_name": result[8] if result[8] else f"Technology ID {result[2]}",
+                "tech_specialisation": result[9] if result[9] else "Unknown",
             }
         return None
 
@@ -2018,7 +2125,7 @@ class Database:
         query = """
             SELECT td.*, t.name, t.specialisation, s.id as structure_id, r.name as region_name
             FROM TechnocentreDevelopment td
-            JOIN Technologies t ON td.tech_id = t.tech_id
+            LEFT JOIN Technologies t ON td.tech_id = t.tech_id
             JOIN Structures s ON td.structure_id = s.id
             JOIN Regions r ON s.region_id = r.region_id
         """
@@ -2039,11 +2146,10 @@ class Database:
                     "days_remaining": row[4],
                     "total_development_time": row[5],
                     "development_cost": row[6],
-                    "slots_used": row[7],
-                    "started_at": row[8],
-                    "tech_name": row[9],
-                    "tech_specialisation": row[10],
-                    "region_name": row[13],
+                    "started_at": row[7],
+                    "tech_name": row[8] if row[8] else f"Technology ID {row[2]}",
+                    "tech_specialisation": row[9] if row[9] else "Unknown",
+                    "region_name": row[11],
                 }
             )
         return results
@@ -2144,3 +2250,33 @@ class Database:
                 }
             )
         return results
+
+    async def update_production(self):
+        return
+    
+    async def update_development(self):
+        return
+    
+    async def get_all_salaries(self):
+        """Get all salaries in a dict with the country_id as key, and a nested dict as value with the unit_ids and 'total' keys, and the maintenance price as values"""
+ 
+        self.cur.execute("SELECT country_id FROM Countries")
+        return_value = {}
+        for country in self.cur.fetchall():
+            country_id = country[0]
+            self.cur.execute("SELECT * FROM InventoryUnits WHERE country_id = ?", (country_id,))
+            for row in self.cur.fetchall():
+                unit_id = row[0]
+                self.cur.execute(
+                    "SELECT maintenance FROM InventoryPricings WHERE unit_id = ?",
+                    (unit_id,),
+                )
+                maintenance = self.cur.fetchone()[0] or 0
+                return_value[country_id] = {
+                    "unit_id": unit_id,
+                    "maintenance": maintenance,
+                }
+            return_value[country_id]["total"] = sum(
+                item["maintenance"] for item in return_value[country_id].values()
+            )
+        return return_value

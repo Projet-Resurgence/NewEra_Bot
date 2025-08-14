@@ -213,13 +213,14 @@ def import_technocentre_data(cursor):
             level = clean_numeric_value(row[2])
             cost = clean_numeric_value(row[3])
 
-            cursor.execute(
-                """
-                INSERT OR REPLACE INTO StructuresDatas 
-                (type, specialisation, level, capacity, population, cout_construction)
-                VALUES (?, ?, ?, ?, ?, ?)
+            for spec in ["Terrestre", "Aerienne", "Navale"]:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO StructuresDatas 
+                    (type, specialisation, level, capacity, population, cout_construction)
+                    VALUES (?, ?, ?, ?, ?, ?)
             """,
-                ("Technocentre", "NA", level, 0, 0, cost),
+                ("Technocentre", spec, level, 1, 0, cost),
             )
 
 
@@ -314,7 +315,7 @@ def import_housing_data(cursor):
         )
 
 
-def main():
+def import_all_datas():
     """Main function to import all CSV data"""
     db_path = "/home/ubuntu/Bots/NEBot/datas/rts.db"
 
@@ -386,4 +387,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    import_all_datas()
