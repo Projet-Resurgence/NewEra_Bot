@@ -419,7 +419,6 @@ async def on_message_delete(message: discord.Message):
             f"🗑️ **Message supprimé** de {message.author} ({message.author.id})\n```{message.content}```",
         )
 
-
 # 3️⃣ Log messages modifiés (gravité ≥ 2)
 @bot.event
 async def on_message_edit(before: discord.Message, after: discord.Message):
