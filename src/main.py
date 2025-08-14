@@ -390,10 +390,10 @@ async def date(ctx):
     )
 
 
-async def log_to_intel(bot, message):
+async def log_to_intel(bot, message, image = None):
     chan = bot.get_channel(int(db.get_setting("intelligence_channel_id")))
     if chan:
-        await chan.send(message)
+        await chan.send(message, file=image)
 
 
 @bot.event
@@ -406,7 +406,7 @@ async def on_user_update(before: discord.User, after: discord.User):
                 f"📝 **Pseudo modifié** : `{before.name}` → `{after.name}` ({after.id})",
             )
         if before.avatar != after.avatar:
-            await log_to_intel(bot, f"🖼️ **Avatar modifié** : {after.mention}")
+            await log_to_intel(bot, f"🖼️ **Avatar modifié** : {after.name} ({after.id})", image=after.avatar)
 
 
 # 2️⃣ Log messages supprimés (gravité ≥ 2)
