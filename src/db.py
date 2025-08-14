@@ -1091,6 +1091,7 @@ class Database:
                 month = 1
                 self.set_paused(True)  # Pause le temps RP à la fin de l'année
                 is_paused = True
+                await self.
             else:
                 month += 1
 
@@ -1118,6 +1119,10 @@ class Database:
 
         self.conn.commit()
         print(f"📅 Avancé à {year}-{month}-{playday} (pause: {is_paused})")
+        
+    def pay_everyones_maintenance(self):
+        """Paye la maintenance de tous les pays."""
+        
 
     def get_country_by_name(self, country_name: str) -> str:
         """Récupère l'ID d'un pays par son nom."""
