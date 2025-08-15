@@ -5,6 +5,10 @@ from datetime import datetime, timezone
 from import_csv_data import import_all_datas
 import discord
 import locale
+from currency import (
+    convert,
+    amount_converter,
+)
 
 debug = False
 bat_types = {}
@@ -755,7 +759,13 @@ class Database:
         return self.cur.fetchone() is not None
 
     def add_region_to_country(
-        self, country_id: str, region_name: str, population: int = 0
+        self,
+        country_id: str,
+        region_name: str,
+        population: int = 0,
+        region_color_hex: str = "#FFFFFF",
+        area: int = 0,
+        geographical_area_id: int = None,
     ) -> int:
         """Ajoute une région à un pays, et met à jour automatiquement la population du pays."""
         # Vérifie si la région existe déjà
@@ -774,17 +784,85 @@ class Database:
         else:
             # Nouvelle région → insertion
             self.cur.execute(
-                "INSERT INTO Regions (country_id, name, mapchart_name, population) VALUES (?, ?, ?, ?)",
+                "INSERT INTO Regions (country_id, name, region_color_hex, population, area, geographical_area_id) VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     country_id,
                     region_name,
-                    region_name,
+                    region_color_hex,
                     population,
-                ),  # mapchart_name = name par défaut
+                    area,
+                    geographical_area_id,
+                ),
             )
             region_id = self.cur.lastrowid
         self.conn.commit()
         return region_id
+
+    def add_geographical_area(
+        self, name: str, x_start: int, x_end: int, y_start: int, y_end: int
+    ) -> int:
+        """Ajoute une zone géographique avec ses délimitations."""
+        self.cur.execute(
+            """
+            INSERT INTO GeographicalAreas (name, delimitation_x_start, delimitation_x_end, delimitation_y_start, delimitation_y_end) 
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (name, x_start, x_end, y_start, y_end),
+        )
+        area_id = self.cur.lastrowid
+        self.conn.commit()
+        return area_id
+
+    def get_geographical_area(self, area_id: int) -> dict:
+        """Récupère les informations d'une zone géographique."""
+        self.cur.execute(
+            "SELECT * FROM GeographicalAreas WHERE geographical_area_id = ?", (area_id,)
+        )
+        result = self.cur.fetchone()
+        if result:
+            return {
+                "geographical_area_id": result["geographical_area_id"],
+                "name": result["name"],
+                "delimitation_x_start": result["delimitation_x_start"],
+                "delimitation_x_end": result["delimitation_x_end"],
+                "delimitation_y_start": result["delimitation_y_start"],
+                "delimitation_y_end": result["delimitation_y_end"],
+            }
+        return None
+
+    def get_all_geographical_areas(self) -> list:
+        """Récupère toutes les zones géographiques."""
+        self.cur.execute("SELECT * FROM GeographicalAreas ORDER BY name")
+        return [dict(row) for row in self.cur.fetchall()]
+
+    def get_regions_in_geographical_area(self, area_id: int) -> list:
+        """Récupère toutes les régions dans une zone géographique donnée."""
+        self.cur.execute(
+            """
+            SELECT r.*, c.name as country_name 
+            FROM Regions r 
+            LEFT JOIN Countries c ON r.country_id = c.country_id
+            WHERE r.geographical_area_id = ?
+            ORDER BY r.name
+            """,
+            (area_id,),
+        )
+        return [dict(row) for row in self.cur.fetchall()]
+
+    def update_region_geographical_area(
+        self, region_id: int, area_id: int = None
+    ) -> bool:
+        """Met à jour la zone géographique d'une région."""
+        try:
+            self.cur.execute(
+                "UPDATE Regions SET geographical_area_id = ? WHERE region_id = ?",
+                (area_id, region_id),
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error updating region geographical area: {e}")
+            return False
 
     async def get_tech_datas(self, tech_type: str, tech_level: int, key: str):
         """Récupère les données d'une technologie spécifique."""
@@ -1102,18 +1180,21 @@ class Database:
             else:
                 month += 1
 
-        # # Vérifier si cette date existe déjà avant d'insérer
-        # self.cur.execute(
-        #     """
-        #     SELECT 1 FROM Dates
-        #     WHERE year = ? AND month = ? AND playday = ?
-        # """,
-        #     (year, month, playday),
-        # )
+        # Vérifier si cette date existe déjà avant d'insérer
+        self.cur.execute(
+            """
+            SELECT 1 FROM Dates
+            WHERE year = ? AND month = ? AND playday = ?
+        """,
+            (year, month, playday),
+        )
 
-        # if self.cur.fetchone():
-        #     print(f"⚠️ Date {year}-{month}-{playday} existe déjà, pas d'insertion", flush=True)
-        #     return
+        if self.cur.fetchone():
+            print(
+                f"⚠️ Date {year}-{month}-{playday} existe déjà, pas d'insertion",
+                flush=True,
+            )
+            return
 
         # Insérer la nouvelle ligne
         self.cur.execute(
@@ -1184,12 +1265,12 @@ class Database:
             for unit_id, unit_data in salary_data.items():
                 if unit_id != "total":
                     unit_details.append(
-                        f"{unit_data['quantity']}x {unit_id}: {unit_data['maintenance']}€"
+                        f"{convert(str(unit_data['quantity']))}x {unit_id}: {convert(str(unit_data['maintenance']))}€"
                     )
             embed.description = "\n".join(unit_details)
             total_price = salary_data.get("total", 0)
 
-            embed.description += f"\n\nTotal: {total_price}€"
+            embed.description += f"\n\nTotal: {convert(str(total_price))}€"
             if total_price <= 0:
                 continue
             await country_secret_channel.send(embed=embed)
@@ -1204,7 +1285,7 @@ class Database:
             self.take_balance(country_id, total_price)
             embed_success = discord.Embed(
                 title="Salaires payés",
-                description=f"Les salaires de maintenance pour {country_data['name']} ont été payés avec succès ({total_price}€).",
+                description=f"Les salaires de maintenance pour {country_data['name']} ont été payés avec succès ({convert(str(total_price))}€).",
                 color=discord.Color.green(),
             )
             await country_secret_channel.send(embed=embed_success)
@@ -1681,6 +1762,68 @@ class Database:
         except Exception as e:
             print(f"Error getting country productions: {e}")
             return []
+
+    def get_country_technology_inventory(self, country_id: int) -> list:
+        """Get all technology inventory for a country."""
+        try:
+            self.cur.execute(
+                """
+                SELECT cti.quantity, t.name, t.type, t.specialisation, t.technology_level,
+                       t.image_url, t.tech_id
+                FROM CountryTechnologyInventory cti
+                JOIN Technologies t ON cti.tech_id = t.tech_id
+                WHERE cti.country_id = ? AND cti.quantity > 0
+                ORDER BY t.specialisation, t.name
+            """,
+                (country_id,),
+            )
+
+            return [dict(row) for row in self.cur.fetchall()]
+
+        except Exception as e:
+            print(f"Error getting country technology inventory: {e}")
+            return []
+
+    def get_country_units_inventory(self, country_id: int) -> dict:
+        """Get all units inventory for a country, formatted like in maintenance."""
+        try:
+            return_value = {}
+
+            self.cur.execute(
+                "SELECT * FROM InventoryUnits WHERE country_id = ?", (country_id,)
+            )
+            for row in self.cur.fetchall():
+                unit_id = row[1]
+                quantity = row[2]
+                if unit_id.startswith("public_"):
+                    continue
+
+                self.cur.execute(
+                    "SELECT price, maintenance FROM InventoryPricings WHERE item = ?",
+                    (unit_id,),
+                )
+                pricing_result = self.cur.fetchone()
+                price = pricing_result[0] if pricing_result else 0
+                maintenance = pricing_result[1] if pricing_result else 0
+
+                # Get unit name from unit_types, fallback to unit_id if not found
+                unit_name_list = [
+                    name for name, id in unit_types.items() if id == unit_id
+                ]
+                unit_name = unit_name_list[0] if unit_name_list else unit_id
+
+                return_value[unit_name] = {
+                    "quantity": quantity,
+                    "price": price or 0,
+                    "maintenance": maintenance or 0,
+                    "unit_id": unit_id,
+                }
+
+            return return_value
+
+        except Exception as e:
+            print(f"Error getting country units inventory: {e}")
+            return {}
 
     async def get_country_gdp(self, country_id: str):
         """Récupère le PIB d'un pays."""
@@ -2341,12 +2484,6 @@ class Database:
             )
         return results
 
-    async def update_production(self):
-        return
-
-    async def update_development(self):
-        return
-
     async def get_all_salaries(self):
         """Get all salaries in a dict with the country_id as key, and a nested dict as value with the unit_ids and 'total' keys, and the maintenance price as values"""
 
@@ -2371,7 +2508,7 @@ class Database:
                 )
                 maintenance_result = self.cur.fetchone()
                 maintenance = maintenance_result[0] if maintenance_result else 0
-                maintenance = maintenance or 0
+                maintenance = (maintenance * 12) or 0
 
                 # Get unit name from unit_types, fallback to unit_id if not found
                 unit_name_list = [

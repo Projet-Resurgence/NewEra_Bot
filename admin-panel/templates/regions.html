@@ -30,8 +30,10 @@
           <th>ID</th>
           <th>Name</th>
           <th>Country</th>
-          <th>MapChart Name</th>
+          <th>Color</th>
           <th>Population</th>
+          <th>Area (km²)</th>
+          <th>Geographical Area</th>
           <th>Actions</th>
         </tr>
       </thead>
@@ -51,8 +53,34 @@
               <em class="text-muted">Unassigned</em>
             {% endif %}
           </td>
-          <td><code>{{ region.mapchart_name }}</code></td>
+          <td>
+            {% if region.region_color_hex %}
+              <span class="badge" style="background-color: {{ region.region_color_hex }}; color: {% if region.region_color_hex in ['#000000', '#333333'] %}white{% else %}black{% endif %};">
+                {{ region.region_color_hex }}
+              </span>
+            {% else %}
+              <em class="text-muted">No color</em>
+            {% endif %}
+          </td>
           <td><span class="badge bg-info">{{ "{:,}".format(region.population) }}</span></td>
+          <td>
+            {% if region.area %}
+              {{ "{:,.2f}".format(region.area) }}
+            {% else %}
+              <em class="text-muted">Not set</em>
+            {% endif %}
+          </td>
+          <td>
+            {% if region.geographical_area_id %}
+              {% for area in geographical_areas %}
+                {% if area.geographical_area_id|string == region.geographical_area_id|string %}
+                  {{ area.name }}
+                {% endif %}
+              {% endfor %}
+            {% else %}
+              <em class="text-muted">None</em>
+            {% endif %}
+          </td>
           <td>
             <a href="/regions/edit/{{ region.region_id }}" class="btn btn-outline-warning btn-sm">
               <i class="bi bi-pencil"></i>
@@ -61,7 +89,7 @@
         </tr>
         {% else %}
         <tr>
-          <td colspan="6" class="text-center text-muted">No regions found</td>
+          <td colspan="8" class="text-center text-muted">No regions found</td>
         </tr>
         {% endfor %}
       </tbody>

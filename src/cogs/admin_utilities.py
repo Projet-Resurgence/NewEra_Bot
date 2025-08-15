@@ -16,12 +16,15 @@ from datetime import datetime, timedelta, timezone
 from shared_utils import (
     get_db,
     get_discord_utils,
+    CountryEntity,
+    CountryConverter,
     ERROR_COLOR_INT as error_color_int,
 )
 from text_formatting import convert_country_name_channel
 from removebg import RemoveBg
 from dotenv import dotenv_values
 from groq import Groq
+from currency import convert
 
 # Initialize removebg
 removebg_apikey = dotenv_values(".env")["REMOVEBG_API_KEY"]
@@ -877,6 +880,199 @@ class AdminUtilities(commands.Cog):
         await ctx.send(
             embed=embed, file=discord.File("datas/rts_clean.db", filename="rts.db")
         )
+
+    @commands.hybrid_command(
+        name="view_inventory",
+        brief="Affiche l'inventaire complet d'un pays.",
+        usage="view_inventory [country]",
+        description="Affiche l'inventaire détaillé d'un pays (unités, technologies, productions).",
+        help="""Affiche l'inventaire complet d'un pays.
+
+        RESTRICTIONS :
+        - Doit être utilisé dans le canal secret du pays
+        - Les non-staff peuvent seulement voir leur propre pays
+        - Les staff peuvent voir n'importe quel pays
+
+        ARGUMENTS :
+        - `[country]` : Pays à examiner (optionnel, défaut = votre pays)
+
+        INFORMATIONS AFFICHÉES :
+        - Toutes les unités militaires (quantité, prix, maintenance)
+        - Technologies produites et en stock
+        - Productions en cours
+
+        EXEMPLE :
+        - `view_inventory` : Affiche votre inventaire
+        - `view_inventory @France` : Affiche l'inventaire de la France (staff uniquement)
+        """,
+        case_insensitive=True,
+    )
+    async def view_inventory(
+        self,
+        ctx,
+        country: CountryConverter = commands.parameter(
+            description="Pays à examiner (optionnel).", default=None
+        ),
+    ):
+        """Affiche l'inventaire complet d'un pays."""
+        await ctx.defer()
+        # Check if user is staff
+        is_staff = self.dUtils.is_authorized(ctx)
+        
+        # Get the target country
+        if country:
+            target_country = CountryEntity(country, ctx.guild).to_dict()
+        else:
+            target_country = CountryEntity(ctx.author, ctx.guild).to_dict()
+
+        if not target_country or not target_country.get("id"):
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Pays non trouvé ou utilisateur sans pays.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        country_id = target_country["id"]
+        country_name = target_country["name"]
+
+        # Check authorization - non-staff can only view their own country
+        if not is_staff:
+            user_country = CountryEntity(ctx.author, ctx.guild).to_dict()
+            if not user_country or user_country.get("id") != country_id:
+                embed = discord.Embed(
+                    title="❌ Accès refusé",
+                    description="Vous ne pouvez consulter que l'inventaire de votre propre pays.",
+                    color=error_color_int,
+                )
+                return await ctx.send(embed=embed)
+
+        # Check if command is used in secret channel
+        country_data = self.db.get_country_datas(country_id)
+        if not country_data:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Données du pays non trouvées.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        secret_channel_id = country_data.get("secret_channel_id")
+        if str(ctx.channel.id) != str(secret_channel_id):
+            embed = discord.Embed(
+                title="❌ Canal incorrect",
+                description="Cette commande doit être utilisée dans le canal secret du pays.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Get inventory data
+        units_inventory = self.db.get_country_units_inventory(country_id)
+        tech_inventory = self.db.get_country_technology_inventory(country_id)
+        ongoing_productions = self.db.get_country_productions(country_id)
+
+        # Create main embed
+        embed = discord.Embed(
+            title=f"📦 Inventaire de {country_name}",
+            description="Inventaire complet du pays",
+            color=discord.Color.blue(),
+        )
+
+        # Add units section
+        if units_inventory:
+            units_text = []
+            total_maintenance = 0
+            for unit_name, unit_data in units_inventory.items():
+                quantity = unit_data["quantity"]
+                maintenance = unit_data["maintenance"]
+                price = unit_data["price"]
+                unit_maintenance = maintenance * quantity
+                total_maintenance += unit_maintenance
+                
+                units_text.append(
+                    f"**{unit_name}**: {convert(str(quantity))}x (💰 {convert(str(price))}€/unité, 🔧 {convert(str(maintenance))}€/m)"
+                )
+            
+            units_description = "\n".join(units_text[:15])  # Limit to 15 units
+            if len(units_text) > 15:
+                units_description += f"\n... et {len(units_text) - 15} autres unités"
+
+            units_description += f"\n\n**Maintenance totale**: {convert(str(total_maintenance))}€/mois"
+            embed.add_field(
+                name="🪖 Unités militaires",
+                value=units_description or "Aucune unité",
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name="🪖 Unités militaires",
+                value="Aucune unité",
+                inline=False,
+            )
+
+        # Add technology inventory section
+        if tech_inventory:
+            tech_text = []
+            for tech in tech_inventory[:10]:  # Limit to 10 technologies
+                tech_text.append(
+                    f"**{tech['name']}** (Niv.{tech['technology_level']}): {convert(str(tech['quantity']))}x"
+                )
+            
+            tech_description = "\n".join(tech_text)
+            if len(tech_inventory) > 10:
+                tech_description += f"\n... et {len(tech_inventory) - 10} autres technologies"
+            
+            embed.add_field(
+                name="🧪 Technologies en stock",
+                value=tech_description,
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name="🧪 Technologies en stock",
+                value="Aucune technologie",
+                inline=False,
+            )
+
+        # Add ongoing productions section
+        if ongoing_productions:
+            prod_text = []
+            for prod in ongoing_productions[:8]:  # Limit to 8 productions
+                remaining_time = prod.get("months_remaining", prod.get("days_remaining", 0))
+                time_unit = "mois" if "months_remaining" in prod else "jours"
+                prod_text.append(
+                    f"**{prod['tech_name']}** ({prod['region_name']}): {convert(str(prod['quantity']))}x - {convert(str(remaining_time))} {time_unit}"
+                )
+            
+            prod_description = "\n".join(prod_text)
+            if len(ongoing_productions) > 8:
+                prod_description += f"\n... et {len(ongoing_productions) - 8} autres productions"
+            
+            embed.add_field(
+                name="🏭 Productions en cours",
+                value=prod_description,
+                inline=False,
+            )
+        else:
+            embed.add_field(
+                name="🏭 Productions en cours",
+                value="Aucune production",
+                inline=False,
+            )
+
+        # Add current balance
+        balance = int(self.db.get_balance(country_id) or 0)
+        pol_points = int(self.db.get_points(country_id, 1) or 0)
+        diplo_points = int(self.db.get_points(country_id, 2) or 0)
+        
+        embed.add_field(
+            name="💰 Ressources",
+            value=f"**Balance**: {convert(str(balance))}€\n**Points politiques**: {convert(str(pol_points))}\n**Points diplomatiques**: {convert(str(diplo_points))}",
+            inline=True,
+        )
+
+        embed.set_footer(text=f"Consultée par {ctx.author.display_name}")
+        await ctx.send(embed=embed)
 
 
 async def setup(bot):

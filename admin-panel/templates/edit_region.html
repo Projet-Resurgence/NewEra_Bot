@@ -49,14 +49,38 @@
     <div class="row">
       <div class="col-md-6">
         <div class="mb-3">
-          <label for="mapchart_name" class="form-label">MapChart Name *</label>
-          <input type="text" class="form-control" id="mapchart_name" name="mapchart_name" value="{{ region.mapchart_name }}" required>
+          <label for="region_color_hex" class="form-label">Region Color (Hex) *</label>
+          <input type="color" class="form-control form-control-color" id="region_color_hex" name="region_color_hex" value="{{ region.region_color_hex or '#ffffff' }}" required>
+          <div class="form-text">Color used for map visualization</div>
         </div>
       </div>
       <div class="col-md-6">
         <div class="mb-3">
           <label for="population" class="form-label">Population</label>
           <input type="number" class="form-control" id="population" name="population" value="{{ region.population }}" min="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="area" class="form-label">Area (km²)</label>
+          <input type="number" class="form-control" id="area" name="area" value="{{ region.area or 0 }}" min="0" step="0.01">
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="geographical_area_id" class="form-label">Geographical Area</label>
+          <select class="form-select" id="geographical_area_id" name="geographical_area_id">
+            <option value="">No Geographical Area</option>
+            {% for area in geographical_areas %}
+            <option value="{{ area.geographical_area_id }}" {% if area.geographical_area_id|string == region.geographical_area_id|string %}selected{% endif %}>
+              {{ area.name }}
+            </option>
+            {% endfor %}
+          </select>
+          <div class="form-text">Assign region to a geographical area</div>
         </div>
       </div>
     </div>

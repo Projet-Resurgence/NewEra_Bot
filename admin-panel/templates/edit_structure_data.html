@@ -13,9 +13,23 @@
             <option value="Base" {{ 'selected' if structure_data.type == 'Base' }}>Base</option>
             <option value="Ecole" {{ 'selected' if structure_data.type == 'Ecole' }}>Ecole</option>
             <option value="Logement" {{ 'selected' if structure_data.type == 'Logement' }}>Logement</option>
-            <option value="Centrale" {{ 'selected' if structure_data.type == 'Centrale' }}>Centrale</option>
             <option value="Technocentre" {{ 'selected' if structure_data.type == 'Technocentre' }}>Technocentre</option>
         </select>
+    </div>
+    
+    <div class="mb-3">
+        <label for="specialisation" class="form-label">Specialisation</label>
+        <select class="form-control" id="specialisation" name="specialisation" required>
+            <option value="Terrestre" {{ 'selected' if structure_data.specialisation == 'Terrestre' }}>Terrestre</option>
+            <option value="Aerienne" {{ 'selected' if structure_data.specialisation == 'Aerienne' }}>Aerienne</option>
+            <option value="Navale" {{ 'selected' if structure_data.specialisation == 'Navale' }}>Navale</option>
+            <option value="NA" {{ 'selected' if structure_data.specialisation == 'NA' }}>NA</option>
+        </select>
+    </div>
+    
+    <div class="mb-3">
+        <label for="level" class="form-label">Level</label>
+        <input type="number" class="form-control" id="level" name="level" value="{{ structure_data.level }}" min="1" required>
     </div>
     
     <div class="mb-3">

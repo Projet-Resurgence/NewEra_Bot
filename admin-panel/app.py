@@ -127,8 +127,24 @@ class Region(db.Model):
     region_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     country_id = db.Column(db.Integer)
     name = db.Column(db.String, nullable=False)
-    mapchart_name = db.Column(db.String, nullable=False)
+    region_color_hex = db.Column(db.String(8), nullable=False)
     population = db.Column(db.Integer, default=0, nullable=False)
+    area = db.Column(db.Integer, default=0, nullable=False)
+    geographical_area_id = db.Column(db.Integer)
+
+
+class GeographicalArea(db.Model):
+    """Geographical Areas - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "GeographicalAreas"
+
+    geographical_area_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String, nullable=False)
+    delimitation_x_start = db.Column(db.Integer, nullable=False)
+    delimitation_x_end = db.Column(db.Integer, nullable=False)
+    delimitation_y_start = db.Column(db.Integer, nullable=False)
+    delimitation_y_end = db.Column(db.Integer, nullable=False)
 
 
 class Structure(db.Model):
@@ -153,7 +169,6 @@ class Stats(db.Model):
     __tablename__ = "Stats"
 
     country_id = db.Column(db.Integer, primary_key=True)
-    tech_level = db.Column(db.Integer, default=1, nullable=False)
     gdp = db.Column(db.Integer, default=0, nullable=False)
 
 
@@ -179,6 +194,7 @@ class Technology(db.Model):
     type = db.Column(db.String, nullable=False)
     difficulty_rating = db.Column(db.Integer, default=1)
     description = db.Column(db.Text)
+    developed_at_structure_id = db.Column(db.Integer)
     created_at = db.Column(db.String)
 
 
@@ -202,6 +218,7 @@ class StructureData(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     type = db.Column(db.String, nullable=False)
     specialisation = db.Column(db.String, nullable=False)
+    level = db.Column(db.Integer, nullable=False)
     capacity = db.Column(db.Integer, default=0, nullable=False)
     population = db.Column(db.Integer, default=0, nullable=False)
     cout_construction = db.Column(db.Integer, nullable=False)
@@ -216,7 +233,7 @@ class StructureProduction(db.Model):
     structure_id = db.Column(db.Integer, primary_key=True)
     tech_id = db.Column(db.Integer, primary_key=True)
     quantity = db.Column(db.Integer, nullable=False)
-    days_remaining = db.Column(db.Integer, nullable=False)
+    months_remaining = db.Column(db.Integer, nullable=False)
     started_at = db.Column(db.String)
 
 
@@ -280,7 +297,7 @@ class CountryTechnologyProduction(db.Model):
     country_id = db.Column(db.Integer, nullable=False)
     tech_id = db.Column(db.Integer, nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
-    days_remaining = db.Column(db.Integer, nullable=False)
+    months_remaining = db.Column(db.Integer, nullable=False)
     started_at = db.Column(db.String)
 
 
@@ -402,6 +419,8 @@ class Treaty(db.Model):
     start_date = db.Column(db.String, nullable=False)
     end_date = db.Column(db.String)
     status = db.Column(db.String(20), nullable=False)
+    is_public = db.Column(db.Boolean, default=True, nullable=False)
+    message_url = db.Column(db.Text)
 
 
 class Alliance(db.Model):
@@ -418,6 +437,18 @@ class Alliance(db.Model):
     end_date = db.Column(db.String)
     alliance_type = db.Column(db.String(50), nullable=False)
     status = db.Column(db.String(20), nullable=False)
+    message_url = db.Column(db.Text)
+    is_public = db.Column(db.Boolean, default=True, nullable=False)
+
+
+class AllianceAppartenance(db.Model):
+    """Alliance Appartenance - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "AlliancesAppartenance"
+
+    alliance_id = db.Column(db.Integer, primary_key=True)
+    country_id = db.Column(db.Integer, primary_key=True)
 
 
 class WarDeclaration(db.Model):
@@ -431,6 +462,107 @@ class WarDeclaration(db.Model):
     country_b = db.Column(db.Integer, nullable=False)
     declaration_date = db.Column(db.String, nullable=False)
     status = db.Column(db.String(20), nullable=False)
+    is_public = db.Column(db.Boolean, default=True, nullable=False)
+    message_url = db.Column(db.Text)
+
+
+# New models for structures schema
+class TechnocentreDevelopment(db.Model):
+    """Technocentre Development - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "TechnocentreDevelopment"
+
+    development_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    structure_id = db.Column(db.Integer, nullable=False)
+    tech_id = db.Column(db.Integer, nullable=False)
+    country_id = db.Column(db.Integer, nullable=False)
+    end_date = db.Column(db.String(20), nullable=False)
+    total_development_time = db.Column(db.Integer, nullable=False)
+    development_cost = db.Column(db.Integer, nullable=False)
+    started_at = db.Column(db.String)
+
+
+class TechnologyBoost(db.Model):
+    """Technology Boosts - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "TechnologyBoosts"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    tech_level = db.Column(db.Integer, nullable=False, unique=True)
+    boost_coefficient = db.Column(db.Float, default=1.0, nullable=False)
+
+
+class Infrastructure(db.Model):
+    """Infrastructure - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "Infrastructure"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    region_id = db.Column(db.Integer, nullable=False)
+    type = db.Column(db.String, nullable=False)
+    length_km = db.Column(db.Float, default=0, nullable=False)
+    cost_per_km = db.Column(db.Integer, nullable=False)
+    total_cost = db.Column(db.Integer, nullable=False)
+
+
+class InfrastructureType(db.Model):
+    """Infrastructure Types - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "InfrastructureTypes"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    type = db.Column(db.String, nullable=False, unique=True)
+    cost_per_km = db.Column(db.Integer, nullable=False)
+
+
+class PowerPlant(db.Model):
+    """Power Plants - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "PowerPlants"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    region_id = db.Column(db.Integer, nullable=False)
+    type = db.Column(db.String, nullable=False)
+    level = db.Column(db.Integer, nullable=False)
+    built_at = db.Column(db.String)
+
+
+class PowerPlantData(db.Model):
+    """Power Plant Data - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "PowerPlantsDatas"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    type = db.Column(db.String, nullable=False)
+    level = db.Column(db.Integer, nullable=False)
+    production_mwh = db.Column(db.Integer, nullable=False)
+    construction_cost = db.Column(db.Integer, nullable=False)
+    danger_rate = db.Column(db.Float, default=0)
+    resource_type = db.Column(db.String)
+    resource_consumption = db.Column(db.Float, default=0)
+    price_per_mwh = db.Column(db.Float, nullable=False)
+
+
+class HousingData(db.Model):
+    """Housing Data - stored in game database"""
+
+    __bind_key__ = "game"
+    __tablename__ = "HousingDatas"
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    density_type = db.Column(db.String, nullable=False)
+    density_multiplier = db.Column(db.Float, nullable=False)
+    style_type = db.Column(db.String, nullable=False)
+    style_multiplier = db.Column(db.Float, nullable=False)
+    quality_type = db.Column(db.String, nullable=False)
+    quality_multiplier = db.Column(db.Float, nullable=False)
+    base_cost_per_person = db.Column(db.Integer, nullable=False)
 
 
 # Authentication decorators
@@ -882,7 +1014,8 @@ def edit_inventory(country_id):
 def regions():
     regions = Region.query.all()
     countries = Country.query.all()
-    return render_template("regions.html", regions=regions, countries=countries)
+    geographical_areas = GeographicalArea.query.all()
+    return render_template("regions.html", regions=regions, countries=countries, geographical_areas=geographical_areas)
 
 
 @app.route("/regions/add", methods=["GET", "POST"])
@@ -893,8 +1026,10 @@ def add_region():
             region = Region(
                 country_id=request.form["country_id"] or None,
                 name=request.form["name"],
-                mapchart_name=request.form["mapchart_name"],
+                region_color_hex=request.form["region_color_hex"],
                 population=int(request.form["population"]),
+                area=int(request.form["area"]) if request.form["area"] else 0,
+                geographical_area_id=request.form["geographical_area_id"] or None,
             )
             db.session.add(region)
             db.session.commit()
@@ -903,7 +1038,8 @@ def add_region():
         except Exception as e:
             flash(f"Error: {str(e)}", "error")
     countries = Country.query.all()
-    return render_template("add_region.html", countries=countries)
+    geographical_areas = GeographicalArea.query.all()
+    return render_template("add_region.html", countries=countries, geographical_areas=geographical_areas)
 
 
 @app.route("/regions/edit/<int:region_id>", methods=["GET", "POST"])
@@ -914,15 +1050,79 @@ def edit_region(region_id):
         try:
             region.country_id = request.form["country_id"] or None
             region.name = request.form["name"]
-            region.mapchart_name = request.form["mapchart_name"]
+            region.region_color_hex = request.form["region_color_hex"]
             region.population = int(request.form["population"])
+            region.area = int(request.form["area"]) if request.form["area"] else 0
+            region.geographical_area_id = request.form["geographical_area_id"] or None
             db.session.commit()
             flash("Region updated successfully!", "success")
             return redirect("/regions")
         except Exception as e:
             flash(f"Error: {str(e)}", "error")
     countries = Country.query.all()
-    return render_template("edit_region.html", region=region, countries=countries)
+    geographical_areas = GeographicalArea.query.all()
+    return render_template("edit_region.html", region=region, countries=countries, geographical_areas=geographical_areas)
+
+
+# Geographical Areas routes
+@app.route("/geographical-areas")
+@login_required
+def geographical_areas():
+    areas = GeographicalArea.query.all()
+    return render_template("geographical_areas.html", areas=areas)
+
+
+@app.route("/geographical-areas/add", methods=["GET", "POST"])
+@login_required
+def add_geographical_area():
+    if request.method == "POST":
+        try:
+            area = GeographicalArea(
+                name=request.form["name"],
+                delimitation_x_start=int(request.form["delimitation_x_start"]),
+                delimitation_x_end=int(request.form["delimitation_x_end"]),
+                delimitation_y_start=int(request.form["delimitation_y_start"]),
+                delimitation_y_end=int(request.form["delimitation_y_end"]),
+            )
+            db.session.add(area)
+            db.session.commit()
+            flash("Geographical area added successfully!", "success")
+            return redirect("/geographical-areas")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    return render_template("add_geographical_area.html")
+
+
+@app.route("/geographical-areas/edit/<int:area_id>", methods=["GET", "POST"])
+@login_required
+def edit_geographical_area(area_id):
+    area = GeographicalArea.query.get_or_404(area_id)
+    if request.method == "POST":
+        try:
+            area.name = request.form["name"]
+            area.delimitation_x_start = int(request.form["delimitation_x_start"])
+            area.delimitation_x_end = int(request.form["delimitation_x_end"])
+            area.delimitation_y_start = int(request.form["delimitation_y_start"])
+            area.delimitation_y_end = int(request.form["delimitation_y_end"])
+            db.session.commit()
+            flash("Geographical area updated successfully!", "success")
+            return redirect("/geographical-areas")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    return render_template("edit_geographical_area.html", area=area)
+
+
+@app.route("/geographical-areas/delete/<int:area_id>", methods=["POST"])
+@login_required
+def delete_geographical_area(area_id):
+    try:
+        area = GeographicalArea.query.get_or_404(area_id)
+        db.session.delete(area)
+        db.session.commit()
+        flash("Geographical area deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/geographical-areas")
 
 
 # Structures routes
@@ -975,6 +1175,13 @@ def add_technology():
         try:
             technology = Technology(
                 name=request.form["name"],
+                cost=int(request.form.get("cost", 0)),
+                specialisation=request.form["specialisation"],
+                development_time=int(request.form.get("development_time", 0)),
+                development_cost=int(request.form.get("development_cost", 0)),
+                slots_taken=float(request.form.get("slots_taken", 1.0)),
+                original_name=request.form["original_name"],
+                technology_level=int(request.form.get("technology_level", 1)),
                 image_url=request.form["image_url"] or None,
                 developed_by=(
                     int(request.form["developed_by"])
@@ -982,8 +1189,16 @@ def add_technology():
                     else None
                 ),
                 exported=bool(request.form.get("exported")),
+                is_secret=bool(request.form.get("is_secret")),
                 type=request.form["type"],
+                difficulty_rating=int(request.form.get("difficulty_rating", 1)),
                 description=request.form["description"] or None,
+                developed_at_structure_id=(
+                    int(request.form["developed_at_structure_id"])
+                    if request.form["developed_at_structure_id"]
+                    else None
+                ),
+                created_at=request.form.get("created_at", str(datetime.now())),
             )
             db.session.add(technology)
             db.session.commit()
@@ -992,7 +1207,8 @@ def add_technology():
         except Exception as e:
             flash(f"Error: {str(e)}", "error")
     countries = Country.query.all()
-    return render_template("add_technology.html", countries=countries)
+    structures = Structure.query.all()
+    return render_template("add_technology.html", countries=countries, structures=structures)
 
 
 # Doctrines Management
@@ -1091,6 +1307,8 @@ def add_structure_data():
         try:
             structure_data = StructureData(
                 type=request.form["type"],
+                specialisation=request.form["specialisation"],
+                level=int(request.form["level"]),
                 capacity=int(request.form["capacity"]),
                 population=int(request.form["population"]),
                 cout_construction=int(request.form["cout_construction"]),
@@ -1111,6 +1329,8 @@ def edit_structure_data(structure_id):
     if request.method == "POST":
         try:
             structure_data.type = request.form["type"]
+            structure_data.specialisation = request.form["specialisation"]
+            structure_data.level = int(request.form["level"])
             structure_data.capacity = int(request.form["capacity"])
             structure_data.population = int(request.form["population"])
             structure_data.cout_construction = int(request.form["cout_construction"])
@@ -1159,7 +1379,7 @@ def add_structure_production():
                 structure_id=int(request.form["structure_id"]),
                 tech_id=int(request.form["tech_id"]),
                 quantity=int(request.form["quantity"]),
-                days_remaining=int(request.form["days_remaining"]),
+                months_remaining=int(request.form["months_remaining"]),
                 started_at=request.form["started_at"] or None,
             )
             db.session.add(production)
@@ -1448,7 +1668,7 @@ def add_country_tech_production():
                 country_id=int(request.form["country_id"]),
                 tech_id=int(request.form["tech_id"]),
                 quantity=int(request.form["quantity"]),
-                days_remaining=int(request.form["days_remaining"]),
+                months_remaining=int(request.form["months_remaining"]),
                 started_at=request.form["started_at"] or None,
             )
             db.session.add(production)
@@ -2167,6 +2387,8 @@ def add_treaty():
                 start_date=request.form["start_date"],
                 end_date=request.form["end_date"] if request.form["end_date"] else None,
                 status=request.form["status"],
+                is_public=bool(request.form.get("is_public")),
+                message_url=request.form["message_url"] if request.form["message_url"] else None,
             )
             db.session.add(treaty)
             db.session.commit()
@@ -2193,6 +2415,8 @@ def edit_treaty(treaty_id):
                 request.form["end_date"] if request.form["end_date"] else None
             )
             treaty.status = request.form["status"]
+            treaty.is_public = bool(request.form.get("is_public"))
+            treaty.message_url = request.form["message_url"] if request.form["message_url"] else None
             db.session.commit()
             flash("Treaty updated successfully!", "success")
             return redirect("/treaties")
@@ -2239,6 +2463,8 @@ def add_alliance():
                 end_date=request.form["end_date"] if request.form["end_date"] else None,
                 alliance_type=request.form["alliance_type"],
                 status=request.form["status"],
+                message_url=request.form["message_url"] if request.form["message_url"] else None,
+                is_public=bool(request.form.get("is_public")),
             )
             db.session.add(alliance)
             db.session.commit()
@@ -2266,6 +2492,8 @@ def edit_alliance(alliance_id):
             )
             alliance.alliance_type = request.form["alliance_type"]
             alliance.status = request.form["status"]
+            alliance.message_url = request.form["message_url"] if request.form["message_url"] else None
+            alliance.is_public = bool(request.form.get("is_public"))
             db.session.commit()
             flash("Alliance updated successfully!", "success")
             return redirect("/alliances")
@@ -2308,6 +2536,7 @@ def add_war_declaration():
                 country_a=int(request.form["country_a"]),
                 country_b=int(request.form["country_b"]),
                 declaration_date=request.form["declaration_date"],
+                message_url=request.form["message_url"] if request.form["message_url"] else None,
                 status=request.form["status"],
             )
             db.session.add(war)
@@ -2330,6 +2559,7 @@ def edit_war_declaration(war_id):
             war.country_a = int(request.form["country_a"])
             war.country_b = int(request.form["country_b"])
             war.declaration_date = request.form["declaration_date"]
+            war.message_url = request.form["message_url"] if request.form["message_url"] else None
             war.status = request.form["status"]
             db.session.commit()
             flash("War declaration updated successfully!", "success")
@@ -2352,6 +2582,97 @@ def delete_war_declaration(war_id):
     except Exception as e:
         flash(f"Error: {str(e)}", "error")
     return redirect("/war_declarations")
+
+
+# Technocentre Development routes
+@app.route("/technocentre-development")
+@login_required
+def technocentre_development():
+    """List all technocentre developments."""
+    developments = TechnocentreDevelopment.query.all()
+    countries = Country.query.all()
+    structures = Structure.query.filter_by(type='Technocentre').all()
+    technologies = Technology.query.all()
+    return render_template("technocentre_development.html", 
+                         developments=developments, 
+                         countries=countries, 
+                         structures=structures, 
+                         technologies=technologies)
+
+
+@app.route("/technocentre-development/add", methods=["GET", "POST"])
+@login_required
+def add_technocentre_development():
+    """Add new technocentre development."""
+    if request.method == "POST":
+        try:
+            development = TechnocentreDevelopment(
+                structure_id=int(request.form["structure_id"]),
+                tech_id=int(request.form["tech_id"]),
+                country_id=int(request.form["country_id"]),
+                end_date=request.form["end_date"],
+                total_development_time=int(request.form["total_development_time"]),
+                development_cost=int(request.form["development_cost"]),
+                started_at=request.form.get("started_at", str(datetime.now())),
+            )
+            db.session.add(development)
+            db.session.commit()
+            flash("Technocentre development added successfully!", "success")
+            return redirect("/technocentre-development")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    
+    countries = Country.query.all()
+    structures = Structure.query.filter_by(type='Technocentre').all()
+    technologies = Technology.query.all()
+    return render_template("add_technocentre_development.html", 
+                         countries=countries, 
+                         structures=structures, 
+                         technologies=technologies)
+
+
+@app.route("/technocentre-development/edit/<int:development_id>", methods=["GET", "POST"])
+@login_required
+def edit_technocentre_development(development_id):
+    """Edit technocentre development."""
+    development = TechnocentreDevelopment.query.get_or_404(development_id)
+    if request.method == "POST":
+        try:
+            development.structure_id = int(request.form["structure_id"])
+            development.tech_id = int(request.form["tech_id"])
+            development.country_id = int(request.form["country_id"])
+            development.end_date = request.form["end_date"]
+            development.total_development_time = int(request.form["total_development_time"])
+            development.development_cost = int(request.form["development_cost"])
+            development.started_at = request.form.get("started_at", development.started_at)
+            db.session.commit()
+            flash("Technocentre development updated successfully!", "success")
+            return redirect("/technocentre-development")
+        except Exception as e:
+            flash(f"Error: {str(e)}", "error")
+    
+    countries = Country.query.all()
+    structures = Structure.query.filter_by(type='Technocentre').all()
+    technologies = Technology.query.all()
+    return render_template("edit_technocentre_development.html", 
+                         development=development,
+                         countries=countries, 
+                         structures=structures, 
+                         technologies=technologies)
+
+
+@app.route("/technocentre-development/delete/<int:development_id>", methods=["POST"])
+@login_required
+def delete_technocentre_development(development_id):
+    """Delete technocentre development."""
+    try:
+        development = TechnocentreDevelopment.query.get_or_404(development_id)
+        db.session.delete(development)
+        db.session.commit()
+        flash("Technocentre development deleted successfully!", "success")
+    except Exception as e:
+        flash(f"Error: {str(e)}", "error")
+    return redirect("/technocentre-development")
 
 
 @app.route("/settings/pause-toggle", methods=["POST"])

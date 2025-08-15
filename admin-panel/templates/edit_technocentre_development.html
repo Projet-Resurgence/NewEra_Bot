@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+
+{% block title %}Edit Technocentre Development{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Edit Technocentre Development</h5>
+                    <a href="/technocentre-development" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> Back to List
+                    </a>
+                </div>
+                <div class="card-body">
+                    <form method="POST">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="structure_id" class="form-label">Technocentre Structure</label>
+                                    <select class="form-select" id="structure_id" name="structure_id" required>
+                                        <option value="">Select Technocentre</option>
+                                        {% for structure in structures %}
+                                        <option value="{{ structure.id }}" {% if structure.id == development.structure_id %}selected{% endif %}>
+                                            {{ structure.type }} - Level {{ structure.level }} - ID: {{ structure.id }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="tech_id" class="form-label">Technology</label>
+                                    <select class="form-select" id="tech_id" name="tech_id" required>
+                                        <option value="">Select Technology</option>
+                                        {% for tech in technologies %}
+                                        <option value="{{ tech.tech_id }}" {% if tech.tech_id == development.tech_id %}selected{% endif %}>
+                                            {{ tech.name }} ({{ tech.type }})
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="country_id" class="form-label">Developing Country</label>
+                            <select class="form-select" id="country_id" name="country_id" required>
+                                <option value="">Select Country</option>
+                                {% for country in countries %}
+                                <option value="{{ country.country_id }}" {% if country.country_id == development.country_id %}selected{% endif %}>
+                                    {{ country.name }}
+                                </option>
+                                {% endfor %}
+                            </select>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="end_date" class="form-label">End Date</label>
+                                    <input type="date" class="form-control" id="end_date" name="end_date" 
+                                           value="{{ development.end_date }}" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="total_development_time" class="form-label">Total Development Time (days)</label>
+                                    <input type="number" class="form-control" id="total_development_time" 
+                                           name="total_development_time" value="{{ development.total_development_time }}" 
+                                           min="1" required>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="development_cost" class="form-label">Development Cost</label>
+                                    <input type="number" class="form-control" id="development_cost" 
+                                           name="development_cost" value="{{ development.development_cost }}" 
+                                           min="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="started_at" class="form-label">Started At</label>
+                                    <input type="text" class="form-control" id="started_at" 
+                                           name="started_at" value="{{ development.started_at or '' }}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a href="/technocentre-development" class="btn btn-secondary me-md-2">Cancel</a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-save"></i> Update Development
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

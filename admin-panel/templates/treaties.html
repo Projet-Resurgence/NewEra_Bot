@@ -30,6 +30,8 @@
                     <th>Start Date</th>
                     <th>End Date</th>
                     <th>Status</th>
+                    <th>Public</th>
+                    <th>Message</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -58,6 +60,20 @@
                         <span class="badge {% if treaty.status == 'active' %}bg-success{% elif treaty.status == 'expired' %}bg-warning{% else %}bg-danger{% endif %}">
                             {{ treaty.status }}
                         </span>
+                    </td>
+                    <td>
+                        <span class="badge {% if treaty.is_public %}bg-success{% else %}bg-secondary{% endif %}">
+                            {% if treaty.is_public %}Public{% else %}Private{% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        {% if treaty.message_url %}
+                            <a href="{{ treaty.message_url }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-external-link-alt"></i>
+                            </a>
+                        {% else %}
+                            <em class="text-muted">None</em>
+                        {% endif %}
                     </td>
                     <td>
                         <div class="btn-group btn-group-sm" role="group">

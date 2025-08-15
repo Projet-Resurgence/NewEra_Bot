@@ -17,7 +17,7 @@
                 <th>Technology ID</th>
                 <th>Technology</th>
                 <th>Quantity</th>
-                <th>Days Remaining</th>
+                <th>Months Remaining</th>
                 <th>Started At</th>
                 <th>Actions</th>
             </tr>
@@ -42,7 +42,7 @@
                     {% endfor %}
                 </td>
                 <td>{{ production.quantity }}</td>
-                <td>{{ production.days_remaining }}</td>
+                <td>{{ production.months_remaining }}</td>
                 <td>{{ production.started_at or 'N/A' }}</td>
                 <td>
                     <form method="POST" action="/structure-production/delete/{{ production.structure_id }}/{{ production.tech_id }}" style="display: inline;" onsubmit="return confirm('Are you sure?')">

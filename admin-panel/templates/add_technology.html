@@ -33,9 +33,72 @@
       </div>
       <div class="col-md-6">
         <div class="mb-3">
+          <label for="original_name" class="form-label">Original Name *</label>
+          <input type="text" class="form-control" id="original_name" name="original_name" required>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
           <label for="type" class="form-label">Technology Type *</label>
           <input type="text" class="form-control" id="type" name="type" required>
           <div class="form-text">e.g., rifle, ship, engine, software, etc.</div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="specialisation" class="form-label">Specialisation *</label>
+          <select class="form-select" id="specialisation" name="specialisation" required>
+            <option value="">Select Specialisation</option>
+            <option value="Terrestre">Terrestre</option>
+            <option value="Aerienne">Aerienne</option>
+            <option value="Navale">Navale</option>
+            <option value="NA">NA</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label for="cost" class="form-label">Production Cost</label>
+          <input type="number" class="form-control" id="cost" name="cost" value="0" min="0">
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label for="development_cost" class="form-label">Development Cost</label>
+          <input type="number" class="form-control" id="development_cost" name="development_cost" value="0" min="0">
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label for="development_time" class="form-label">Development Time (days)</label>
+          <input type="number" class="form-control" id="development_time" name="development_time" value="0" min="0">
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label for="technology_level" class="form-label">Technology Level *</label>
+          <input type="number" class="form-control" id="technology_level" name="technology_level" value="1" min="1" max="11" required>
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label for="slots_taken" class="form-label">Slots Taken</label>
+          <input type="number" class="form-control" id="slots_taken" name="slots_taken" value="1.0" step="0.1" min="0.1">
+        </div>
+      </div>
+      <div class="col-md-4">
+        <div class="mb-3">
+          <label for="difficulty_rating" class="form-label">Difficulty Rating</label>
+          <input type="number" class="form-control" id="difficulty_rating" name="difficulty_rating" value="1" min="1" max="10">
         </div>
       </div>
     </div>
@@ -54,18 +117,52 @@
       </div>
       <div class="col-md-6">
         <div class="mb-3">
-          <label for="image_url" class="form-label">Image URL</label>
-          <input type="url" class="form-control" id="image_url" name="image_url">
+          <label for="developed_at_structure_id" class="form-label">Developed At Structure</label>
+          <select class="form-select" id="developed_at_structure_id" name="developed_at_structure_id">
+            <option value="">Select Structure</option>
+            {% for structure in structures %}
+            <option value="{{ structure.id }}">{{ structure.type }} - ID: {{ structure.id }}</option>
+            {% endfor %}
+          </select>
         </div>
       </div>
     </div>
 
-    <div class="mb-3">
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="exported" name="exported">
-        <label class="form-check-label" for="exported">
-          Available for Export
-        </label>
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="image_url" class="form-label">Image URL</label>
+          <input type="url" class="form-control" id="image_url" name="image_url">
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <label for="created_at" class="form-label">Created At</label>
+          <input type="text" class="form-control" id="created_at" name="created_at" placeholder="Auto-generated if empty">
+        </div>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-6">
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="exported" name="exported">
+            <label class="form-check-label" for="exported">
+              Available for Export
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-6">
+        <div class="mb-3">
+          <div class="form-check">
+            <input class="form-check-input" type="checkbox" id="is_secret" name="is_secret">
+            <label class="form-check-label" for="is_secret">
+              Secret Technology
+            </label>
+          </div>
+        </div>
       </div>
     </div>
 

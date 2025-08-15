@@ -28,6 +28,8 @@
                     <th>Defender</th>
                     <th>Declaration Date</th>
                     <th>Status</th>
+                    <th>Public</th>
+                    <th>Message</th>
                     <th>Actions</th>
                 </tr>
             </thead>
@@ -54,6 +56,20 @@
                         <span class="badge {% if war.status == 'active' %}bg-danger{% elif war.status == 'resolved' %}bg-success{% else %}bg-secondary{% endif %}">
                             {{ war.status }}
                         </span>
+                    </td>
+                    <td>
+                        <span class="badge {% if war.is_public %}bg-success{% else %}bg-secondary{% endif %}">
+                            {% if war.is_public %}Public{% else %}Private{% endif %}
+                        </span>
+                    </td>
+                    <td>
+                        {% if war.message_url %}
+                            <a href="{{ war.message_url }}" target="_blank" class="btn btn-outline-primary btn-sm">
+                                <i class="fas fa-external-link-alt"></i>
+                            </a>
+                        {% else %}
+                            <em class="text-muted">None</em>
+                        {% endif %}
                     </td>
                     <td>
                         <div class="btn-group btn-group-sm" role="group">

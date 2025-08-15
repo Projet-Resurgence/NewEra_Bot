@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+
+{% block title %}Technocentre Development{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Technocentre Development</h2>
+        <a href="/technocentre-development/add" class="btn btn-primary">Add Development</a>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            {% for category, message in messages %}
+                <div class="alert alert-{{ 'danger' if category == 'error' else 'success' }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        {% endif %}
+    {% endwith %}
+
+    <div class="table-responsive">
+        <table class="table table-striped table-hover">
+            <thead class="table-dark">
+                <tr>
+                    <th>ID</th>
+                    <th>Structure</th>
+                    <th>Technology</th>
+                    <th>Country</th>
+                    <th>End Date</th>
+                    <th>Development Time</th>
+                    <th>Development Cost</th>
+                    <th>Started At</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for development in developments %}
+                <tr>
+                    <td>{{ development.development_id }}</td>
+                    <td>
+                        {% for structure in structures %}
+                            {% if structure.id == development.structure_id %}
+                                {{ structure.type }} - ID: {{ structure.id }}
+                            {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>
+                        {% for tech in technologies %}
+                            {% if tech.tech_id == development.tech_id %}
+                                {{ tech.name }}
+                            {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>
+                        {% for country in countries %}
+                            {% if country.country_id == development.country_id %}
+                                {{ country.name }}
+                            {% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>{{ development.end_date }}</td>
+                    <td>{{ development.total_development_time }} days</td>
+                    <td>{{ "{:,}".format(development.development_cost) }}</td>
+                    <td>{{ development.started_at or 'N/A' }}</td>
+                    <td>
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="/technocentre-development/edit/{{ development.development_id }}" class="btn btn-outline-primary" title="Edit">
+                                <i class="fas fa-edit"></i>
+                            </a>
+                            <form method="POST" action="/technocentre-development/delete/{{ development.development_id }}" style="display: inline;" onsubmit="return confirm('Are you sure you want to delete this development?')">
+                                <button type="submit" class="btn btn-outline-danger" title="Delete">
+                                    <i class="fas fa-trash"></i>
+                                </button>
+                            </form>
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="9" class="text-center">No technocentre developments found.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

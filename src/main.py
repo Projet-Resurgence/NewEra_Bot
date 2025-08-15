@@ -235,67 +235,61 @@ async def polling_notion():
     except Exception as e:
         print(f"Erreur lors du polling Notion: {e}")
 
+
 async def update_map():
     return
 
-@tasks.loop(hours=1)
-async def daily_update():
-    current_hour = datetime.now(pytz.timezone("Europe/Paris")).hour
-    if current_hour != 6:
-        return
-    if db.get_setting("is_paused"):
-        return
-    await db.update_production()
-    await db.update_development()
-    await update_map()
 
-@tasks.loop(seconds=5)
+RP_UPDATE_INTERVAL = 60
+# RP_UPDATE_INTERVAL = 5
+
+@tasks.loop(seconds=RP_UPDATE_INTERVAL)
 async def update_rp_date():
     now = datetime.now(pytz.timezone("Europe/Paris"))  # ou "UTC"
-    # if now.hour == 7 and now.minute == 0:
-    if True:
-        # Advance the playday
-        await db.advance_playday(bot)
-
-        # Process production cycle
-        completed_productions = db.process_production_cycle()
-
-
-        if db.is_paused() or db.get_current_date().get('playday') != 1:
-            return
-        # Notify countries of completed productions
-        for production in completed_productions:
-            print(f"Production completed for country {production['country_id']}: {production['quantity']}x {production['tech_name']}")
-            try:
-                country_data = db.get_country_datas(production["country_id"])
-                if country_data and country_data.get("secret_channel_id"):
-                    channel = bot.get_channel(int(country_data["secret_channel_id"]))
-                    if channel:
-                        embed = discord.Embed(
-                            title="🏭 Production Completed!",
-                            description=f"**{production['quantity']}x {production['tech_name']}** has been completed and added to your inventory.",
-                            color=factory_color_int,
-                        )
-                        embed.add_field(
-                            name="Technology Type",
-                            value=production["tech_type"],
-                            inline=True,
-                        )
-                        embed.add_field(
-                            name="Structure ID",
-                            value=production["structure_id"],
-                            inline=True,
-                        )
-                        embed.add_field(
-                            name="Quantity",
-                            value=f"{production['quantity']:,}",
-                            inline=True,
-                        )
-                        await channel.send(embed=embed)
-            except Exception as e:
-                print(
-                    f"Error notifying country {production['country_id']} of completed production: {e}"
+    if not (now.hour == 7 and now.minute == 0):
+        return
+    await db.advance_playday(bot)
+    # Process production cycle
+    if not db.is_paused:
+        await update_map()
+    if db.is_paused() or db.get_current_date().get("playday") != 1:
+        return
+    completed_productions = db.process_production_cycle()
+    for production in completed_productions:
+        print(
+            f"Production completed for country {production['country_id']}: {production['quantity']}x {production['tech_name']}"
+        )
+        try:
+            country_data = db.get_country_datas(production["country_id"])
+            if country_data and country_data.get("secret_channel_id"):
+                channel = bot.get_channel(int(country_data["secret_channel_id"]))
+                if not channel:
+                    return
+                embed = discord.Embed(
+                    title="🏭 Production Completed!",
+                    description=f"**{convert(str(production['quantity']))}x {production['tech_name']}** has been completed and added to your inventory.",
+                    color=factory_color_int,
                 )
+                embed.add_field(
+                    name="Technology Type",
+                    value=production["tech_type"],
+                    inline=True,
+                )
+                embed.add_field(
+                    name="Structure ID",
+                    value=production["structure_id"],
+                    inline=True,
+                )
+                embed.add_field(
+                    name="Quantity",
+                    value=f"{convert(str(production['quantity'])):,}",
+                    inline=True,
+                )
+                await channel.send(embed=embed)
+        except Exception as e:
+            print(
+                f"Error notifying country {production['country_id']} of completed production: {e}"
+            )
 
 
 @update_rp_date.before_loop
@@ -408,7 +402,7 @@ async def date(ctx):
     )
 
 
-async def log_to_intel(bot, message, image = None):
+async def log_to_intel(bot, message, image=None):
     chan = bot.get_channel(int(db.get_setting("intelligence_channel_id")))
     if chan:
         await chan.send(message, file=image)
@@ -424,7 +418,11 @@ async def on_user_update(before: discord.User, after: discord.User):
                 f"📝 **Pseudo modifié** : `{before.name}` → `{after.name}` ({after.id})",
             )
         if before.avatar != after.avatar:
-            await log_to_intel(bot, f"🖼️ **Avatar modifié** : {after.name} ({after.id})", image=after.avatar)
+            await log_to_intel(
+                bot,
+                f"🖼️ **Avatar modifié** : {after.name} ({after.id})",
+                image=after.avatar,
+            )
 
 
 # 2️⃣ Log messages supprimés (gravité ≥ 2)
@@ -436,6 +434,7 @@ async def on_message_delete(message: discord.Message):
             bot,
             f"🗑️ **Message supprimé** de {message.author} ({message.author.id})\n```{message.content}```",
         )
+
 
 # 3️⃣ Log messages modifiés (gravité ≥ 2)
 @bot.event
