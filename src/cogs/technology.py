@@ -1191,7 +1191,7 @@ class Technology(commands.Cog):
                     )
                 else:
                     progress = (
-                        (dev["total_development_time"] - dev["days_remaining"])
+                        (dev["total_development_time"] - dev["months_remaining"])
                         / dev["total_development_time"]
                     ) * 100
                     embed = discord.Embed(
@@ -1201,7 +1201,7 @@ class Technology(commands.Cog):
                     )
                     embed.add_field(
                         name="Progression",
-                        value=f"{progress:.1f}% ({dev['days_remaining']} jours restants)",
+                        value=f"{progress:.1f}% ({dev['months_remaining']} mois restants)",
                         inline=True,
                     )
                     embed.add_field(
@@ -1228,12 +1228,12 @@ class Technology(commands.Cog):
 
                 for dev in developments[:10]:  # Limit to 10 to avoid embed size issues
                     progress = (
-                        (dev["total_development_time"] - dev["days_remaining"])
+                        (dev["total_development_time"] - dev["months_remaining"])
                         / dev["total_development_time"]
                     ) * 100
                     embed.add_field(
                         name=f"🏢 {dev['region_name']} (#{dev['structure_id']})",
-                        value=f"**{dev['tech_name']}**\n{progress:.1f}% - {dev['days_remaining']} jours restants",
+                        value=f"**{dev['tech_name']}**\n{progress:.1f}% - {dev['months_remaining']} jours restants",
                         inline=True,
                     )
 
@@ -1920,12 +1920,12 @@ class Technology(commands.Cog):
             for prod in productions[:10]:  # Limit to 10 to avoid embed size issues
                 tech_name = prod.get("tech_name", "Technologie inconnue")
                 quantity = prod.get("quantity", 0)
-                days_remaining = prod.get("days_remaining", 0)
+                months_remaining = prod.get("months_remaining", 0)
                 structure_id = prod.get("structure_id", "N/A")
 
                 embed.add_field(
                     name=f"🏢 Usine #{structure_id}",
-                    value=f"**{tech_name}**\nQuantité: {quantity}\nTemps restant: {days_remaining} jours",
+                    value=f"**{tech_name}**\nQuantité: {quantity}\nTemps restant: {months_remaining} mois",
                     inline=True,
                 )
 

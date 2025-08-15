@@ -61,7 +61,7 @@ SELECT
     c.name AS country_name,
     t.name AS technology_name,
     p.quantity,
-    p.days_remaining,
+    p.months_remaining,
     p.started_at
 FROM CountryTechnologyProduction p
 JOIN Countries c ON p.country_id = c.country_id

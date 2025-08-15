@@ -20,10 +20,10 @@ db = None
 dUtils = None
 
 
-def initialize_utilities(bot, bat_types, bat_buffs):
+def initialize_utilities(bot, bat_types, bat_buffs, unit_types):
     """Initialize all utility instances with the bot instance."""
     global db, dUtils
-    uDatas = UsefulDatas(bat_types, bat_buffs)
+    uDatas = UsefulDatas(bat_types, bat_buffs, unit_types)
     db = Database("datas/rts.db", uDatas)
     dUtils = discordUtils(bot, db)
 

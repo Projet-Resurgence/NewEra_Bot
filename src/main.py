@@ -177,10 +177,10 @@ with open("datas/main.json") as f:
     bat_buffs = json_data["bat_buffs"]
     unit_types = json_data["unit_types"]
 
-usefulDatas = UsefulDatas(bat_types, bat_buffs)
+usefulDatas = UsefulDatas(bat_types, bat_buffs, unit_types)
 
 # Initialize utilities early for debug_init
-initialize_utilities(bot, bat_types, bat_buffs)
+initialize_utilities(bot, bat_types, bat_buffs, unit_types)
 db = get_db()
 dUtils = get_discord_utils(bot, db)
 notion_handler = NotionHandler(notion_token, bot)
@@ -249,18 +249,23 @@ async def daily_update():
     await db.update_development()
     await update_map()
 
-@tasks.loop(minutes=1)
+@tasks.loop(seconds=5)
 async def update_rp_date():
     now = datetime.now(pytz.timezone("Europe/Paris"))  # ou "UTC"
-    if now.hour == 7 and now.minute == 0:
+    # if now.hour == 7 and now.minute == 0:
+    if True:
         # Advance the playday
-        await db.advance_playday()
+        await db.advance_playday(bot)
 
         # Process production cycle
         completed_productions = db.process_production_cycle()
 
+
+        if db.is_paused() or db.get_current_date().get('playday') != 1:
+            return
         # Notify countries of completed productions
         for production in completed_productions:
+            print(f"Production completed for country {production['country_id']}: {production['quantity']}x {production['tech_name']}")
             try:
                 country_data = db.get_country_datas(production["country_id"])
                 if country_data and country_data.get("secret_channel_id"):

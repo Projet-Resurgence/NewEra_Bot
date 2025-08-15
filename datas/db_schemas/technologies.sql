@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS StructureProduction (
     structure_id INTEGER NOT NULL,
     tech_id INTEGER NOT NULL,
     quantity INTEGER NOT NULL,
-    days_remaining INTEGER NOT NULL,
+    months_remaining INTEGER NOT NULL,
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (structure_id, tech_id),
     FOREIGN KEY (structure_id) REFERENCES Structures(id) ON DELETE CASCADE,
@@ -84,7 +84,7 @@ CREATE TABLE IF NOT EXISTS CountryTechnologyProduction (
     country_id INTEGER NOT NULL,
     tech_id INTEGER NOT NULL,
     quantity INTEGER NOT NULL,
-    days_remaining INTEGER NOT NULL,
+    months_remaining INTEGER NOT NULL,
     started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (country_id) REFERENCES Countries(country_id) ON DELETE CASCADE,
     FOREIGN KEY (tech_id) REFERENCES Technologies(tech_id) ON DELETE CASCADE

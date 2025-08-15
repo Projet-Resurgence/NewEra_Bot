@@ -3,19 +3,23 @@ import math
 import os
 from datetime import datetime, timezone
 from import_csv_data import import_all_datas
+import discord
+import locale
 
 debug = False
 bat_types = {}
 bat_buffs = {}
+unit_types = {}
 
 
 class UsefulDatas:
     """Class to hold useful data for the bot."""
 
-    def __init__(self, _bat_types, _bat_buffs):
-        global bat_types, bat_buffs, debug
+    def __init__(self, _bat_types, _bat_buffs, _unit_types):
+        global bat_types, bat_buffs, unit_types, debug
         bat_types = _bat_types
         bat_buffs = _bat_buffs
+        unit_types = _unit_types
 
 
 class Database:
@@ -100,9 +104,9 @@ class Database:
         """Check if a player has enough balance."""
         result = self.get_balance(country_id)
         if result is None:
-            return False
+            result = 0
         if amount <= 0:
-            return False
+            return True
         return int(result) >= int(amount)
 
     def has_enough_points(self, country_id, amount, type: int = 1):
@@ -1051,7 +1055,7 @@ class Database:
         result = self.cur.fetchone()
         return result["playdays"] if result else 2
 
-    async def advance_playday(self):
+    async def advance_playday(self, bot):
         # Récupère la dernière date enregistrée
         self.cur.execute("SELECT * FROM Dates ORDER BY real_date DESC LIMIT 1")
         row = self.cur.fetchone()
@@ -1059,9 +1063,11 @@ class Database:
         today = datetime.now(timezone.utc)
         today_str = today.isoformat()  # Convert to ISO string format for comparison
 
+        date_channel = bot.get_channel(int(self.get_setting("date_channel_id")))
+
         is_paused = self.is_paused()
         if is_paused:
-            print("⏸️ Temps RP en pause. Rien à faire.")
+            print("⏸️ Temps RP en pause. Rien à faire.", flush=True)
             return
 
         if row:
@@ -1076,7 +1082,8 @@ class Database:
         playdays_result = self.cur.fetchone()
         if not playdays_result:
             print(
-                f"⚠️ Aucune configuration trouvée pour le mois {month}, utilisation de 2 playdays par défaut"
+                f"⚠️ Aucune configuration trouvée pour le mois {month}, utilisation de 2 playdays par défaut",
+                flush=True,
             )
             playdays_in_month = 2
         else:
@@ -1091,22 +1098,22 @@ class Database:
                 month = 1
                 self.set_paused(True)  # Pause le temps RP à la fin de l'année
                 is_paused = True
-                await self.
+                await self.pay_everyones_maintenance(bot)
             else:
                 month += 1
 
-        # Vérifier si cette date existe déjà avant d'insérer
-        self.cur.execute(
-            """
-            SELECT 1 FROM Dates 
-            WHERE year = ? AND month = ? AND playday = ?
-        """,
-            (year, month, playday),
-        )
+        # # Vérifier si cette date existe déjà avant d'insérer
+        # self.cur.execute(
+        #     """
+        #     SELECT 1 FROM Dates
+        #     WHERE year = ? AND month = ? AND playday = ?
+        # """,
+        #     (year, month, playday),
+        # )
 
-        if self.cur.fetchone():
-            print(f"⚠️ Date {year}-{month}-{playday} existe déjà, pas d'insertion")
-            return
+        # if self.cur.fetchone():
+        #     print(f"⚠️ Date {year}-{month}-{playday} existe déjà, pas d'insertion", flush=True)
+        #     return
 
         # Insérer la nouvelle ligne
         self.cur.execute(
@@ -1118,11 +1125,89 @@ class Database:
         )
 
         self.conn.commit()
-        print(f"📅 Avancé à {year}-{month}-{playday} (pause: {is_paused})")
-        
-    def pay_everyones_maintenance(self):
-        """Paye la maintenance de tous les pays."""
-        
+
+        try:
+            locale.setlocale(locale.LC_TIME, "fr_FR.UTF-8")  # Système Unix/Linux
+        except locale.Error:
+            try:
+                locale.setlocale(locale.LC_TIME, "fr_FR")  # Windows
+            except locale.Error as e:
+                print(f"⚠️ Impossible de définir la locale française. {e}", flush=True)
+                return
+        month_name = datetime(year, month, 1).strftime("%B")
+        max_playdays = self.get_playdays_in_month(month)
+        playdays_left = max_playdays - playday
+
+        embed = discord.Embed(
+            title="Avancement du temps RP", color=discord.Color.blue()
+        )
+        embed.add_field(
+            name="Date",
+            value=f"{month_name} {year} Partie {playday}/{max_playdays} - <t:{int(today.timestamp())}:F>",
+        )
+        embed.add_field(name="Pause", value="Oui" if is_paused else "Non")
+        await date_channel.send(embed=embed)
+
+        print(f"📅 Avancé à {year}-{month}-{playday} (pause: {is_paused})", flush=True)
+
+    async def pay_everyones_maintenance(self, bot):
+        """Fait payer la maintenance à tous les pays."""
+        maintenance_dict = await self.get_all_salaries()
+        embed_datas = {
+            "title": "Paiement de la maintenance des soldats pour {country}",
+            "color": discord.Color.green(),
+            "description": "Voici le récapitulatif des paiements de maintenance.",
+        }
+        for country_id, salary_data in maintenance_dict.items():
+            country_data = self.get_country_datas(country_id)
+            if not country_data:
+                print(f"Données pays introuvables pour l'ID {country_id}.")
+                continue
+
+            country_secret_channel = bot.get_channel(
+                int(country_data["secret_channel_id"])
+            )
+            country_role = country_secret_channel.guild.get_role(
+                int(country_data["role_id"])
+            )
+            if not country_role:
+                print(f"Rôle introuvable pour le pays {country_id}.")
+                continue
+            if not country_secret_channel:
+                print(f"Canal secret introuvable pour le pays {country_id}.")
+                continue
+            embed = discord.Embed(**embed_datas)
+            embed.title = embed.title.format(country=country_data["name"])
+
+            # Build description from unit details
+            unit_details = []
+            for unit_id, unit_data in salary_data.items():
+                if unit_id != "total":
+                    unit_details.append(
+                        f"{unit_data['quantity']}x {unit_id}: {unit_data['maintenance']}€"
+                    )
+            embed.description = "\n".join(unit_details)
+            total_price = salary_data.get("total", 0)
+
+            embed.description += f"\n\nTotal: {total_price}€"
+            if total_price <= 0:
+                continue
+            await country_secret_channel.send(embed=embed)
+            if not self.has_enough_balance(country_id, total_price):
+                embed_error = discord.Embed(
+                    title="Solde insuffisant",
+                    description=f"⚠️ {country_data['name']} n'a pas assez de fonds pour payer la maintenance ({total_price}€).",
+                    color=discord.Color.red(),
+                )
+                await country_secret_channel.send(embed=embed_error)
+                continue
+            self.take_balance(country_id, total_price)
+            embed_success = discord.Embed(
+                title="Salaires payés",
+                description=f"Les salaires de maintenance pour {country_data['name']} ont été payés avec succès ({total_price}€).",
+                color=discord.Color.green(),
+            )
+            await country_secret_channel.send(embed=embed_success)
 
     def get_country_by_name(self, country_name: str) -> str:
         """Récupère l'ID d'un pays par son nom."""
@@ -1332,12 +1417,12 @@ class Database:
                 self.cur.execute(
                     """
                     UPDATE StructureProduction
-                    SET quantity = ?, days_remaining = ?, started_at = ?
+                    SET quantity = ?, months_remaining = ?, started_at = ?
                     WHERE structure_id = ? AND tech_id = ?
                     """,
                     (
                         new_quantity,
-                        production_time * 30,
+                        production_time,
                         datetime.now().isoformat(),
                         structure_id,
                         tech_id,
@@ -1347,14 +1432,14 @@ class Database:
                 self.cur.execute(
                     """
                     INSERT INTO StructureProduction 
-                    (structure_id, tech_id, quantity, days_remaining, started_at)
+                    (structure_id, tech_id, quantity, months_remaining, started_at)
                     VALUES (?, ?, ?, ?, ?)
                     """,
                     (
                         structure_id,
                         tech_id,
                         quantity,
-                        production_time * 30,
+                        production_time,
                         datetime.now().isoformat(),
                     ),
                 )
@@ -1499,7 +1584,7 @@ class Database:
                 SELECT sp.*, t.name as tech_name, t.type as tech_type
                 FROM StructureProduction sp
                 JOIN Technologies t ON sp.tech_id = t.tech_id
-                WHERE sp.days_remaining > 0
+                WHERE sp.months_remaining > 0
             """
             )
 
@@ -1507,9 +1592,9 @@ class Database:
 
             for production in productions:
                 # Decrease remaining time
-                new_days_remaining = production["days_remaining"] - 1
+                new_months_remaining = production["months_remaining"] - 1
 
-                if new_days_remaining <= 0:
+                if new_months_remaining <= 0:
                     # Production complete - add to inventory
                     structure_info = self.get_structure_informations(
                         production["structure_id"]
@@ -1557,11 +1642,11 @@ class Database:
                     self.cur.execute(
                         """
                         UPDATE StructureProduction 
-                        SET days_remaining = ? 
+                        SET months_remaining = ? 
                         WHERE structure_id = ? AND tech_id = ?
                     """,
                         (
-                            new_days_remaining,
+                            new_months_remaining,
                             production["structure_id"],
                             production["tech_id"],
                         ),
@@ -1586,7 +1671,7 @@ class Database:
                 JOIN Structures s ON sp.structure_id = s.id
                 JOIN Regions r ON s.region_id = r.region_id
                 WHERE r.country_id = ?
-                ORDER BY sp.days_remaining ASC
+                ORDER BY sp.months_remaining ASC
             """,
                 (country_id,),
             )
@@ -2086,7 +2171,7 @@ class Database:
                     structure_id,
                     tech_id,
                     country_id,
-                    "2024-02-01", # FOR FUTURE REFERENCE. TO UPDATE.
+                    "2024-02-01",  # FOR FUTURE REFERENCE. TO UPDATE.
                     development_time,
                     development_cost,
                 ),
@@ -2116,7 +2201,7 @@ class Database:
                 "structure_id": result[1],
                 "tech_id": result[2],
                 "country_id": result[3],
-                "days_remaining": result[4],
+                "months_remaining": result[4],
                 "total_development_time": result[5],
                 "development_cost": result[6],
                 "started_at": result[7],
@@ -2148,7 +2233,7 @@ class Database:
                     "structure_id": row[1],
                     "tech_id": row[2],
                     "country_id": row[3],
-                    "days_remaining": row[4],
+                    "months_remaining": row[4],
                     "total_development_time": row[5],
                     "development_cost": row[6],
                     "started_at": row[7],
@@ -2258,30 +2343,47 @@ class Database:
 
     async def update_production(self):
         return
-    
+
     async def update_development(self):
         return
-    
+
     async def get_all_salaries(self):
         """Get all salaries in a dict with the country_id as key, and a nested dict as value with the unit_ids and 'total' keys, and the maintenance price as values"""
- 
+
         self.cur.execute("SELECT country_id FROM Countries")
         return_value = {}
         for country in self.cur.fetchall():
             country_id = country[0]
-            self.cur.execute("SELECT * FROM InventoryUnits WHERE country_id = ?", (country_id,))
+            return_value[country_id] = {}
+            total_maintenance = 0
+
+            self.cur.execute(
+                "SELECT * FROM InventoryUnits WHERE country_id = ?", (country_id,)
+            )
             for row in self.cur.fetchall():
-                unit_id = row[0]
+                unit_id = row[1]
+                quantity = row[2]
+                if unit_id.startswith("public_"):
+                    continue
                 self.cur.execute(
-                    "SELECT maintenance FROM InventoryPricings WHERE unit_id = ?",
+                    "SELECT maintenance FROM InventoryPricings WHERE item = ?",
                     (unit_id,),
                 )
-                maintenance = self.cur.fetchone()[0] or 0
-                return_value[country_id] = {
-                    "unit_id": unit_id,
-                    "maintenance": maintenance,
+                maintenance_result = self.cur.fetchone()
+                maintenance = maintenance_result[0] if maintenance_result else 0
+                maintenance = maintenance or 0
+
+                # Get unit name from unit_types, fallback to unit_id if not found
+                unit_name_list = [
+                    name for name, id in unit_types.items() if id == unit_id
+                ]
+                unit_name = unit_name_list[0] if unit_name_list else unit_id
+
+                return_value[country_id][unit_name] = {
+                    "maintenance": maintenance * quantity,
+                    "quantity": quantity,
                 }
-            return_value[country_id]["total"] = sum(
-                item["maintenance"] for item in return_value[country_id].values()
-            )
+                total_maintenance += maintenance * quantity
+
+            return_value[country_id]["total"] = total_maintenance
         return return_value
