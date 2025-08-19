@@ -43,11 +43,16 @@ class Database:
         cur = conn.cursor()
         dbs_content = {}
         for filename in sorted(os.listdir("datas/db_schemas")):
-            if filename.endswith(".sql"):
-                with open(f"datas/db_schemas/{filename}", "r", encoding="utf-8") as f:
-                    content = f.read()
-                    dbs_content[filename] = content
+            if not filename.endswith(".sql"):
+                continue
+            with open(f"datas/db_schemas/{filename}", "r", encoding="utf-8") as f:
+                content = f.read()
+                dbs_content[filename] = content
+                try:
                     cur.executescript(content)
+                except Exception as e:
+                    print(f"Error executing {filename}: {e}")
+                    raise e
         conn.commit()
         cur.execute(
             """
