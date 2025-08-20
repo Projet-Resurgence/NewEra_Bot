@@ -39,7 +39,7 @@ def clean_numeric_value(value_str):
             value = float(cleaned)
         else:
             value = int(cleaned)
-        
+
         # If it was a percentage, convert to decimal (e.g., 2.00% -> 2.00)
         # Store as the actual percentage value, not as decimal fraction
         return value
@@ -220,8 +220,8 @@ def import_technocentre_data(cursor):
                     (type, specialisation, level, capacity, population, cout_construction)
                     VALUES (?, ?, ?, ?, ?, ?)
             """,
-                ("Technocentre", spec, level, 1, 0, cost),
-            )
+                    ("Technocentre", spec, level, 1, 0, cost),
+                )
 
 
 def import_infrastructure_data(cursor):
@@ -315,6 +315,93 @@ def import_housing_data(cursor):
         )
 
 
+def import_regions_data(cursor):
+    """Import regions data from region_list.csv"""
+    print("Importing regions data from region_list.csv...")
+
+    try:
+        region_csv_path = "/home/ubuntu/Bots/NEBot/datas/mapping/region_list.csv"
+
+        with open(region_csv_path, "r", encoding="utf-8") as file:
+            reader = csv.DictReader(file)
+
+            geographical_areas = {}
+            regions_data = []
+
+            for row in reader:
+                geographical_area_name = row["Pays/Region"].strip()
+                continent = row["Continent"].strip()
+                region_name = row["Nom region"].strip()
+                hex_color = row["Code couleur HEX"].strip()
+
+                # Ensure hex color is properly formatted
+                if not hex_color.startswith("#"):
+                    hex_color = "#" + hex_color
+
+                # Store geographical area for later insertion
+                if geographical_area_name not in geographical_areas:
+                    geographical_areas[geographical_area_name] = True
+
+                regions_data.append(
+                    {
+                        "geographical_area": geographical_area_name,
+                        "continent": continent,
+                        "name": region_name,
+                        "hex_color": hex_color,
+                    }
+                )
+
+            # Insert geographical areas first
+            print(f"Inserting {len(geographical_areas)} geographical areas...")
+            for area_name in geographical_areas.keys():
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO GeographicalAreas (name)
+                    VALUES (?)
+                    """,
+                    (area_name,),
+                )
+
+            # Get geographical area IDs for foreign key references
+            area_id_map = {}
+            cursor.execute("SELECT geographical_area_id, name FROM GeographicalAreas")
+            for area_id, area_name in cursor.fetchall():
+                area_id_map[area_name] = area_id
+
+            # Insert regions with references to geographical areas
+            print(f"Inserting {len(regions_data)} regions...")
+            for region in regions_data:
+                geographical_area_id = area_id_map.get(region["geographical_area"])
+
+                cursor.execute(
+                    """
+                    INSERT OR IGNORE INTO Regions 
+                    (country_id, name, region_color_hex, population, continent, geographical_area_id)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        None,  # country_id - NULL for unoccupied regions
+                        region["name"],
+                        region["hex_color"],
+                        0,  # Default population
+                        region["continent"],
+                        geographical_area_id,
+                    ),
+                )
+
+            print(
+                f"✅ Successfully imported {len(regions_data)} regions and {len(geographical_areas)} geographical areas"
+            )
+
+    except FileNotFoundError:
+        print(f"⚠️  Warning: region_list.csv not found at {region_csv_path}")
+    except Exception as e:
+        print(f"❌ Error importing regions data: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
 def import_all_datas():
     """Main function to import all CSV data"""
     db_path = "/home/ubuntu/Bots/NEBot/datas/rts.db"
@@ -338,6 +425,7 @@ def import_all_datas():
         import_infrastructure_data(cursor)
         import_power_plants_data(cursor)
         import_housing_data(cursor)
+        import_regions_data(cursor)
 
         # Commit changes
         conn.commit()

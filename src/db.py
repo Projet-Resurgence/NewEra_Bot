@@ -84,6 +84,12 @@ class Database:
             for name, sql in dbs_content.items():
                 print(f"{name}:\n{sql}\n")
         import_all_datas()
+        cur.executescript("""
+                UPDATE Regions SET country_id = 1 WHERE region_id = 1; -- Assign Testland to Europe
+                UPDATE Regions SET country_id = 1 WHERE region_id = 2; -- Assign Testland to Europe
+                UPDATE Regions SET country_id = 2 WHERE region_id = 3; -- Assign Debuglia to Europe
+                """
+        )
         print("Database initialized.", flush=True)
         return conn, cur
 
@@ -837,7 +843,7 @@ class Database:
 
     def get_all_geographical_areas(self) -> list:
         """Récupère toutes les zones géographiques."""
-        self.cur.execute("SELECT * FROM GeographicalAreas ORDER BY name")
+        self.cur.execute("SELECT DISTINCT * FROM GeographicalAreas ORDER BY name")
         return [dict(row) for row in self.cur.fetchall()]
 
     def get_regions_in_geographical_area(self, area_id: int) -> list:

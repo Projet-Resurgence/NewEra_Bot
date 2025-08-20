@@ -110,6 +110,10 @@ async def load_cogs():
         await bot.load_extension("cogs.admin_utilities")
         print("✅ AdminUtilities cog loaded successfully")
 
+        print("🔄 Loading mapping cog...")
+        await bot.load_extension("cogs.mapping")
+        print("✅ Mapping cog loaded successfully")
+
         # List loaded commands for debugging
         economy_commands = [cmd for cmd in bot.commands if cmd.cog_name == "Economy"]
         points_commands = [cmd for cmd in bot.commands if cmd.cog_name == "Points"]
@@ -122,6 +126,7 @@ async def load_cogs():
         admin_commands = [
             cmd for cmd in bot.commands if cmd.cog_name == "AdminUtilities"
         ]
+        mapping_commands = [cmd for cmd in bot.commands if cmd.cog_name == "MappingCog"]
         print(f"📋 Loaded economy commands: {[cmd.name for cmd in economy_commands]}")
         print(f"📋 Loaded points commands: {[cmd.name for cmd in points_commands]}")
         print(
@@ -134,6 +139,7 @@ async def load_cogs():
             f"📋 Loaded structures commands: {[cmd.name for cmd in structures_commands]}"
         )
         print(f"📋 Loaded admin commands: {[cmd.name for cmd in admin_commands]}")
+        print(f"📋 Loaded mapping commands: {[cmd.name for cmd in mapping_commands]}")
     except Exception as e:
         print(f"❌ Failed to load cogs: {e}")
 
@@ -242,6 +248,7 @@ async def update_map():
 
 RP_UPDATE_INTERVAL = 60
 # RP_UPDATE_INTERVAL = 5
+
 
 @tasks.loop(seconds=RP_UPDATE_INTERVAL)
 async def update_rp_date():
