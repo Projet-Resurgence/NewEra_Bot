@@ -1,0 +1,705 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <script>
+    window.axeptioSettings = {
+        clientId: "68963e315d089c7b7334b5d1",
+        cookiesVersion: "projet-resurgence-fr-EU",
+        googleConsentMode: {
+            default: {
+            analytics_storage: "denied",
+            ad_storage: "denied",
+            ad_user_data: "denied",
+            ad_personalization: "denied",
+            wait_for_update: 500
+            }
+        }
+    };
+    
+    (function(d, s) {
+    var t = d.getElementsByTagName(s)[0], e = d.createElement(s);
+    e.async = true; e.src = "https://static.axept.io/sdk.js";
+    t.parentNode.insertBefore(e, t);
+    })(document, "script");
+    </script>
+    
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-5B3PEQ65HX"></script>
+    <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag(){dataLayer.push(arguments);}
+    gtag('js', new Date());
+
+    gtag('config', 'G-5B3PEQ65HX');
+    </script>
+
+    <!-- Critical CSS for above-the-fold content -->
+    <style>
+        :root {
+            --primary-gold: #D5B654;
+            --bg-primary: #ffffff;
+            --bg-primary-dark: #1a1a1a;
+            --text-primary: #212529;
+            --text-primary-dark: #ffffff
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            line-height: 1.6;
+            color: var(--text-primary);
+            background: var(--bg-primary);
+            transition: all 0.3s ease
+        }
+
+        [data-theme="dark"] {
+            --bg-primary: #1a1a1a;
+            --text-primary: #ffffff
+        }
+
+        [data-theme="dark"] body {
+            background: var(--bg-primary-dark);
+            color: var(--text-primary-dark)
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            position: fixed;
+            top: 0;
+            width: 100%;
+            z-index: 1000;
+            border-bottom: 1px solid rgba(213, 182, 84, 0.2)
+        }
+
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            background: linear-gradient(135deg, rgba(213, 182, 84, 0.1), rgba(213, 182, 84, 0.05));
+            background-size: cover;
+            background-position: center
+        }
+
+        .hero-content {
+            text-align: center;
+            max-width: 800px;
+            padding: 2rem;
+            z-index: 2
+        }
+
+        .hero-title {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--primary-gold), #E6C76A);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text
+        }
+
+        .btn {
+            display: inline-block;
+            padding: 1rem 2rem;
+            margin: 0.5rem;
+            text-decoration: none;
+            border-radius: 50px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            border: none;
+            cursor: pointer;
+            font-size: 1.1rem
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-gold), #E6C76A);
+            color: #000;
+            box-shadow: 0 4px 15px rgba(213, 182, 84, 0.3)
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 2rem
+        }
+
+        @media(max-width:768px) {
+            .hero-title {
+                font-size: 2.5rem
+            }
+
+            .hero {
+                min-height: 80vh
+            }
+
+            .btn {
+                padding: 0.8rem 1.5rem;
+                font-size: 1rem
+            }
+        }
+    </style>
+
+    <!-- Primary Meta Tags -->
+    <title>Projet Résurgence - Serveur RP Géopolitique Francophone Post-Apocalyptique | Discord</title>
+    <meta name="title" content="Projet Résurgence - Serveur RP Géopolitique Francophone Post-Apocalyptique">
+    <meta name="description"
+        content="Rejoignez Projet Résurgence, le serveur Discord de roleplay géopolitique francophone post-apocalyptique. Créez votre nation, participez à la diplomatie mondiale et façonnez l'avenir dans un monde en reconstruction.">
+    <meta name="keywords"
+        content="projet résurgence, roleplay français, RP géopolitique, serveur discord français, jeu de rôle géopolitique, nation virtuelle, diplomatie discord, post-apocalyptique, stratégie politique, serveur RP francophone, communauté française, simulation politique">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="French">
+    <meta name="author" content="Projet Résurgence">
+    <meta name="creator" content="Projet Résurgence">
+    <meta name="publisher" content="Projet Résurgence">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://projet-resurgence.github.io/">
+    <meta property="og:title" content="Projet Résurgence - Serveur RP Géopolitique Francophone">
+    <meta property="og:description"
+        content="Rejoignez notre communauté francophone de roleplay géopolitique post-apocalyptique. Créez votre nation et participez à la reconstruction du monde sur Discord.">
+    <meta property="og:image" content="https://projet-resurgence.github.io/images/banner.jpg">
+    <meta property="og:image:width" content="1055">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Bannière du Projet Résurgence">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:site_name" content="Projet Résurgence">
+    <meta property="og:locale" content="fr_FR">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://projet-resurgence.github.io/">
+    <meta property="twitter:title" content="Projet Résurgence - Serveur RP Géopolitique Francophone">
+    <meta property="twitter:description"
+        content="Rejoignez notre communauté francophone de roleplay géopolitique post-apocalyptique sur Discord.">
+    <meta property="twitter:image" content="https://projet-resurgence.github.io/images/banner.jpg">
+    <meta property="twitter:image:width" content="1055">
+    <meta property="twitter:image:height" content="630">
+    <meta property="twitter:image:alt" content="Bannière du Projet Résurgence">
+    <meta property="twitter:image:type" content="image/jpeg">
+
+    <!-- Additional Meta Tags -->
+    <meta name="revisit-after" content="7 days">
+    <meta name="distribution" content="global">
+    <meta name="rating" content="general">
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://projet-resurgence.github.io/">
+
+    <!-- Hreflang for internationalization -->
+    <link rel="alternate" hreflang="fr" href="https://projet-resurgence.github.io/">
+    <link rel="alternate" hreflang="x-default" href="https://projet-resurgence.github.io/">
+
+    <!-- Resource hints for performance -->
+    <link rel="preload" href="./fonts/pressgothic.otf" as="font" type="font/otf" crossorigin="anonymous">
+    <link rel="preload" href="./styles/main.css" as="style">
+    <link rel="preload" href="./images/final_logo_centered_little.webp" as="image" type="image/webp">
+    <link rel="preload" href="./styles/main.js" as="script">
+    <link rel="prefetch" href="./regles.html">
+    <link rel="prefetch" href="./guide.html">
+    <link rel="dns-prefetch" href="//discord.gg">
+
+    <link rel="stylesheet" href="./styles/main.css">
+    <link rel="icon" type="image/png" href="./images/final_logo_little.png">
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#D5B654">
+    <meta name="google-site-verification" content="LMfrQYr-Zjgp6F8FUXlE1wKl0ItR2UIGTg6-TUhgy30" />
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Projet Résurgence",
+      "description": "Serveur Discord de roleplay géopolitique francophone post-apocalyptique",
+      "url": "https://projet-resurgence.github.io",
+      "logo": "https://projet-resurgence.github.io/images/final_logo_centered_little.png",
+      "sameAs": [
+        "https://discord.gg/NuwQqWGbHc"
+      ],
+      "contactPoint": {
+        "@type": "ContactPoint",
+        "contactType": "Community Support",
+        "url": "https://discord.gg/NuwQqWGbHc"
+      }
+    }
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      "name": "Projet Résurgence",
+      "url": "https://projet-resurgence.github.io",
+      "potentialAction": {
+        "@type": "SearchAction",
+        "target": "https://projet-resurgence.github.io/search?q={search_term_string}",
+        "query-input": "required name=search_term_string"
+      }
+    }
+    </script>
+
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Game",
+      "name": "Projet Résurgence - RP Géopolitique",
+      "description": "Serveur Discord de roleplay géopolitique francophone dans un univers post-apocalyptique",
+      "genre": "Role-playing game",
+      "gamePlatform": "Discord",
+      "inLanguage": "fr",
+      "url": "https://projet-resurgence.github.io",
+      "image": "https://projet-resurgence.github.io/images/banner.jpg",
+      "numberOfPlayers": "100+",
+      "applicationCategory": "Game"
+    }
+    </script>
+</head>
+
+<body>
+
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WDG77HQC" height="0" width="0"
+            style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <picture>
+                        <source srcset="./images/final_logo_centered_little.webp" type="image/webp">
+                        <img src="./images/final_logo_centered_little.png" alt="Logo Projet Résurgence" width="50"
+                            height="50" loading="eager" decoding="async">
+                    </picture>
+                    <span class="logo-text">PROJET RÉSURGENCE</span>
+                </div>
+                <nav class="nav" role="navigation" aria-label="Navigation principale">
+                    <!-- Mobile menu button -->
+                    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Ouvrir le menu de navigation"
+                        aria-expanded="false">
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                    </button>
+
+                    <!-- Navigation menu -->
+                    <div class="nav-menu" id="navMenu">
+                        <ul class="nav-list">
+                            <li><a href="#accueil" class="nav-link" aria-label="Aller à la section Accueil">Accueil</a>
+                            </li>
+                            <li><a href="#serveur" class="nav-link" aria-label="Découvrir le serveur">Le Serveur</a>
+                            </li>
+                            <li><a href="#univers" class="nav-link" aria-label="Explorer l'univers">Univers</a></li>
+                            <li><a href="regles.html" class="nav-link" aria-label="Consulter les règles">Règles</a></li>
+                            <li><a href="guide.html" class="nav-link" aria-label="Lire le guide du débutant">Guide</a>
+                            </li>
+                            <li><a href="#rejoindre" class="nav-link" aria-label="Nous rejoindre">Rejoindre</a></li>
+                        </ul>
+                        <button class="theme-toggle" id="themeToggle" aria-label="Changer de thème">
+                            🌙
+                        </button>
+                    </div>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Hero Section -->
+        <section id="accueil" class="hero" role="banner">
+            <div class="container">
+                <div class="hero-content animate-fade-in-up">
+                    <h1 class="hero-title">PROJET RÉSURGENCE</h1>
+                    <h2 class="hero-subtitle">RP Géopolitique Francophone 🌍🌺</h2>
+                    <p class="hero-description">
+                        <strong>Projet Résurgence</strong> est un serveur RP géopolitique francophone qui vous plonge
+                        dans un monde
+                        post-apocalyptique, où les nations, les frontières et les cultures anciennes ne sont plus que
+                        des souvenirs. L'ancien ordre s'est effondré. Une nouvelle ère commence.
+                        <br><br>
+                        Vous incarnez une force émergente : un <em>État</em>, un <em>mouvement</em>, une
+                        <em>idéologie</em>, un <em>peuple</em>… et
+                        participez à la reconstruction du monde. Chaque choix compte : diplomatie, stratégie militaire,
+                        développement interne, technologies, alliances, conflits, gestion de territoire ou de
+                        ressources.
+                    </p>
+                    <div class="btn-group">
+                        <a href="https://discord.gg/NuwQqWGbHc" class="btn btn-primary"
+                            aria-label="Rejoindre notre serveur Discord Projet Résurgence" rel="noopener noreferrer"
+                            target="_blank">Rejoindre Discord</a>
+                        <a href="#univers" class="btn btn-secondary"
+                            aria-label="Découvrir l'univers de Projet Résurgence">Découvrir l'Univers</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section id="serveur" class="features">
+            <div class="container">
+                <h2 class="section-title">Ce Qui Vous Attend</h2>
+                <p style="text-align: center; max-width: 800px; margin: 0 auto; color: var(--text-secondary);">
+                    Projet Résurgence s'adresse autant aux joueurs expérimentés qu'aux nouveaux curieux, avec une
+                    approche sérieuse, structurée, mais ouverte à la créativité.
+                </p>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon">🏛️</span>
+                        <h3 class="feature-title">Gouvernance Politique</h3>
+                        <p class="feature-description">
+                            Créez et dirigez votre propre nation avec un système gouvernemental complet. Gérez
+                            différents ministères et prenez des décisions politiques cruciales qui façonneront votre
+                            pays.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">💰</span>
+                        <h3 class="feature-title">Économie & Commerce</h3>
+                        <p class="feature-description">
+                            Développez l'économie de votre nation, gérez les ressources, établissez des routes
+                            commerciales et négociez des accords économiques avec d'autres pays.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">⚔️</span>
+                        <h3 class="feature-title">Conflits & Diplomatie</h3>
+                        <p class="feature-description">
+                            Engagez-vous dans des négociations diplomatiques complexes, formez des alliances
+                            stratégiques ou préparez votre nation à la guerre si nécessaire.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">🗺️</span>
+                        <h3 class="feature-title">Expansion Territoriale</h3>
+                        <p class="feature-description">
+                            Explorez et revendiquez de nouveaux territoires, gérez vos frontières et développez
+                            l'infrastructure de vos régions pour étendre votre influence.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">🏗️</span>
+                        <h3 class="feature-title">Développement & Technologie</h3>
+                        <p class="feature-description">
+                            Investissez dans la recherche et le développement, construisez des infrastructures modernes
+                            et guidez votre nation vers la prospérité technologique.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">🤝</span>
+                        <h3 class="feature-title">Communauté Active</h3>
+                        <p class="feature-description">
+                            Rejoignez une communauté francophone passionnée avec un staff actif qui accompagne le jeu
+                            tout en laissant aux joueurs la liberté d'écrire leur histoire.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Stats Section -->
+        <section class="stats">
+            <div class="container">
+                <h2 class="section-title">Le Serveur en Chiffres</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <span class="stat-number">24/7</span>
+                        <span class="stat-label">Serveur Actif</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">∞</span>
+                        <span class="stat-label">Possibilités RP</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">🌍</span>
+                        <span class="stat-label">Monde Immersif</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">🇫🇷</span>
+                        <span class="stat-label">Francophone</span>
+                    </div>
+                    <div class="stat-card">
+                        <span class="stat-number">100+</span>
+                        <span class="stat-label">Commandes d'un bot dédié au RP!</span>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Universe Section -->
+        <section id="univers" class="features">
+            <div class="container">
+                <h2 class="section-title">L'Univers de Projet Résurgence</h2>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon">🌍</span>
+                        <h3 class="feature-title">Un Monde à Reconstruire</h3>
+                        <p class="feature-description">
+                            Dans un futur post-apocalyptique, incarnez une force émergente : État, mouvement, idéologie
+                            ou peuple. Participez à la reconstruction d'un monde où tout a été détruit.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">🎭</span>
+                        <h3 class="feature-title">Liberté Créative</h3>
+                        <p class="feature-description">
+                            Créez votre propre projet politique, libre des modèles existants. Chaque choix compte :
+                            diplomatie, stratégie militaire, développement interne, technologies et alliances.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">⚖️</span>
+                        <h3 class="feature-title">Équilibre & Sérieux</h3>
+                        <p class="feature-description">
+                            Approche sérieuse et structurée, mais ouverte à la créativité. Staff actif qui accompagne le
+                            jeu tout en laissant aux joueurs la liberté d'écrire leur histoire.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">🎓</span>
+                        <h3 class="feature-title">Pour Tous les Niveaux</h3>
+                        <p class="feature-description">
+                            Que vous soyez joueur expérimenté ou nouveau curieux, Projet Résurgence vous accueille.
+                            Tutoriels, aide du staff et communauté bienveillante.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">📈</span>
+                        <h3 class="feature-title">Évolution Continue</h3>
+                        <p class="feature-description">
+                            Le monde évolue au fil de vos décisions. Gestion de territoire, de ressources, développement
+                            technologique... Chaque action a des conséquences durables.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">🤝</span>
+                        <h3 class="feature-title">Communauté Francophone</h3>
+                        <p class="feature-description">
+                            Rejoignez une communauté francophone passionnée par la géopolitique et le roleplay
+                            stratégique. Discussions enrichissantes et alliances durables.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- FAQ Section -->
+        <section id="faq" class="features">
+            <div class="container">
+                <h2 class="section-title">Questions Fréquentes</h2>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <h3 class="feature-title">Comment rejoindre le serveur ?</h3>
+                        <p class="feature-description">
+                            Cliquez sur le lien Discord, acceptez les règles, présentez-vous et créez votre nation selon
+                            nos guidelines.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3 class="feature-title">Faut-il avoir de l'expérience en RP ?</h3>
+                        <p class="feature-description">
+                            Non ! Nous accueillons les débutants. Notre guide et la communauté vous aideront à
+                            commencer.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3 class="feature-title">Le serveur est-il actif ?</h3>
+                        <p class="feature-description">
+                            Oui, avec plus de 100 membres actifs et des événements réguliers. L'activité est constante
+                            24h/24.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3 class="feature-title">Puis-je créer n'importe quel type de nation ?</h3>
+                        <p class="feature-description">
+                            Dans le cadre de notre univers post-apocalyptique, oui ! Démocratie, dictature,
+                            théocratie... tout est possible.
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3 class="feature-title">Y a-t-il des événements spéciaux ?</h3>
+                        <p class="feature-description">
+                            Régulièrement ! Crises internationales, catastrophes naturelles, découvertes
+                            technologiques...
+                        </p>
+                    </div>
+
+                    <div class="feature-card">
+                        <h3 class="feature-title">Le serveur coûte-t-il quelque chose ?</h3>
+                        <p class="feature-description">
+                            Non, Projet Résurgence est entièrement gratuit. Nous fonctionnons grâce à la passion de
+                            notre communauté.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Call to Action -->
+        <section id="rejoindre" class="cta">
+            <div class="container">
+                <h2>Prêt à Façonner la Nouvelle Ère ?</h2>
+                <p>
+                    Vous cherchez un univers où tout est à rebâtir ? Où chaque projet politique peut émerger librement ?
+                    Bienvenue dans la Nouvelle Ère. Bienvenue dans Projet Résurgence.
+                </p>
+                <div class="btn-group">
+                    <a href="https://discord.gg/NuwQqWGbHc" class="btn btn-secondary">Rejoindre Discord</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3 class="project-title">PROJET RÉSURGENCE</h3>
+                    <p>Serveur RP géopolitique francophone post-apocalyptique sur Discord. Incarnez une nation émergente
+                        et participez à la reconstruction du monde.</p>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Liens Rapides</h3>
+                    <ul>
+                        <li><a href="https://discord.gg/NuwQqWGbHc">Discord</a></li>
+                        <li><a href="regles.html">Règles</a></li>
+                        <li><a href="guide.html">Guide du Débutant</a></li>
+                        <li><a href="#univers">Univers</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Support</h3>
+                    <ul>
+                        <li><a href="guide.html">Comment Commencer</a></li>
+                        <li><a href="https://discord.gg/NuwQqWGbHc">Aide Discord</a></li>
+                        <li><a href="mailto:contact@projet-resurgence.fr">Contact</a></li>
+                        <li><a href="regles.html">Documentation</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Communauté</h3>
+                    <ul>
+                        <li><a href="https://discord.gg/NuwQqWGbHc">Rejoindre Discord</a></li>
+                        <li><a href="#univers">Découvrir l'Univers</a></li>
+                        <li><a href="guide.html">Premiers Pas</a></li>
+                        <li><a href="regles.html">Règlement</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2025 Projet Résurgence. Construit avec ❤️ pour la communauté RP géopolitiquefrancophone.</p>
+                <p>Serveur Discord de roleplay géopolitique post-apocalyptique</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script>
+        // Smooth Scrolling for Navigation Links
+        document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+            anchor.addEventListener('click', function (e) {
+                e.preventDefault();
+                const target = document.querySelector(this.getAttribute('href'));
+                if (target) {
+                    const headerHeight = document.querySelector('.header').offsetHeight;
+                    const targetPosition = target.offsetTop - headerHeight;
+
+                    window.scrollTo({
+                        top: targetPosition,
+                        behavior: 'smooth'
+                    });
+                }
+            });
+        });
+
+        // Intersection Observer for Animations
+        const observerOptions = {
+            threshold: 0.1,
+            rootMargin: '0px 0px -50px 0px'
+        };
+
+        const observer = new IntersectionObserver((entries) => {
+            entries.forEach(entry => {
+                if (entry.isIntersecting) {
+                    entry.target.classList.add('animate-fade-in-up');
+                }
+            });
+        }, observerOptions);
+
+        // Observe feature cards and stat cards
+        document.querySelectorAll('.feature-card, .stat-card').forEach(card => {
+            observer.observe(card);
+        });
+
+        // Header Background on Scroll
+        window.addEventListener('scroll', () => {
+            const header = document.querySelector('.header');
+            if (window.scrollY > 100) {
+                header.style.backgroundColor = 'var(--bg-secondary)';
+                header.style.backdropFilter = 'blur(10px)';
+            } else {
+                header.style.backgroundColor = 'var(--bg-secondary)';
+                header.style.backdropFilter = 'blur(10px)';
+            }
+        });
+
+        // Add loading states and error handling
+        window.addEventListener('load', () => {
+            document.body.classList.remove('loading');
+        });
+
+        // Service Worker Registration (for PWA capabilities)
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(registration => {
+                        console.log('SW registered: ', registration);
+                    })
+                    .catch(registrationError => {
+                        console.log('SW registration failed: ', registrationError);
+                    });
+            });
+        }
+    </script>
+    <!-- External JavaScript -->
+    <script src="./styles/main.js"></script>
+    <script src="./styles/seo-optimizer.js"></script>
+    <script src="./styles/performance-optimizer.js"></script>
+</body>
+
+</html>

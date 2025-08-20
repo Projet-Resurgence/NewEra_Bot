@@ -7,6 +7,7 @@ import asyncio
 import discord.utils
 from time import sleep
 import json
+import io
 from discord.ext.commands import has_role, Context, Converter, BadArgument
 from discord.ext import tasks
 import urllib.request
@@ -412,7 +413,21 @@ async def date(ctx):
 async def log_to_intel(bot, message, image=None):
     chan = bot.get_channel(int(db.get_setting("intelligence_channel_id")))
     if chan:
-        await chan.send(message, file=image)
+        if image:
+            # Convert Discord Asset to File if needed
+            if hasattr(image, 'read'):  # It's a Discord Asset
+                try:
+                    image_bytes = await image.read()
+                    file = discord.File(io.BytesIO(image_bytes), filename="avatar.png")
+                    await chan.send(message, file=file)
+                except Exception as e:
+                    print(f"Error processing image: {e}")
+                    await chan.send(message)  # Send without image if error
+            else:
+                # Assume it's already a proper File object
+                await chan.send(message, file=image)
+        else:
+            await chan.send(message)
 
 
 @bot.event

@@ -13,6 +13,7 @@ import time
 import hashlib
 import csv
 from scipy.ndimage import binary_dilation
+from skimage.segmentation import find_boundaries
 
 CROPPING_OFFSET = 10
 BORDERS_SIZE = 3
@@ -233,115 +234,161 @@ class MappingCog(commands.Cog):
             print(f"Error generating map: {e}")
             return ""
 
+
     def generate_regions_map(self, regions_data: List[dict]) -> Image.Image:
-        """Generate a white map with black region outlines."""
+        """Generate a white map with black region outlines (sans overlap)."""
         print("[Mapping] Starting generate_regions_map...", flush=True)
         height, width = self.base_array.shape[:2]
-        result_array = (
-            np.ones((height, width, 3), dtype=np.uint8) * 255
-        )  # White background
+        result_array = np.ones((height, width, 3), dtype=np.uint8) * 255  # fond blanc
 
         water_color = np.array([39, 39, 39])  # #272727
 
-        # Create water mask
+        # Mask eau (pixels gris foncés ou transparents)
         water_mask = (np.all(self.base_array[:, :, :3] == water_color, axis=2)) | (
             self.base_array[:, :, 3] == 0
-        )  # Transparent areas
-
-        # Apply water color to water areas
+        )
         result_array[water_mask] = water_color
         print("[Mapping] Water mask applied.", flush=True)
 
-        # For regions map, we need to identify ALL regions to create borders
-        # If we have a filter, only show borders for those regions
-        # If no filter, show borders for ALL regions in the CSV (not database)
-
-        if not regions_data:  # No filter - use all CSV regions
-            print(
-                "[Mapping] No filter specified, using all CSV regions for borders.",
-                flush=True,
-            )
+        # Détermination des couleurs des régions à afficher
+        if not regions_data:
             relevant_colors = set(self.region_colors_cache.keys())
+            print(f"[Mapping] No filter: {len(relevant_colors)} regions from CSV.", flush=True)
         else:
-            # Filter specified - get colors from the filtered database data
-            print(
-                f"[Mapping] Filter specified, using {len(regions_data)} filtered regions.",
-                flush=True,
-            )
             relevant_colors = set()
             for region in regions_data:
                 hex_color = region.get("region_color_hex", "")
                 if hex_color:
                     if not hex_color.startswith("#"):
                         hex_color = "#" + hex_color
-                    rgb = self.hex_to_rgb(hex_color)
-                    relevant_colors.add(rgb)
+                    relevant_colors.add(self.hex_to_rgb(hex_color))
+            print(f"[Mapping] Filter: {len(relevant_colors)} regions from DB.", flush=True)
 
-        print(
-            f"[Mapping] Using {len(relevant_colors)} region colors for borders.",
-            flush=True,
-        )
+        # Construction d'une carte d'IDs (chaque région = un entier unique)
+        label_map = np.zeros((height, width), dtype=np.int32)
+        for idx, color in enumerate(relevant_colors, start=1):
+            mask = np.all(self.base_array[:, :, :3] == np.array(color), axis=2)
+            label_map[mask] = idx
 
-        # Create borders for each region individually to avoid merging adjacent regions
-        combined_border_mask = np.zeros((height, width), dtype=bool)
-        found_regions = 0
-        missing_regions = 0
+        # Extraction des frontières
+        border_mask = find_boundaries(label_map, mode="outer")
 
-        # Use a smaller kernel and create borders more carefully to avoid thickness
-        kernel = np.ones((3, 3), dtype=bool)  # Smaller 3x3 kernel for thinner borders
+        # Application des frontières en noir
+        result_array[border_mask] = [0, 0, 0]
 
-        for idx, color in enumerate(relevant_colors):
-            color_array = np.array(color)
-            region_mask = np.all(self.base_array[:, :, :3] == color_array, axis=2)
-            pixel_count = np.sum(region_mask)
-
-            if pixel_count > 0:
-                # Create border for this individual region
-                dilated_mask = binary_dilation(region_mask, structure=kernel)
-                border_mask = dilated_mask & ~region_mask
-
-                # Add this region's border to the combined border mask
-                combined_border_mask |= border_mask
-                found_regions += 1
-
-                if idx % 50 == 0:  # Less frequent logging
-                    individual_border_count = np.sum(border_mask)
-                    print(
-                        f"[Mapping] Region {color}: {pixel_count} pixels, {individual_border_count} border pixels"
-                    )
-            else:
-                missing_regions += 1
-                if missing_regions <= 5:  # Only log first few missing regions
-                    print(
-                        f"[Mapping] Warning: No pixels found for region color {color}"
-                    )
-
-            if idx % 50 == 0:
-                print(
-                    f"[Mapping] Processed {idx+1}/{len(relevant_colors)} region colors...",
-                    flush=True,
-                )
-
-        print(
-            f"[Mapping] Successfully found {found_regions}/{len(relevant_colors)} regions in map"
-        )
-        print(f"[Mapping] {missing_regions} regions not found in base map")
-
-        # Apply all borders at once
-        if np.any(combined_border_mask):
-            result_array[combined_border_mask] = [0, 0, 0]  # Black borders
-            total_border_pixels = np.sum(combined_border_mask)
-            print(
-                f"[Mapping] Applied {total_border_pixels} total border pixels for individual regions.",
-                flush=True,
-            )
-        else:
-            print(
-                "[Mapping] Warning: No regions found for border creation!", flush=True
-            )
-
+        print(f"[Mapping] Applied {np.sum(border_mask)} border pixels.", flush=True)
         print("[Mapping] Finished generate_regions_map.", flush=True)
         return Image.fromarray(result_array)
+
+    # def generate_regions_map(self, regions_data: List[dict]) -> Image.Image:
+    #     """Generate a white map with black region outlines."""
+    #     print("[Mapping] Starting generate_regions_map...", flush=True)
+    #     height, width = self.base_array.shape[:2]
+    #     result_array = (
+    #         np.ones((height, width, 3), dtype=np.uint8) * 255
+    #     )  # White background
+
+    #     water_color = np.array([39, 39, 39])  # #272727
+
+    #     # Create water mask
+    #     water_mask = (np.all(self.base_array[:, :, :3] == water_color, axis=2)) | (
+    #         self.base_array[:, :, 3] == 0
+    #     )  # Transparent areas
+
+    #     # Apply water color to water areas
+    #     result_array[water_mask] = water_color
+    #     print("[Mapping] Water mask applied.", flush=True)
+
+    #     # For regions map, we need to identify ALL regions to create borders
+    #     # If we have a filter, only show borders for those regions
+    #     # If no filter, show borders for ALL regions in the CSV (not database)
+
+    #     if not regions_data:  # No filter - use all CSV regions
+    #         print(
+    #             "[Mapping] No filter specified, using all CSV regions for borders.",
+    #             flush=True,
+    #         )
+    #         relevant_colors = set(self.region_colors_cache.keys())
+    #     else:
+    #         # Filter specified - get colors from the filtered database data
+    #         print(
+    #             f"[Mapping] Filter specified, using {len(regions_data)} filtered regions.",
+    #             flush=True,
+    #         )
+    #         relevant_colors = set()
+    #         for region in regions_data:
+    #             hex_color = region.get("region_color_hex", "")
+    #             if hex_color:
+    #                 if not hex_color.startswith("#"):
+    #                     hex_color = "#" + hex_color
+    #                 rgb = self.hex_to_rgb(hex_color)
+    #                 relevant_colors.add(rgb)
+
+    #     print(
+    #         f"[Mapping] Using {len(relevant_colors)} region colors for borders.",
+    #         flush=True,
+    #     )
+
+    #     # Create borders for each region individually to avoid merging adjacent regions
+    #     combined_border_mask = np.zeros((height, width), dtype=bool)
+    #     found_regions = 0
+    #     missing_regions = 0
+
+    #     # Use a smaller kernel and create borders more carefully to avoid thickness
+    #     kernel = np.ones((3, 3), dtype=bool)  # Smaller 3x3 kernel for thinner borders
+
+    #     for idx, color in enumerate(relevant_colors):
+    #         color_array = np.array(color)
+    #         region_mask = np.all(self.base_array[:, :, :3] == color_array, axis=2)
+    #         pixel_count = np.sum(region_mask)
+
+    #         if pixel_count > 0:
+    #             # Create border for this individual region
+    #             dilated_mask = binary_dilation(region_mask, structure=kernel)
+    #             border_mask = dilated_mask & ~region_mask
+
+    #             # Add this region's border to the combined border mask
+    #             combined_border_mask |= border_mask
+    #             found_regions += 1
+
+    #             if idx % 50 == 0:  # Less frequent logging
+    #                 individual_border_count = np.sum(border_mask)
+    #                 print(
+    #                     f"[Mapping] Region {color}: {pixel_count} pixels, {individual_border_count} border pixels"
+    #                 )
+    #         else:
+    #             missing_regions += 1
+    #             if missing_regions <= 5:  # Only log first few missing regions
+    #                 print(
+    #                     f"[Mapping] Warning: No pixels found for region color {color}"
+    #                 )
+
+    #         if idx % 50 == 0:
+    #             print(
+    #                 f"[Mapping] Processed {idx+1}/{len(relevant_colors)} region colors...",
+    #                 flush=True,
+    #             )
+
+    #     print(
+    #         f"[Mapping] Successfully found {found_regions}/{len(relevant_colors)} regions in map"
+    #     )
+    #     print(f"[Mapping] {missing_regions} regions not found in base map")
+
+    #     # Apply all borders at once
+    #     if np.any(combined_border_mask):
+    #         result_array[combined_border_mask] = [0, 0, 0]  # Black borders
+    #         total_border_pixels = np.sum(combined_border_mask)
+    #         print(
+    #             f"[Mapping] Applied {total_border_pixels} total border pixels for individual regions.",
+    #             flush=True,
+    #         )
+    #     else:
+    #         print(
+    #             "[Mapping] Warning: No regions found for border creation!", flush=True
+    #         )
+
+    #     print("[Mapping] Finished generate_regions_map.", flush=True)
+    #     return Image.fromarray(result_array)
 
     def generate_countries_map(self, regions_data: List[dict]) -> Image.Image:
         """Generate a map colored by countries with legend."""

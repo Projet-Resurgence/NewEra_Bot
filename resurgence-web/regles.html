@@ -1,0 +1,461 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google Tag Manager -->
+    <script>(function (w, d, s, l, i) {
+            w[l] = w[l] || []; w[l].push({
+                'gtm.start':
+                    new Date().getTime(), event: 'gtm.js'
+            }); var f = d.getElementsByTagName(s)[0],
+                j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =
+                    'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
+        })(window, document, 'script', 'dataLayer', 'GTM-WDG77HQC');</script>
+    <!-- End Google Tag Manager -->
+
+    <script>
+    window.axeptioSettings = {
+        clientId: "68963e315d089c7b7334b5d1",
+        cookiesVersion: "fr-08-08-2025_fr-EU",
+        googleConsentMode: {
+            default: {
+            analytics_storage: "denied",
+            ad_storage: "denied",
+            ad_user_data: "denied",
+            ad_personalization: "denied",
+            wait_for_update: 500
+            }
+        }
+    };
+    
+    (function(d, s) {
+    var t = d.getElementsByTagName(s)[0], e = d.createElement(s);
+    e.async = true; e.src = "//static.axept.io/sdk.js";
+    t.parentNode.insertBefore(e, t);
+    })(document, "script");
+    </script>
+
+
+    <!-- Enhanced Analytics Configuration -->
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'GTM-WDG77HQC', {
+            send_page_view: true,
+            enhanced_measurement: {
+                scroll_events: true,
+                outbound_clicks: true,
+                site_search: true,
+                file_downloads: true
+            },
+            custom_parameters: {
+                content_group1: 'Rules Page',
+                content_group2: 'Documentation',
+                content_group3: 'Policy Content'
+            }
+        });
+
+        window.trackEvent = function (eventName, parameters = {}) {
+            gtag('event', eventName, {
+                event_category: parameters.category || 'User Interaction',
+                event_label: parameters.label || '',
+                value: parameters.value || 0,
+                custom_parameters: {
+                    page_type: 'rules',
+                    ...parameters.custom
+                }
+            });
+        };
+    </script>
+
+
+    <!-- Primary Meta Tags -->
+    <title>Règles et Règlement - Projet Résurgence | Serveur RP Géopolitique Francophone</title>
+    <meta name="title" content="Règles et Règlement - Projet Résurgence">
+    <meta name="description"
+        content="Consultez les règles officielles du serveur Discord Projet Résurgence. Règlement complet pour le roleplay géopolitique, comportement, militaire et territorial.">
+    <meta name="keywords"
+        content="règles projet résurgence, règlement RP géopolitique, règles discord français, roleplay francophone, code de conduite, règles militaires RP, règlement territorial">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="French">
+    <meta name="author" content="Projet Résurgence">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://projet-resurgence.github.io/regles.html">
+    <meta property="og:title" content="Règles et Règlement - Projet Résurgence">
+    <meta property="og:description"
+        content="Découvrez les règles officielles qui régissent notre communauté de roleplay géopolitique francophone.">
+    <meta property="og:image" content="https://projet-resurgence.github.io/images/banner.jpg">
+    <meta property="og:image:width" content="1055">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Bannière des Règles et Règlement">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:site_name" content="Projet Résurgence">
+    <meta property="og:locale" content="fr_FR">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://projet-resurgence.github.io/regles.html">
+    <meta property="twitter:title" content="Règles et Règlement - Projet Résurgence">
+    <meta property="twitter:description"
+        content="Consultez les règles officielles du serveur Discord Projet Résurgence.">
+    <meta property="twitter:image" content="https://projet-resurgence.github.io/images/banner.jpg">
+    <meta property="twitter:image:width" content="1055">
+    <meta property="twitter:image:height" content="630">
+    <meta property="twitter:image:alt" content="Bannière des Règles et Règlement">
+    <meta property="twitter:image:type" content="image/jpeg">
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://projet-resurgence.github.io/regles.html">
+
+    <!-- Resource hints for performance -->
+    <link rel="preload" href="./fonts/pressgothic.otf" as="font" type="font/otf" crossorigin="anonymous">
+    <link rel="preload" href="./styles/main.css" as="style">
+    <link rel="preload" href="./images/final_logo_centered_little.webp" as="image" type="image/webp">
+    <link rel="preload" href="./images/final_logo_centered_little.png" as="image" type="image/png">
+    <link rel="preload" href="./styles/main.js" as="script">
+    <link rel="prefetch" href="./index.html">
+    <link rel="prefetch" href="./guide.html">
+    <link rel="dns-prefetch" href="//discord.gg">
+
+    <link rel="stylesheet" href="./styles/main.css">
+    <link rel="icon" type="image/png" href="./images/final_logo_little.png">
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#D5B654">
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "Règles et Règlement - Projet Résurgence",
+        "description": "Règles officielles du serveur Discord Projet Résurgence pour le roleplay géopolitique francophone post-apocalyptique",
+        "url": "https://projet-resurgence.github.io/regles.html",
+        "inLanguage": "fr",
+        "isPartOf": {
+            "@type": "WebSite",
+            "name": "Projet Résurgence",
+            "url": "https://projet-resurgence.github.io"
+        },
+        "about": {
+            "@type": "Game",
+            "name": "Projet Résurgence - RP Géopolitique",
+            "genre": "Role-playing game",
+            "gamePlatform": "Discord"
+        },
+        "author": {
+            "@type": "Organization",
+            "name": "Projet Résurgence"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "Projet Résurgence"
+        }
+    }
+    </script>
+</head>
+
+<body>
+
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WDG77HQC" height="0" width="0"
+            style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <picture>
+                        <source srcset="./images/final_logo_centered_little.webp" type="image/webp">
+                        <img src="./images/final_logo_centered_little.png" alt="Logo Projet Résurgence" width="50"
+                            height="50" loading="eager" decoding="async">
+                    </picture>
+                    <span class="logo-text">PROJET RÉSURGENCE</span>
+                </div>
+                <nav class="nav" role="navigation" aria-label="Navigation principale">
+                    <!-- Mobile menu button -->
+                    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Ouvrir le menu de navigation"
+                        aria-expanded="false">
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                    </button>
+
+                    <!-- Navigation menu -->
+                    <div class="nav-menu" id="navMenu">
+                        <ul class="nav-list">
+                            <li><a href="index.html" class="nav-link">Accueil</a></li>
+                            <li><a href="index.html#serveur" class="nav-link">Le Serveur</a></li>
+                            <li><a href="index.html#univers" class="nav-link">Univers</a></li>
+                            <li><a href="regles.html" class="nav-link active">Règles</a></li>
+                            <li><a href="guide.html" class="nav-link">Guide</a></li>
+                            <li><a href="index.html#rejoindre" class="nav-link">Rejoindre</a></li>
+                        </ul>
+                        <button class="theme-toggle" id="themeToggle" aria-label="Changer de thème">
+                            🌙
+                        </button>
+                    </div>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Hero Section -->
+        <section class="hero rules-hero">
+            <div class="container">
+                <div class="hero-content">
+                    <h1 class="hero-title">Règles & Règlement</h1>
+                    <p class="hero-subtitle" style="font-family: var(--font-family-title);"> PROJET RÉSURGENCE - RP
+                        Géopolitique</p>
+                    <p class="hero-description">
+                        Découvrez les règles qui régissent notre communauté et garantissent une expérience de roleplay
+                        équitable et immersive pour tous.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Rules Categories -->
+        <section class="features">
+            <div class="container">
+                <h2 class="section-title">Catégories de Règles</h2>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon">📋</span>
+                        <h3 class="feature-title">Règles Générales</h3>
+                        <p class="feature-description">Règles de base du serveur, comportement attendu et sanctions.</p>
+                        <a href="#regles-generales" class="btn btn-secondary">Consulter</a>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">🎭</span>
+                        <h3 class="feature-title">Roleplay</h3>
+                        <p class="feature-description">Directives pour le roleplay, création de nations et interactions
+                            RP.</p>
+                        <a href="#roleplay" class="btn btn-secondary">Consulter</a>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">⚔️</span>
+                        <h3 class="feature-title">Militaire & Conflits</h3>
+                        <p class="feature-description">Règles concernant les guerres, batailles et opérations
+                            militaires.</p>
+                        <a href="#militaire" class="btn btn-secondary">Consulter</a>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">🗺️</span>
+                        <h3 class="feature-title">Territorial</h3>
+                        <p class="feature-description">Gestion des territoires, frontières et expansions géographiques.
+                        </p>
+                        <a href="#territorial" class="btn btn-secondary">Consulter</a>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">💬</span>
+                        <h3 class="feature-title">HRP (Hors Roleplay)</h3>
+                        <p class="feature-description">Règles pour les discussions hors roleplay et la modération.</p>
+                        <a href="#hrp" class="btn btn-secondary">Consulter</a>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">📢</span>
+                        <h3 class="feature-title">Annonces</h3>
+                        <p class="feature-description">Protocoles pour les annonces officielles et communications.</p>
+                        <a href="#annonces" class="btn btn-secondary">Consulter</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Detailed Rules Sections -->
+        <section class="rules-content">
+            <div class="container">
+                <!-- General Rules -->
+                <div id="regles-generales" class="rule-section">
+                    <h2 class="section-title">📋 Règles Générales</h2>
+                    <div class="rules-grid">
+                        <div class="rule-card">
+                            <h3>Respect et Courtoisie</h3>
+                            <p>Le respect mutuel est la base de notre communauté. Aucune forme de harcèlement,
+                                discrimination ou comportement toxique ne sera tolérée.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Langue et Communication</h3>
+                            <p>Le français est la langue principale du serveur. Utilisez un langage approprié et évitez
+                                le spam ou les messages répétitifs.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Contenu Approprié</h3>
+                            <p>Partagez uniquement du contenu approprié. Aucun contenu NSFW, violent ou offensant ne
+                                sera autorisé.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Sanctions</h3>
+                            <p>Les violations peuvent entraîner des avertissements, mutes temporaires, kicks ou
+                                bannissements selon la gravité.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Roleplay Rules -->
+                <div id="roleplay" class="rule-section">
+                    <h2 class="section-title">🎭 Règles de Roleplay</h2>
+                    <div class="rules-grid">
+                        <div class="rule-card">
+                            <h3>Création de Nation</h3>
+                            <p>Chaque joueur peut créer une nation unique avec une histoire, culture et gouvernement
+                                cohérents avec l'univers post-apocalyptique.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Réalisme et Cohérence</h3>
+                            <p>Les actions doivent être réalistes et cohérentes avec le contexte RP. Évitez le
+                                power-gaming et le meta-gaming.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Interactions Diplomatiques</h3>
+                            <p>Les négociations et accords doivent être formalisés. Respectez les traités signés et les
+                                engagements pris.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Développement Narratif</h3>
+                            <p>Contribuez au développement de l'histoire collective. Vos actions ont des conséquences
+                                sur l'univers partagé.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Military Rules -->
+                <div id="militaire" class="rule-section">
+                    <h2 class="section-title">⚔️ Règles Militaires</h2>
+                    <div class="rules-grid">
+                        <div class="rule-card">
+                            <h3>Déclarations de Guerre</h3>
+                            <p>Les guerres doivent être déclarées officiellement avec des justifications RP valides.
+                                Aucune attaque surprise sans contexte.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Batailles et Combats</h3>
+                            <p>Les combats sont résolus par le système automatisé du bot. Respectez les résultats et
+                                jouez les conséquences.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Alliances Militaires</h3>
+                            <p>Les alliances doivent être formalisées par traité. Les obligations d'assistance mutuelle
+                                doivent être respectées.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Infrastructures Militaires</h3>
+                            <p>La construction d'infrastructures militaires suit les règles économiques. Planifiez vos
+                                investissements stratégiquement.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Territorial Rules -->
+                <div id="territorial" class="rule-section">
+                    <h2 class="section-title">🗺️ Règles Territoriales</h2>
+                    <div class="rules-grid">
+                        <div class="rule-card">
+                            <h3>Revendications Territoriales</h3>
+                            <p>Les nouvelles revendications doivent être justifiées RP et approuvées par le staff.
+                                Aucune expansion arbitraire.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Gestion des Frontières</h3>
+                            <p>Les frontières sont définies clairement sur la carte. Les modifications nécessitent un
+                                accord ou une victoire militaire.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Ressources Naturelles</h3>
+                            <p>L'exploitation des ressources est liée au territoire contrôlé. Développez vos régions
+                                pour maximiser les bénéfices.</p>
+                        </div>
+                        <div class="rule-card">
+                            <h3>Occupation et Libération</h3>
+                            <p>Les territoires occupés peuvent être libérés. Les populations locales influencent la
+                                stabilité des régions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Call to Action -->
+        <section class="cta">
+            <div class="container">
+                <h2>Questions sur les Règles ?</h2>
+                <p>
+                    Si vous avez des questions concernant les règles ou avez besoin de clarifications, n'hésitez pas à
+                    contacter le staff sur Discord.
+                </p>
+                <div class="btn-group">
+                    <a href="https://discord.gg/NuwQqWGbHc" class="btn btn-primary">Rejoindre Discord</a>
+                    <a href="guide.html" class="btn btn-secondary">Guide du Débutant</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3 class="project-title">PROJET RÉSURGENCE</h3>
+                    <p>Serveur RP géopolitique francophone post-apocalyptique sur Discord.</p>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Navigation</h3>
+                    <ul>
+                        <li><a href="index.html">Accueil</a></li>
+                        <li><a href="regles.html">Règles</a></li>
+                        <li><a href="guide.html">Guide</a></li>
+                        <li><a href="https://discord.gg/NuwQqWGbHc">Discord</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Support</h3>
+                    <ul>
+                        <li><a href="guide.html">Comment Commencer</a></li>
+                        <li><a href="https://discord.gg/NuwQqWGbHc">Aide Discord</a></li>
+                        <li><a href="mailto:contact@projet-resurgence.fr">Contact</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Communauté</h3>
+                    <ul>
+                        <li><a href="https://discord.gg/NuwQqWGbHc">Rejoindre</a></li>
+                        <li><a href="index.html#univers">Univers</a></li>
+                        <li><a href="regles.html">Règlement</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2025 Projet Résurgence. Construit avec ❤️ pour la communauté RP francophone.</p>
+                <p>Serveur Discord de roleplay géopolitique post-apocalyptique</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="./styles/main.js"></script>
+    <script src="./styles/seo-optimizer.js"></script>
+    <script src="./styles/performance-optimizer.js"></script>
+</body>
+
+</html>

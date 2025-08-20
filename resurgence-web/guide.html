@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="fr" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <!-- Google Tag Manager -->
+    <script>(function (w, d, s, l, i) {
+            w[l] = w[l] || []; w[l].push({
+                'gtm.start':
+                    new Date().getTime(), event: 'gtm.js'
+            }); var f = d.getElementsByTagName(s)[0],
+                j = d.createElement(s), dl = l != 'dataLayer' ? '&l=' + l : ''; j.async = true; j.src =
+                    'https://www.googletagmanager.com/gtm.js?id=' + i + dl; f.parentNode.insertBefore(j, f);
+        })(window, document, 'script', 'dataLayer', 'GTM-WDG77HQC');</script>
+    <!-- End Google Tag Manager -->
+
+    <script>
+    window.axeptioSettings = {
+        clientId: "68963e315d089c7b7334b5d1",
+        cookiesVersion: "fr-08-08-2025_fr-EU",
+        googleConsentMode: {
+            default: {
+            analytics_storage: "denied",
+            ad_storage: "denied",
+            ad_user_data: "denied",
+            ad_personalization: "denied",
+            wait_for_update: 500
+            }
+        }
+    };
+    
+    (function(d, s) {
+    var t = d.getElementsByTagName(s)[0], e = d.createElement(s);
+    e.async = true; e.src = "//static.axept.io/sdk.js";
+    t.parentNode.insertBefore(e, t);
+    })(document, "script");
+    </script>
+
+
+    <!-- Enhanced Analytics Configuration -->
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'GTM-WDG77HQC', {
+            send_page_view: true,
+            enhanced_measurement: {
+                scroll_events: true,
+                outbound_clicks: true,
+                site_search: true,
+                file_downloads: true
+            },
+            custom_parameters: {
+                content_group1: 'Guide Page',
+                content_group2: 'Documentation',
+                content_group3: 'Tutorial Content'
+            }
+        });
+
+        window.trackEvent = function (eventName, parameters = {}) {
+            gtag('event', eventName, {
+                event_category: parameters.category || 'User Interaction',
+                event_label: parameters.label || '',
+                value: parameters.value || 0,
+                custom_parameters: {
+                    page_type: 'guide',
+                    ...parameters.custom
+                }
+            });
+        };
+    </script>
+
+    <!-- Primary Meta Tags -->
+    <title>Guide du Débutant - Projet Résurgence | Comment Commencer le RP Géopolitique</title>
+    <meta name="title" content="Guide du Débutant - Projet Résurgence">
+    <meta name="description"
+        content="Guide complet pour débuter sur Projet Résurgence. Apprenez à créer votre nation, comprendre l'économie et maîtriser le roleplay géopolitique francophone.">
+    <meta name="keywords"
+        content="guide projet résurgence, tutoriel RP géopolitique, débuter roleplay français, créer nation virtuelle, guide discord français, aide débutant RP">
+    <meta name="robots" content="index, follow">
+    <meta name="language" content="French">
+    <meta name="author" content="Projet Résurgence">
+
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://projet-resurgence.github.io/guide.html">
+    <meta property="og:title" content="Guide du Débutant - Projet Résurgence">
+    <meta property="og:description"
+        content="Apprenez à créer votre nation et maîtriser le roleplay géopolitique avec notre guide complet pour débutants.">
+    <meta property="og:image" content="https://projet-resurgence.github.io/images/banner.jpg">
+    <meta property="og:image:width" content="1055">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="Bannière du Guide du Débutant">
+    <meta property="og:image:type" content="image/jpeg">
+    <meta property="og:site_name" content="Projet Résurgence">
+    <meta property="og:locale" content="fr_FR">
+
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://projet-resurgence.github.io/guide.html">
+    <meta property="twitter:title" content="Guide du Débutant - Projet Résurgence">
+    <meta property="twitter:description"
+        content="Guide complet pour débuter sur notre serveur de roleplay géopolitique.">
+    <meta property="twitter:image" content="https://projet-resurgence.github.io/images/banner.jpg">
+    <meta property="twitter:image:width" content="1055">
+    <meta property="twitter:image:height" content="630">
+    <meta property="twitter:image:alt" content="Bannière du Guide du Débutant">
+    <meta property="twitter:image:type" content="image/jpeg">
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://projet-resurgence.github.io/guide.html">
+
+    <!-- Resource hints for performance -->
+    <link rel="preload" href="./fonts/pressgothic.otf" as="font" type="font/otf" crossorigin="anonymous">
+    <link rel="preload" href="./styles/main.css" as="style">
+    <link rel="preload" href="./images/final_logo_centered_little.webp" as="image" type="image/webp">
+    <link rel="preload" href="./images/final_logo_centered_little.png" as="image" type="image/png">
+    <link rel="preload" href="./styles/main.js" as="script">
+    <link rel="prefetch" href="./index.html">
+    <link rel="prefetch" href="./regles.html">
+    <link rel="dns-prefetch" href="//discord.gg">
+
+    <link rel="stylesheet" href="./styles/main.css">
+    <link rel="icon" type="image/png" href="./images/final_logo_little.png">
+    <link rel="manifest" href="./manifest.json">
+    <meta name="theme-color" content="#D5B654">
+
+    <!-- Structured Data (JSON-LD) -->
+    <script type="application/ld+json">
+    {
+        "@context": "https://schema.org",
+        "@type": "WebPage",
+        "name": "Guide du Débutant - Projet Résurgence",
+        "description": "Guide complet pour débuter sur Projet Résurgence. Apprenez à créer votre nation, comprendre l'économie et maîtriser le roleplay géopolitique francophone",
+        "url": "https://projet-resurgence.github.io/guide.html",
+        "inLanguage": "fr",
+        "isPartOf": {
+            "@type": "WebSite",
+            "name": "Projet Résurgence",
+            "url": "https://projet-resurgence.github.io"
+        },
+        "about": {
+            "@type": "Game",
+            "name": "Projet Résurgence - RP Géopolitique",
+            "genre": "Role-playing game",
+            "gamePlatform": "Discord"
+        },
+        "author": {
+            "@type": "Organization",
+            "name": "Projet Résurgence"
+        },
+        "publisher": {
+            "@type": "Organization",
+            "name": "Projet Résurgence"
+        },
+        "educationalUse": "Tutorial",
+        "typicalAgeRange": "16-99",
+        "audience": {
+            "@type": "Audience",
+            "audienceType": "French speakers interested in geopolitical roleplay"
+        }
+    }
+    </script>
+</head>
+
+<body>
+
+    <!-- Google Tag Manager (noscript) -->
+    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-WDG77HQC" height="0" width="0"
+            style="display:none;visibility:hidden"></iframe></noscript>
+    <!-- End Google Tag Manager (noscript) -->
+
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <div class="logo">
+                    <picture>
+                        <source srcset="./images/final_logo_centered_little.webp" type="image/webp">
+                        <img src="./images/final_logo_centered_little.png" alt="Logo Projet Résurgence" width="50"
+                            height="50" loading="eager" decoding="async">
+                    </picture>
+                    <span class="logo-text">PROJET RÉSURGENCE</span>
+                </div>
+                <nav class="nav" role="navigation" aria-label="Navigation principale">
+                    <!-- Mobile menu button -->
+                    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Ouvrir le menu de navigation"
+                        aria-expanded="false">
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                        <span class="hamburger-line"></span>
+                    </button>
+
+                    <!-- Navigation menu -->
+                    <div class="nav-menu" id="navMenu">
+                        <ul class="nav-list">
+                            <li><a href="index.html" class="nav-link">Accueil</a></li>
+                            <li><a href="index.html#serveur" class="nav-link">Le Serveur</a></li>
+                            <li><a href="index.html#univers" class="nav-link">Univers</a></li>
+                            <li><a href="regles.html" class="nav-link">Règles</a></li>
+                            <li><a href="guide.html" class="nav-link active">Guide</a></li>
+                            <li><a href="index.html#rejoindre" class="nav-link">Rejoindre</a></li>
+                        </ul>
+                        <button class="theme-toggle" id="themeToggle" aria-label="Changer de thème">
+                            🌙
+                        </button>
+                    </div>
+                </nav>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <!-- Hero Section -->
+        <section class="hero guide-hero">
+            <div class="container">
+                <div class="hero-content">
+                    <h1 class="hero-title">Guide du Débutant</h1>
+                    <p class="hero-subtitle">Premiers Pas dans Projet Résurgence</p>
+                    <p class="hero-description">
+                        Nouveau sur le serveur ? Ce guide vous accompagne étape par étape pour créer votre nation et
+                        commencer votre aventure géopolitique.
+                    </p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Quick Start -->
+        <section class="features">
+            <div class="container">
+                <h2 class="section-title">Démarrage Rapide</h2>
+
+                <div class="step-timeline">
+                    <div class="step-item">
+                        <div class="step-number">1</div>
+                        <div class="step-content">
+                            <h3>Rejoindre le Discord</h3>
+                            <p>Cliquez sur le lien d'invitation et rejoignez notre serveur Discord. Lisez le canal
+                                d'accueil pour une première présentation.</p>
+                            <a href="https://discord.gg/NuwQqWGbHc" class="btn btn-primary">Rejoindre Discord</a>
+                        </div>
+                    </div>
+
+                    <div class="step-item">
+                        <div class="step-number">2</div>
+                        <div class="step-content">
+                            <h3>Lire les Règles</h3>
+                            <p>Prenez le temps de lire attentivement les règles du serveur. Elles garantissent une
+                                expérience équitable pour tous.</p>
+                            <a href="regles.html" class="btn btn-secondary">Voir les Règles</a>
+                        </div>
+                    </div>
+
+                    <div class="step-item">
+                        <div class="step-number">3</div>
+                        <div class="step-content">
+                            <h3>Créer votre Nation</h3>
+                            <p>Réfléchissez à votre concept de nation : culture, gouvernement, histoire. Utilisez les
+                                canaux dédiés pour présenter votre projet.</p>
+                        </div>
+                    </div>
+
+                    <div class="step-item">
+                        <div class="step-number">4</div>
+                        <div class="step-content">
+                            <h3>Validation Staff</h3>
+                            <p>Le staff examinera votre demande et vous aidera à affiner votre concept pour qu'il
+                                s'intègre parfaitement dans l'univers.</p>
+                        </div>
+                    </div>
+
+                    <div class="step-item">
+                        <div class="step-number">5</div>
+                        <div class="step-content">
+                            <h3>Commencer à Jouer</h3>
+                            <p>Une fois validé, vous recevrez votre rôle et accès aux canaux de votre nation. L'aventure
+                                peut commencer !</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Detailed Guides -->
+        <section class="features">
+            <div class="container">
+                <h2 class="section-title">Guides Détaillés</h2>
+
+                <div class="features-grid">
+                    <div class="feature-card">
+                        <span class="feature-icon">🏛️</span>
+                        <h3 class="feature-title">Création de Nation</h3>
+                        <p class="feature-description">Comment concevoir une nation cohérente : histoire, culture,
+                            gouvernement et institutions.</p>
+                        <a href="#creation-nation" class="btn btn-secondary">En savoir plus</a>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">💰</span>
+                        <h3 class="feature-title">Système Économique</h3>
+                        <p class="feature-description">Comprendre l'économie du serveur : ressources, commerce et
+                            développement industriel.</p>
+                        <a href="#economie" class="btn btn-secondary">En savoir plus</a>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">🎭</span>
+                        <h3 class="feature-title">Bases du Roleplay</h3>
+                        <p class="feature-description">Principes fondamentaux du RP géopolitique et comment interagir
+                            avec les autres nations.</p>
+                        <a href="#roleplay-bases" class="btn btn-secondary">En savoir plus</a>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">⚔️</span>
+                        <h3 class="feature-title">Diplomatie & Conflits</h3>
+                        <p class="feature-description">Art de la négociation, formation d'alliances et gestion des
+                            tensions internationales.</p>
+                        <a href="#diplomatie" class="btn btn-secondary">En savoir plus</a>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">🤖</span>
+                        <h3 class="feature-title">Utilisation du Bot</h3>
+                        <p class="feature-description">Guide des commandes essentielles du bot pour gérer votre nation
+                            efficacement.</p>
+                        <a href="#bot-commands" class="btn btn-secondary">En savoir plus</a>
+                    </div>
+
+                    <div class="feature-card">
+                        <span class="feature-icon">❓</span>
+                        <h3 class="feature-title">FAQ</h3>
+                        <p class="feature-description">Réponses aux questions les plus fréquemment posées par les
+                            nouveaux joueurs.</p>
+                        <a href="#faq" class="btn btn-secondary">En savoir plus</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Detailed Content Sections -->
+        <section class="guide-content">
+            <div class="container">
+                <!-- Nation Creation -->
+                <div id="creation-nation" class="guide-section">
+                    <h2 class="section-title">🏛️ Création de Nation</h2>
+                    <div class="guide-grid">
+                        <div class="guide-card">
+                            <h3>Concept de Base</h3>
+                            <p>Définissez l'identité fondamentale de votre nation : est-ce un État-nation traditionnel,
+                                une fédération de tribus, une corporation, ou autre chose ?</p>
+                            <ul>
+                                <li>Nom et symboles nationaux</li>
+                                <li>Idéologie et valeurs</li>
+                                <li>Structure sociale</li>
+                                <li>Particularités culturelles</li>
+                            </ul>
+                        </div>
+
+                        <div class="guide-card">
+                            <h3>Histoire Post-Apocalyptique</h3>
+                            <p>Racontez comment votre nation a émergé après l'effondrement. Quelle était sa situation
+                                avant ? Comment a-t-elle survécu ?</p>
+                            <ul>
+                                <li>Origine et fondation</li>
+                                <li>Épreuves surmontées</li>
+                                <li>Évolution depuis l'effondrement</li>
+                                <li>Relations avec les autres survivants</li>
+                            </ul>
+                        </div>
+
+                        <div class="guide-card">
+                            <h3>Gouvernement et Institutions</h3>
+                            <p>Décrivez le système politique de votre nation et ses institutions principales.</p>
+                            <ul>
+                                <li>Type de gouvernement</li>
+                                <li>Processus de décision</li>
+                                <li>Institutions clés</li>
+                                <li>Système de justice</li>
+                            </ul>
+                        </div>
+
+                        <div class="guide-card">
+                            <h3>Géographie et Ressources</h3>
+                            <p>Indiquez vos préférences géographiques et les ressources dont dispose votre territoire.
+                            </p>
+                            <ul>
+                                <li>Climat et terrain préférés</li>
+                                <li>Ressources naturelles</li>
+                                <li>Villes et infrastructure</li>
+                                <li>Défenses naturelles</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- FAQ Section -->
+                <div id="faq" class="guide-section">
+                    <h2 class="section-title">❓ Questions Fréquentes</h2>
+                    <div class="faq-grid">
+                        <div class="faq-item">
+                            <h3>Combien de temps faut-il pour créer une nation ?</h3>
+                            <p>Comptez entre 1-3 jours pour la validation complète, selon la complexité de votre concept
+                                et la disponibilité du staff.</p>
+                        </div>
+
+                        <div class="faq-item">
+                            <h3>Puis-je changer ma nation après validation ?</h3>
+                            <p>Des modifications mineures sont possibles, mais les changements majeurs nécessitent une
+                                justification RP et l'accord du staff.</p>
+                        </div>
+
+                        <div class="faq-item">
+                            <h3>Dois-je être connecté tous les jours ?</h3>
+                            <p>Non, mais une activité régulière est appréciée. Prévenez en cas d'absence prolongée pour
+                                éviter l'inactivité de votre nation.</p>
+                        </div>
+
+                        <div class="faq-item">
+                            <h3>Puis-je avoir plusieurs nations ?</h3>
+                            <p>Généralement une seule nation par personne, sauf cas particuliers et accord du staff.</p>
+                        </div>
+
+                        <div class="faq-item">
+                            <h3>Comment apprendre les commandes du bot ?</h3>
+                            <p>Utilisez la commande d'aide du bot et consultez la documentation disponible sur le
+                                serveur.</p>
+                        </div>
+
+                        <div class="faq-item">
+                            <h3>Que faire si j'ai un conflit avec un joueur ?</h3>
+                            <p>Contactez un membre du staff en privé. Ne réglez jamais les conflits HRP en public.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Call to Action -->
+        <section class="cta">
+            <div class="container">
+                <h2>Prêt à Commencer ?</h2>
+                <p>
+                    Vous avez lu le guide et vous sentez prêt à créer votre nation ? Rejoignez-nous sur Discord et
+                    présentez-vous à la communauté !
+                </p>
+                <div class="btn-group">
+                    <a href="https://discord.gg/NuwQqWGbHc" class="btn btn-primary">Rejoindre Discord</a>
+                    <a href="regles.html" class="btn btn-secondary">Lire les Règles</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-section">
+                    <h3 class="project-title">PROJET RÉSURGENCE</h3>
+                    <p>Serveur RP géopolitique francophone post-apocalyptique sur Discord.</p>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Navigation</h3>
+                    <ul>
+                        <li><a href="index.html">Accueil</a></li>
+                        <li><a href="regles.html">Règles</a></li>
+                        <li><a href="guide.html">Guide</a></li>
+                        <li><a href="https://discord.gg/NuwQqWGbHc">Discord</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Support</h3>
+                    <ul>
+                        <li><a href="guide.html">Comment Commencer</a></li>
+                        <li><a href="https://discord.gg/NuwQqWGbHc">Aide Discord</a></li>
+                        <li><a href="mailto:contact@projet-resurgence.fr">Contact</a></li>
+                    </ul>
+                </div>
+
+                <div class="footer-section">
+                    <h3>Communauté</h3>
+                    <ul>
+                        <li><a href="https://discord.gg/NuwQqWGbHc">Rejoindre</a></li>
+                        <li><a href="index.html#univers">Univers</a></li>
+                        <li><a href="regles.html">Règlement</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <p>&copy; 2025 Projet Résurgence. Construit avec ❤️ pour la communauté RP francophone.</p>
+                <p>Serveur Discord de roleplay géopolitique post-apocalyptique</p>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="./styles/main.js"></script>
+    <script src="./styles/seo-optimizer.js"></script>
+    <script src="./styles/performance-optimizer.js"></script>
+</body>
+
+</html>
