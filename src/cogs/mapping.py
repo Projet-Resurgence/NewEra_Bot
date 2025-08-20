@@ -14,6 +14,9 @@ import hashlib
 import csv
 from scipy.ndimage import binary_dilation
 
+CROPPING_OFFSET = 10
+BORDERS_SIZE = 3
+
 
 class MappingCog(commands.Cog):
     """Geographic mapping and visualization commands with optimized preprocessing."""
@@ -25,6 +28,7 @@ class MappingCog(commands.Cog):
         self.region_colors_cache = {}
         self.region_masks_cache = {}
         self._load_region_colors()
+        self.country_colors = {}
         self.base_img = Image.open("datas/mapping/region_map.png").convert("RGBA")
         self.base_array = np.array(self.base_img)
 
@@ -125,6 +129,15 @@ class MappingCog(commands.Cog):
             cursor = self.db.cur
 
             if filter_key == "All" or not filter_value:
+                # For "All" case, we return empty list to trigger CSV-based processing
+                # This ensures we get all regions including those not in database
+                if filter_key == "All":
+                    print(
+                        "[Mapping] Filter key is 'All', returning empty list to use CSV colors"
+                    )
+                    return []
+
+                # If filter_value is None but filter_key is not "All", get all regions
                 cursor.execute(
                     """
                     SELECT r.region_id, r.country_id, r.name, r.region_color_hex, 
@@ -175,7 +188,11 @@ class MappingCog(commands.Cog):
                     (filter_value,),
                 )
 
-            return [dict(row) for row in cursor.fetchall()]
+            result = [dict(row) for row in cursor.fetchall()]
+            print(
+                f"[Mapping] Database query returned {len(result)} regions for filter {filter_key}={filter_value}"
+            )
+            return result
 
         except Exception as e:
             print(f"Error getting regions data: {e}")
@@ -190,6 +207,7 @@ class MappingCog(commands.Cog):
         """Generate a filtered map based on the key/value and map type."""
         try:
             # Get regions data for filtering
+            self.country_colors = {}
             regions_data = self.get_regions_data(filter_key, filter_value)
 
             if is_regions_map:
@@ -202,6 +220,9 @@ class MappingCog(commands.Cog):
             # Crop if not showing all
             if filter_key != "All" and filter_value:
                 result_img = self.crop_to_regions(result_img, regions_data)
+
+            if not is_regions_map:
+                result_img = self.add_legend(result_img, regions_data)
 
             # Save result
             output_path = "datas/mapping/final_map.png"
@@ -234,13 +255,19 @@ class MappingCog(commands.Cog):
         # For regions map, we need to identify ALL regions to create borders
         # If we have a filter, only show borders for those regions
         # If no filter, show borders for ALL regions in the CSV (not database)
-        
+
         if not regions_data:  # No filter - use all CSV regions
-            print("[Mapping] No filter specified, using all CSV regions for borders.", flush=True)
+            print(
+                "[Mapping] No filter specified, using all CSV regions for borders.",
+                flush=True,
+            )
             relevant_colors = set(self.region_colors_cache.keys())
         else:
             # Filter specified - get colors from the filtered database data
-            print(f"[Mapping] Filter specified, using {len(regions_data)} filtered regions.", flush=True)
+            print(
+                f"[Mapping] Filter specified, using {len(regions_data)} filtered regions.",
+                flush=True,
+            )
             relevant_colors = set()
             for region in regions_data:
                 hex_color = region.get("region_color_hex", "")
@@ -250,46 +277,68 @@ class MappingCog(commands.Cog):
                     rgb = self.hex_to_rgb(hex_color)
                     relevant_colors.add(rgb)
 
-        print(f"[Mapping] Using {len(relevant_colors)} region colors for borders.", flush=True)
+        print(
+            f"[Mapping] Using {len(relevant_colors)} region colors for borders.",
+            flush=True,
+        )
 
-        # Create region mask for border detection
-        region_mask = np.zeros((height, width), dtype=bool)
+        # Create borders for each region individually to avoid merging adjacent regions
+        combined_border_mask = np.zeros((height, width), dtype=bool)
         found_regions = 0
         missing_regions = 0
-        
+
+        # Use a smaller kernel and create borders more carefully to avoid thickness
+        kernel = np.ones((3, 3), dtype=bool)  # Smaller 3x3 kernel for thinner borders
+
         for idx, color in enumerate(relevant_colors):
             color_array = np.array(color)
-            color_mask = np.all(self.base_array[:, :, :3] == color_array, axis=2)
-            pixel_count = np.sum(color_mask)
+            region_mask = np.all(self.base_array[:, :, :3] == color_array, axis=2)
+            pixel_count = np.sum(region_mask)
+
             if pixel_count > 0:
-                region_mask |= color_mask
+                # Create border for this individual region
+                dilated_mask = binary_dilation(region_mask, structure=kernel)
+                border_mask = dilated_mask & ~region_mask
+
+                # Add this region's border to the combined border mask
+                combined_border_mask |= border_mask
                 found_regions += 1
+
                 if idx % 50 == 0:  # Less frequent logging
-                    print(f"[Mapping] Found {pixel_count} pixels for region color {color}")
+                    individual_border_count = np.sum(border_mask)
+                    print(
+                        f"[Mapping] Region {color}: {pixel_count} pixels, {individual_border_count} border pixels"
+                    )
             else:
                 missing_regions += 1
                 if missing_regions <= 5:  # Only log first few missing regions
-                    print(f"[Mapping] Warning: No pixels found for region color {color}")
+                    print(
+                        f"[Mapping] Warning: No pixels found for region color {color}"
+                    )
 
             if idx % 50 == 0:
-                print(f"[Mapping] Processed {idx+1}/{len(relevant_colors)} region colors...", flush=True)
+                print(
+                    f"[Mapping] Processed {idx+1}/{len(relevant_colors)} region colors...",
+                    flush=True,
+                )
 
-        print(f"[Mapping] Successfully found {found_regions}/{len(relevant_colors)} regions in map")
+        print(
+            f"[Mapping] Successfully found {found_regions}/{len(relevant_colors)} regions in map"
+        )
         print(f"[Mapping] {missing_regions} regions not found in base map")
 
-        # Create black outlines for regions (7px border)
-        if np.any(region_mask):
-            print("[Mapping] Creating region borders...", flush=True)
-            kernel = np.ones((7, 7), dtype=bool)
-            dilated_mask = binary_dilation(region_mask, structure=kernel)
-            border_mask = dilated_mask & ~region_mask
-
-            # Apply black borders
-            result_array[border_mask] = [0, 0, 0]  # Black borders
-            border_pixel_count = np.sum(border_mask)
-            print(f"[Mapping] Applied {border_pixel_count} border pixels.", flush=True)
+        # Apply all borders at once
+        if np.any(combined_border_mask):
+            result_array[combined_border_mask] = [0, 0, 0]  # Black borders
+            total_border_pixels = np.sum(combined_border_mask)
+            print(
+                f"[Mapping] Applied {total_border_pixels} total border pixels for individual regions.",
+                flush=True,
+            )
         else:
-            print("[Mapping] Warning: No regions found for border creation!", flush=True)
+            print(
+                "[Mapping] Warning: No regions found for border creation!", flush=True
+            )
 
         print("[Mapping] Finished generate_regions_map.", flush=True)
         return Image.fromarray(result_array)
@@ -303,8 +352,19 @@ class MappingCog(commands.Cog):
         water_color = np.array([39, 39, 39])  # #272727
         unoccupied_color = np.array([255, 255, 255])  # White for unoccupied
 
+        # If no regions_data (All filter), we need to get all regions from database
+        if not regions_data:
+            print(
+                "[Mapping] No regions data provided, querying all regions from database...",
+                flush=True,
+            )
+            regions_data = self.get_all_regions()
+            print(
+                f"[Mapping] Retrieved {len(regions_data)} regions from database",
+                flush=True,
+            )
+
         # Build country color mapping and region-to-country mapping
-        country_colors = {}
         region_to_country = {}
         countries_in_map = set()
 
@@ -313,12 +373,13 @@ class MappingCog(commands.Cog):
             country_id = region.get("country_id")
             if country_id:
                 countries_in_map.add(country_id)
-                if country_id not in country_colors:
-                    country_color = self.get_country_color(country_id)
-                    country_colors[country_id] = np.array(country_color)
-                    print(f"[Mapping] Country {country_id} gets color {country_color}")
+                if country_id not in self.country_colors:
+                    self.country_colors[country_id] = self.get_country_color(country_id)
+                    print(
+                        f"[Mapping] Country {country_id} gets color {self.country_colors[country_id]}"
+                    )
 
-        print(f"[Mapping] Found {len(country_colors)} countries with colors")
+        print(f"[Mapping] Found {len(self.country_colors)} countries with colors")
 
         # Second pass: map each region to its country
         for idx, region in enumerate(regions_data):
@@ -353,9 +414,9 @@ class MappingCog(commands.Cog):
             pixel_count = np.sum(region_mask)
 
             if pixel_count > 0:
-                if country_id and country_id in country_colors:
+                if country_id and country_id in self.country_colors:
                     # Color by country
-                    result_array[region_mask, :3] = country_colors[country_id]
+                    result_array[region_mask, :3] = self.country_colors[country_id]
                     print(
                         f"[Mapping] Colored {pixel_count} pixels for country {country_id}"
                     )
@@ -394,11 +455,6 @@ class MappingCog(commands.Cog):
 
         # Convert back to PIL Image
         result_img = Image.fromarray(result_array)
-
-        # Add legend
-        if country_colors:
-            print("[Mapping] Adding legend...", flush=True)
-            result_img = self.add_legend(result_img, country_colors, regions_data)
 
         print("[Mapping] Finished generate_countries_map.", flush=True)
         return result_img
@@ -463,18 +519,37 @@ class MappingCog(commands.Cog):
         print("[Mapping] Finished crop_to_regions.", flush=True)
         return image.crop((min_x, min_y, max_x, max_y))
 
-    def add_legend(
-        self, image: Image.Image, country_colors: dict, regions_data: list
-    ) -> Image.Image:
+    def get_all_regions(self):
+        try: 
+            cursor = self.db.cur
+            cursor.execute(
+                """
+                SELECT r.region_id, r.country_id, r.name, r.region_color_hex, 
+                    r.continent, r.geographical_area_id, ga.name as geographical_area_name,
+                    c.name as country_name
+                FROM Regions r
+                LEFT JOIN GeographicalAreas ga ON r.geographical_area_id = ga.geographical_area_id
+                LEFT JOIN Countries c ON r.country_id = c.country_id
+            """
+            )
+            return  [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            print(f"[Mapping] Error fetching regions: {e}", flush=True)
+            return []
+
+    def add_legend(self, image: Image.Image, regions_data: list) -> Image.Image:
         """Add a legend showing countries and their colors."""
         print("[Mapping] Starting add_legend...", flush=True)
         try:
+            if not regions_data:
+                regions_data = self.get_all_regions()
             country_names = {}
             for idx, region in enumerate(regions_data):
                 country_id = region.get("country_id")
                 country_name = region.get("country_name")
-                if country_id and country_name and country_id in country_colors:
+                if country_id and country_name and country_id in self.country_colors:
                     country_names[country_id] = country_name
+                print(f"[Mapping] Processed region {region['name']} for legend...")
                 if idx % 20 == 0:
                     print(
                         f"[Mapping] Processed {idx+1}/{len(regions_data)} regions for legend...",
@@ -485,8 +560,23 @@ class MappingCog(commands.Cog):
                 print("[Mapping] No country names found, skipping legend.", flush=True)
                 return image
 
+            # Calculate scale factor based on image size (reference: 400x400)
+            image_width, image_height = image.size
+            reference_size = 250
+            scale_factor = min(image_width, image_height) / reference_size
+            scale_factor = max(0.8, min(scale_factor, 5.0))  # Clamp between 0.5x and 3x
+
+            print(
+                f"[Mapping] Image size: {image_width}x{image_height}, scale factor: {scale_factor:.2f}",
+                flush=True,
+            )
+
+            # Scale font and sizes
+            base_font_size = 12
+            font_size = max(8, int(base_font_size * scale_factor))
+
             try:
-                font = ImageFont.truetype("datas/arial.ttf", 12)
+                font = ImageFont.truetype("datas/arial.ttf", font_size)
             except:
                 font = ImageFont.load_default()
 
@@ -507,8 +597,9 @@ class MappingCog(commands.Cog):
                         flush=True,
                     )
 
-            color_square_size = 12
-            padding = 5
+            # Scale legend elements
+            color_square_size = max(8, int(12 * scale_factor))
+            padding = max(3, int(5 * scale_factor))
             legend_width = color_square_size + padding + max_text_width + padding * 2
             legend_height = len(legend_items) * (color_square_size + padding) + padding
 
@@ -521,7 +612,7 @@ class MappingCog(commands.Cog):
             for idx, (country_id, text, text_width, text_height) in enumerate(
                 legend_items
             ):
-                color = country_colors[country_id]
+                color = self.country_colors[country_id]
                 legend_draw.rectangle(
                     [
                         padding,
@@ -546,12 +637,16 @@ class MappingCog(commands.Cog):
                     )
 
             image_width, image_height = image.size
-            legend_x = 10
-            legend_y = image_height - legend_height - 10
+            legend_x = max(5, int(10 * scale_factor))
+            legend_y = image_height - legend_height - max(5, int(10 * scale_factor))
 
             result_img = image.copy()
             result_img.paste(legend_img, (legend_x, legend_y), legend_img)
 
+            print(
+                f"[Mapping] Legend positioned at ({legend_x}, {legend_y}) with size {legend_width}x{legend_height}",
+                flush=True,
+            )
             print("[Mapping] Finished add_legend.", flush=True)
             return result_img
 
