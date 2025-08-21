@@ -210,13 +210,19 @@ class MappingCog(commands.Cog):
             # Get regions data for filtering
             self.country_colors = {}
             regions_data = self.get_regions_data(filter_key, filter_value)
+            if regions_data == [] and filter_key != "All":
+                print("[Mapping] No regions data available for mapping.")
+                return ""
 
             if is_regions_map:
                 # For regions map: outline regions with black borders on white background
                 result_img = self.generate_regions_map(regions_data)
             else:
                 # For countries map: colorize by country and add legend
-                result_img = self.generate_countries_map(regions_data)
+                result_img = self.generate_countries_map(regions_data, is_all=(filter_key == "All"))
+                if result_img is None:
+                    print("[Mapping] No regions data available for mapping.")
+                    return ""
 
             # Crop if not showing all
             if filter_key != "All" and filter_value:
@@ -390,7 +396,7 @@ class MappingCog(commands.Cog):
     #     print("[Mapping] Finished generate_regions_map.", flush=True)
     #     return Image.fromarray(result_array)
 
-    def generate_countries_map(self, regions_data: List[dict]) -> Image.Image:
+    def generate_countries_map(self, regions_data: List[dict], is_all: bool) -> Image.Image:
         """Generate a map colored by countries with legend."""
         print("[Mapping] Starting generate_countries_map...", flush=True)
         height, width = self.base_array.shape[:2]
@@ -400,7 +406,7 @@ class MappingCog(commands.Cog):
         unoccupied_color = np.array([255, 255, 255])  # White for unoccupied
 
         # If no regions_data (All filter), we need to get all regions from database
-        if not regions_data:
+        if is_all:
             print(
                 "[Mapping] No regions data provided, querying all regions from database...",
                 flush=True,
@@ -410,6 +416,10 @@ class MappingCog(commands.Cog):
                 f"[Mapping] Retrieved {len(regions_data)} regions from database",
                 flush=True,
             )
+
+        if not regions_data:
+            print("[Mapping] No regions data available for mapping.", flush=True)
+            return Image.new("RGB", (width, height), color=(255, 255, 255))
 
         # Build country color mapping and region-to-country mapping
         region_to_country = {}

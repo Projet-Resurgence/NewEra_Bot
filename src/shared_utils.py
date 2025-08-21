@@ -47,7 +47,7 @@ def get_discord_utils(bot=None, db=None):
 class CountryEntity:
     """Centralized CountryEntity class used across all cogs."""
 
-    def __init__(self, entity: Union[discord.User, discord.Role], guild: discord.Guild):
+    def __init__(self, entity: Union[discord.User, discord.Member, discord.Role, discord.TextChannel], guild: discord.Guild):
         self.entity = entity
         self.guild = guild
 
@@ -58,6 +58,10 @@ class CountryEntity:
     @property
     def is_role(self) -> bool:
         return isinstance(self.entity, discord.Role)
+    
+    @property
+    def is_channel(self) -> bool:
+        return isinstance(self.entity, discord.TextChannel)
 
     def get_country_id(self) -> int:
         db_instance = get_db()
@@ -77,6 +81,7 @@ class CountryEntity:
                 "name": getattr(self.entity, "name", "Inconnu"),
                 "id": None,
                 "role": None,
+                "channel": None,
             }
 
         datas = db_instance.get_country_datas(country_id)
@@ -84,55 +89,87 @@ class CountryEntity:
             return {
                 "name": getattr(self.entity, "name", "Inconnu"),
                 "id": country_id,
+                "channel": None,
                 "role": None,
             }
         role = self.guild.get_role(int(datas.get("role_id")))
-        return {"name": datas.get("name"), "id": country_id, "role": role}
-
+        channel = self.guild.get_channel(int(datas.get("public_channel_id")))
+        return {"name": datas.get("name"), "id": country_id, "role": role, "channel": channel}
 
 class CountryConverter(commands.Converter):
     """Centralized CountryConverter class used across all cogs."""
 
     async def convert(self, ctx, argument):
+        entity = await self._convert_member(ctx, argument)
+        if entity:
+            return entity.to_dict()
+
+        entity = await self._convert_role(ctx, argument)
+        if entity:
+            return entity.to_dict()
+
+        entity = await self._convert_channel(ctx, argument)
+        if entity:
+            return entity.to_dict()
+
+        entity = await self._convert_country_id(ctx, argument)
+        if entity:
+            return entity.to_dict()
+
+        entity = await self._convert_country_name(ctx, argument)
+        if entity:
+            return entity.to_dict()
+
+        raise commands.BadArgument(f"Entité inconnue : {argument}")
+
+    async def _convert_member(self, ctx, argument):
         try:
             member = await commands.MemberConverter().convert(ctx, argument)
-            entity = CountryEntity(member, ctx.guild)
+            return CountryEntity(member, ctx.guild)
         except commands.BadArgument:
-            try:
-                role = await commands.RoleConverter().convert(ctx, argument)
-                entity = CountryEntity(role, ctx.guild)
-            except commands.BadArgument:
-                try:
-                    country_id = int(argument)
-                    db_instance = get_db()
-                    country_role_id = int(
-                        db_instance.get_country_role_with_id(country_id)
-                    )
-                    if not country_role_id:
-                        raise commands.BadArgument("Entité inconnue.")
-                    role = ctx.guild.get_role(country_role_id)
-                    if not role:
-                        raise commands.BadArgument("Rôle introuvable.")
-                    entity = CountryEntity(role, ctx.guild)
-                except (commands.BadArgument, ValueError):
-                    try:
-                        country_name = argument.strip().lower()
-                        db_instance = get_db()
-                        country_id = db_instance.get_country_by_name(
-                            country_name.capitalize()
-                        )
-                        if not country_id:
-                            raise commands.BadArgument("Pays inconnu.")
-                        role = ctx.guild.get_role(
-                            int(db_instance.get_country_role_with_id(country_id))
-                        )
-                        if not role:
-                            raise commands.BadArgument("Rôle introuvable.")
-                        entity = CountryEntity(role, ctx.guild)
-                    except commands.BadArgument:
-                        raise commands.BadArgument("Entité inconnue.")
-        return entity.to_dict()
+            return None
 
+    async def _convert_role(self, ctx, argument):
+        try:
+            role = await commands.RoleConverter().convert(ctx, argument)
+            return CountryEntity(role, ctx.guild)
+        except commands.BadArgument:
+            return None
+
+    async def _convert_channel(self, ctx, argument):
+        try:
+            channel = await commands.TextChannelConverter().convert(ctx, argument)
+            return CountryEntity(channel, ctx.guild)
+        except commands.BadArgument:
+            return None
+
+    async def _convert_country_id(self, ctx, argument):
+        try:
+            country_id = int(argument)
+            db_instance = get_db()
+            country_role_id = int(db_instance.get_country_role_with_id(country_id))
+            if not country_role_id:
+                return None
+            role = ctx.guild.get_role(country_role_id)
+            if not role:
+                return None
+            return CountryEntity(role, ctx.guild)
+        except (ValueError, TypeError):
+            return None
+
+    async def _convert_country_name(self, ctx, argument):
+        try:
+            country_name = argument.strip().lower()
+            db_instance = get_db()
+            country_id = db_instance.get_country_by_name(country_name.capitalize())
+            if not country_id:
+                return None
+            role = ctx.guild.get_role(int(db_instance.get_country_role_with_id(country_id)))
+            if not role:
+                return None
+            return CountryEntity(role, ctx.guild)
+        except Exception:
+            return None
 
 async def country_autocomplete(
     interaction: discord.Interaction,

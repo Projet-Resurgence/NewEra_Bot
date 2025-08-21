@@ -6,6 +6,7 @@ Contains balance and other economic-related commands.
 import discord
 from discord.ext import commands
 from discord import app_commands
+import random
 
 # Import centralized utilities
 from shared_utils import (
@@ -662,7 +663,6 @@ class Economy(commands.Cog):
             # Calculate interest rate based on geopolitical status
             power_status = self.db.get_country_power_status(country_id)
 
-            import random
 
             interest_rates = {
                 "Superpuissance": random.uniform(0.0, 1.0),
@@ -677,6 +677,14 @@ class Economy(commands.Cog):
             # Calculate total amount to repay
             total_repayment = amount + (amount * interest_rate / 100)
             total_repayment = int(total_repayment)
+
+            if not await self.dUtils.ask_confirmation(ctx, country_id, f"Êtes-vous sûr de vouloir emprunter **{convert(str(amount))}** pour **{years}** ans à un taux d'intérêt de **{interest_rate}%** ?"):
+                embed = discord.Embed(
+                    title="❌ Emprunt annulé",
+                    description="La demande d'emprunt a été annulée.",
+                    color=self.error_color_int,
+                )
+                return await ctx.send(embed=embed)
 
             # Generate unique reference
             debt_reference = self.db.generate_debt_reference(country_id)

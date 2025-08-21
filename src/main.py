@@ -277,7 +277,6 @@ atexit.register(lambda: driver.quit())
 def check_vps_availability():
     status = {}
     driver.get(URL)
-
     for loc in TARGET_LOCATIONS:
         try:
             # Attendre que le h5 avec le texte apparaisse (max 10s)
@@ -295,7 +294,6 @@ def check_vps_availability():
             status[loc] = not disabled
         except:
             status[loc] = None
-
     return status
 
 
@@ -304,18 +302,13 @@ async def polling_ovh():
     CHANNEL_ID = 1396669237539635320
     global previous_status
     channel = bot.get_channel(CHANNEL_ID)
-
     status = check_vps_availability()
-
     for loc, available in status.items():
         prev = previous_status.get(loc)
-
         if prev is None:
             previous_status[loc] = available
-
         if available == prev:
             continue
-
         if available:
             await channel.send(f"✅ Un VPS-3 est DISPONIBLE à **{loc}** ! 🎉")
         else:
@@ -324,7 +317,331 @@ async def polling_ovh():
 
 
 async def update_map():
-    return
+    """Update the daily map in the designated channel with continental and world statistics."""
+    try:
+        print("[Map Update] Starting daily map update...")
+
+        # Get the map channel
+        map_channel_id = db.get_setting("map_channel_id")
+        if not map_channel_id:
+            print("[Map Update] No map_channel_id set in database settings")
+            return
+
+        map_channel = bot.get_channel(int(map_channel_id))
+        if not map_channel:
+            print(f"[Map Update] Could not find channel with ID {map_channel_id}")
+            return
+
+        # Get the mapping cog
+        mapping_cog = bot.get_cog("MappingCog")
+        if not mapping_cog:
+            print("[Map Update] MappingCog not found")
+            return
+
+        print(f"[Map Update] Clearing channel {map_channel.name}")
+
+        # Clear the channel
+        async for message in map_channel.history(limit=None):
+            try:
+                await message.delete()
+            except Exception as e:
+                print(f"[Map Update] Error deleting message: {e}")
+
+        # Continental data list
+        continents = [
+            "Europe",
+            "Asie",
+            "Afrique",
+            "Amerique",
+            "Oceanie",
+            "Moyen-Orient",
+        ]
+
+        print("[Map Update] Generating continental maps...")
+
+        # Generate maps for each continent
+        for continent in continents:
+            try:
+                print(f"[Map Update] Processing continent: {continent}")
+
+                # Get continental statistics
+                continental_stats = get_continental_statistics(continent)
+
+                # Generate the continental map
+                output_path = await mapping_cog.generate_filtered_map_async(
+                    "Continent", continent, is_regions_map=False
+                )
+
+                # if output_path and os.path.exists(output_path): was the old condition, decided to reverse it to allow unnesting
+                if not output_path or not os.path.exists(output_path):
+                    print(f"[Map Update] Failed to generate map for {continent}")
+                    continue
+                # Create embed with continental statistics
+                embed = discord.Embed(
+                    title=f"🌍 {continent} - Carte Politique",
+                    color=all_color_int,
+                )
+
+                # Add statistical fields
+                embed.add_field(
+                    name="📊 Statistiques Générales",
+                    value=f"🏛️ **Pays total:** {continental_stats['total_countries']}\n"
+                    f"👤 **Pays joués:** {continental_stats['played_countries']}\n"
+                    f"🏳️ **Pays libres:** {continental_stats['unplayed_countries']}\n"
+                    f"📍 **Régions totales:** {continental_stats['total_regions']}",
+                    inline=True,
+                )
+
+                embed.add_field(
+                    name="🗺️ Contrôle Territorial",
+                    value=f"🎯 **Régions contrôlées:** {continental_stats['controlled_regions']}\n"
+                    f"🆓 **Régions libres:** {continental_stats['free_regions']}\n"
+                    f"📈 **% contrôlé:** {continental_stats['control_percentage']:.1f}%\n"
+                    f"🔓 **% libre:** {continental_stats['free_percentage']:.1f}%",
+                    inline=True,
+                )
+
+                embed.add_field(
+                    name="⏰ Mise à jour",
+                    value=f"📅 **Date:** {datetime.now(pytz.timezone('Europe/Paris')).strftime('%d/%m/%Y')}\n"
+                    f"🕐 **Heure:** <t:{int(datetime.now(pytz.timezone('Europe/Paris')).timestamp())}>",
+                    inline=False,
+                )
+
+                # Send the continental map
+                file = discord.File(output_path, filename=f"{continent}_map.png")
+                embed.set_image(url=f"attachment://{continent}_map.png")
+
+                await map_channel.send(embed=embed, file=file)
+                print(f"[Map Update] Sent map for {continent}")
+
+            except Exception as e:
+                print(f"[Map Update] Error processing continent {continent}: {e}")
+
+        # Generate world map with global statistics
+        try:
+            print("[Map Update] Generating world map...")
+
+            # Get global statistics
+            world_stats = get_world_statistics()
+
+            # Generate the world map
+            output_path = await mapping_cog.generate_filtered_map_async(
+                "All", None, is_regions_map=False
+            )
+
+            if output_path and os.path.exists(output_path):
+                # Create embed with world statistics
+                embed = discord.Embed(
+                    title="🌍 Monde - Carte Politique Globale",
+                    description="Vue d'ensemble de l'état géopolitique mondial",
+                    color=all_color_int,
+                )
+
+                # Add global statistical fields
+                embed.add_field(
+                    name="🌐 Statistiques Mondiales",
+                    value=f"🏛️ **Pays total:** {world_stats['total_countries']}\n"
+                    f"👤 **Pays joués:** {world_stats['played_countries']}\n"
+                    f"🏳️ **Pays libres:** {world_stats['unplayed_countries']}\n"
+                    f"📍 **Régions totales:** {world_stats['total_regions']}",
+                    inline=True,
+                )
+
+                embed.add_field(
+                    name="🗺️ Contrôle Global",
+                    value=f"🎯 **Régions contrôlées:** {world_stats['controlled_regions']}\n"
+                    f"🆓 **Régions libres:** {world_stats['free_regions']}\n"
+                    f"📈 **% contrôlé:** {world_stats['control_percentage']:.1f}%\n"
+                    f"🔓 **% libre:** {world_stats['free_percentage']:.1f}%",
+                    inline=True,
+                )
+
+                embed.add_field(
+                    name="📈 Répartition par Continent",
+                    value="\n".join(
+                        [
+                            f"🌍 **{cont}:** {get_continent_country_count(cont)} pays"
+                            for cont in continents
+                        ]
+                    ),
+                    inline=False,
+                )
+
+                embed.add_field(
+                    name="⏰ Mise à jour Quotidienne",
+                    value=f"📅 **Date:** {datetime.now(pytz.timezone('Europe/Paris')).strftime('%d/%m/%Y')}\n"
+                    f"🕐 **Heure:** <t:{int(datetime.now(pytz.timezone('Europe/Paris')).timestamp())}>\n"
+                    f"🔄 **Prochaine:** <t:{int((datetime.now(pytz.timezone('Europe/Paris')).replace(hour=7, minute=0, second=0, microsecond=0) + timedelta(days=1)).timestamp())}>",
+                    inline=False,
+                )
+
+                # Send the world map
+                file = discord.File(output_path, filename="world_map.png")
+                embed.set_image(url="attachment://world_map.png")
+
+                await map_channel.send(embed=embed, file=file)
+                print("[Map Update] Sent world map")
+            else:
+                print("[Map Update] Failed to generate world map")
+
+        except Exception as e:
+            print(f"[Map Update] Error generating world map: {e}")
+
+        print("[Map Update] Daily map update completed successfully")
+
+    except Exception as e:
+        print(f"[Map Update] Error in update_map: {e}")
+        import traceback
+
+        traceback.print_exc()
+
+
+def get_continental_statistics(continent: str) -> dict:
+    """Get statistics for a specific continent."""
+    try:
+        cursor = db.cur
+
+        # Get all regions in the continent
+        cursor.execute("SELECT COUNT(*) FROM Regions WHERE continent = ?", (continent,))
+        total_regions = cursor.fetchone()[0]
+
+        # Get controlled regions (regions with country_id)
+        cursor.execute(
+            "SELECT COUNT(*) FROM Regions WHERE continent = ? AND country_id IS NOT NULL",
+            (continent,),
+        )
+        controlled_regions = cursor.fetchone()[0]
+
+        # Get free regions
+        free_regions = total_regions - controlled_regions
+
+        # Get unique countries in the continent
+        cursor.execute(
+            "SELECT COUNT(DISTINCT country_id) FROM Regions WHERE continent = ? AND country_id IS NOT NULL",
+            (continent,),
+        )
+        played_countries = cursor.fetchone()[0]
+
+        # Get total countries (including those without regions)
+        cursor.execute(
+            """SELECT COUNT(DISTINCT c.country_id) 
+               FROM Countries c 
+               LEFT JOIN Regions r ON c.country_id = r.country_id 
+               WHERE r.continent = ? OR r.continent IS NULL""",
+            (continent,),
+        )
+        total_countries_result = cursor.fetchone()[0]
+
+        total_countries = max(played_countries, total_countries_result)
+        unplayed_countries = max(0, total_countries - played_countries)
+
+        # Calculate percentages
+        control_percentage = (
+            (controlled_regions / total_regions * 100) if total_regions > 0 else 0
+        )
+        free_percentage = (
+            (free_regions / total_regions * 100) if total_regions > 0 else 0
+        )
+
+        return {
+            "total_regions": total_regions,
+            "controlled_regions": controlled_regions,
+            "free_regions": free_regions,
+            "total_countries": total_countries,
+            "played_countries": played_countries,
+            "unplayed_countries": unplayed_countries,
+            "control_percentage": control_percentage,
+            "free_percentage": free_percentage,
+        }
+
+    except Exception as e:
+        print(f"Error getting continental statistics for {continent}: {e}")
+        return {
+            "total_regions": 0,
+            "controlled_regions": 0,
+            "free_regions": 0,
+            "total_countries": 0,
+            "played_countries": 0,
+            "unplayed_countries": 0,
+            "control_percentage": 0.0,
+            "free_percentage": 0.0,
+        }
+
+
+def get_world_statistics() -> dict:
+    """Get global world statistics."""
+    try:
+        cursor = db.cur
+
+        # Get all regions worldwide
+        cursor.execute("SELECT COUNT(*) FROM Regions")
+        total_regions = cursor.fetchone()[0]
+
+        # Get controlled regions (regions with country_id)
+        cursor.execute("SELECT COUNT(*) FROM Regions WHERE country_id IS NOT NULL")
+        controlled_regions = cursor.fetchone()[0]
+
+        # Get free regions
+        free_regions = total_regions - controlled_regions
+
+        # Get total countries
+        cursor.execute("SELECT COUNT(*) FROM Countries")
+        total_countries = cursor.fetchone()[0]
+
+        # Get played countries (countries that have at least one region)
+        cursor.execute(
+            "SELECT COUNT(DISTINCT country_id) FROM Regions WHERE country_id IS NOT NULL"
+        )
+        played_countries = cursor.fetchone()[0]
+
+        unplayed_countries = total_countries - played_countries
+
+        # Calculate percentages
+        control_percentage = (
+            (controlled_regions / total_regions * 100) if total_regions > 0 else 0
+        )
+        free_percentage = (
+            (free_regions / total_regions * 100) if total_regions > 0 else 0
+        )
+
+        return {
+            "total_regions": total_regions,
+            "controlled_regions": controlled_regions,
+            "free_regions": free_regions,
+            "total_countries": total_countries,
+            "played_countries": played_countries,
+            "unplayed_countries": unplayed_countries,
+            "control_percentage": control_percentage,
+            "free_percentage": free_percentage,
+        }
+
+    except Exception as e:
+        print(f"Error getting world statistics: {e}")
+        return {
+            "total_regions": 0,
+            "controlled_regions": 0,
+            "free_regions": 0,
+            "total_countries": 0,
+            "played_countries": 0,
+            "unplayed_countries": 0,
+            "control_percentage": 0.0,
+            "free_percentage": 0.0,
+        }
+
+
+def get_continent_country_count(continent: str) -> int:
+    """Get the number of countries in a specific continent."""
+    try:
+        cursor = db.cur
+        cursor.execute(
+            "SELECT COUNT(DISTINCT country_id) FROM Regions WHERE continent = ? AND country_id IS NOT NULL",
+            (continent,),
+        )
+        return cursor.fetchone()[0]
+    except Exception as e:
+        print(f"Error getting country count for {continent}: {e}")
+        return 0
 
 
 RP_UPDATE_INTERVAL = 60
@@ -338,9 +655,12 @@ async def update_rp_date():
         return
     await db.advance_playday(bot)
     # Process production cycle
-    if not db.is_paused:
+    if not db.is_paused():
+        print("Doing mapping stuff")
         await update_map()
-    if db.is_paused() or db.get_current_date().get("playday") != 1:
+    if db.get_current_date().get("playday") != 1:
+        return
+    if db.is_paused():
         return
     completed_productions = db.process_production_cycle()
     for production in completed_productions:
@@ -424,6 +744,31 @@ async def before():
 async def resume_rp(ctx):
     db.set_paused(False)
     await ctx.send("✅ Le temps RP a été relancé !")
+
+
+async def get_actions_from_country_channel(country: CountryConverter):
+    channel = country.get("channel")
+    if not channel:
+        return []
+    government_ids = db.get_government_by_country(country.get("id"))
+    government_players = [int(player.get("player_id", 0)) for player in government_ids]
+    last_bilan_id = db.get_country_datas(country.get("id")).get("last_bilan_id")
+    if not last_bilan_id:
+        last_bilan = None
+    else:
+        last_bilan = await channel.fetch_message(last_bilan_id)
+
+    actions = []
+    async for msg in channel.history(limit=None, oldest_first=True):
+        if msg.author == bot.user:
+            continue
+        if msg.content.startswith("[-"):
+            continue
+        if last_bilan != None and msg.created_at < last_bilan.created_at:
+            continue
+        if msg.author.id in government_players or msg.embeds:
+            actions.append(msg.content)
+    return len(actions)
 
 
 @bot.hybrid_command(
