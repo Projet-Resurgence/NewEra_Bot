@@ -664,6 +664,67 @@ async def region_autocomplete(
 
     return choices
 
+async def free_region_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for regions in slash commands.
+    Returns a list of unowned regions.
+    """
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance or not interaction.guild:
+        return choices
+
+    try:
+        cursor = db_instance.cur
+        if current_lower:
+            cursor.execute(
+            """
+            SELECT r.region_id, r.name, r.population, r.geographical_area_id
+            FROM Regions r
+            JOIN GeographicalAreas g ON r.geographical_area_id = g.geographical_area_id
+            WHERE (r.country_id = 0 OR r.country_id IS NULL)
+              AND (LOWER(g.name) LIKE ? OR LOWER(r.name) LIKE ?)
+            ORDER BY r.name
+            LIMIT 25
+            """,
+            (f"{current_lower}%", f"{current_lower}%")
+            )
+        else:
+            cursor.execute(
+            """
+            SELECT r.region_id, r.name, r.population, r.geographical_area_id
+            FROM Regions r
+            WHERE (r.country_id = 0 OR r.country_id IS NULL)
+            ORDER BY r.name
+            LIMIT 25
+            """
+            )
+        regions = cursor.fetchall()
+
+        for region in regions:
+            region_id, region_name, population, geographical_area_id = region
+            geographical_area = db_instance.get_geographical_area(geographical_area_id)
+
+            if current_lower in region_name.lower() or current_lower in geographical_area['name'].lower():
+                choices.append(
+                    app_commands.Choice(
+                        name=f"🌍 {geographical_area['name']}: {region_name} (Pop: {population:,})",
+                        value=str(region_id),
+                    )
+                )
+
+    except Exception as e:
+        print(f"Error in region_autocomplete: {e}")
+
+    return choices
 
 async def factory_autocomplete(
     interaction: discord.Interaction,
@@ -725,7 +786,6 @@ async def factory_autocomplete(
 
     return choices[:25]  # Discord limit
 
-
 async def technocentre_autocomplete(
     interaction: discord.Interaction,
     current: str,
@@ -785,7 +845,6 @@ async def technocentre_autocomplete(
         print(f"Error in technocentre_autocomplete: {e}")
 
     return choices[:25]  # Discord limit
-
 
 async def technology_autocomplete(
     interaction: discord.Interaction,

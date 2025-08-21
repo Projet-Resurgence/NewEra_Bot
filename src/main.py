@@ -47,6 +47,7 @@ from shared_utils import (
     specialisation_autocomplete,
     structure_autocomplete,
     region_autocomplete,
+    free_region_autocomplete,
     STRUCTURE_TYPES,
     SPECIALISATIONS,
     convert,
@@ -415,7 +416,7 @@ async def log_to_intel(bot, message, image=None):
     if chan:
         if image:
             # Convert Discord Asset to File if needed
-            if hasattr(image, 'read'):  # It's a Discord Asset
+            if hasattr(image, "read"):  # It's a Discord Asset
                 try:
                     image_bytes = await image.read()
                     file = discord.File(io.BytesIO(image_bytes), filename="avatar.png")
@@ -576,6 +577,45 @@ async def info_intel(ctx: commands.Context, user: discord.User):
         title=f"Informations sur {user.name}", description=message, color=color
     )
     await ctx.send(embed=embed)
+
+
+@bot.hybrid_command(name="create_intel", hidden=True)
+@commands.has_permissions(administrator=True)
+@app_commands.choices(
+    gravite=[
+        app_commands.Choice(name="Faible", value=1),
+        app_commands.Choice(name="Moyenne", value=2),
+        app_commands.Choice(name="Élevée", value=3),
+    ]
+)
+async def create_intel(
+    ctx: commands.Context,
+    user: discord.User,
+    reason: str,
+    gravite: int,
+    main_username: str,
+):
+    """Intègre un compte d'un utilisateur à l'intelligence."""
+    if ctx.channel.id != int(db.get_setting("intelligence_channel_id")):
+        return await ctx.send(
+            "❌ Cette commande ne peut être utilisée que dans le salon d'intelligence.",
+            delete_after=5,
+        )
+
+    # Récupère la personne
+    personne_data = db.get_personne_from_account_id(
+        user.id
+    ) or db.get_personne_with_name(main_username)
+    if personne_data:
+        return await ctx.send(
+            f"Utilisateur {user.name} déjà dans la fiche S en tant que {personne_data['nom_commun']}"
+        )
+    db.create_personne(main_username, reason, gravite)
+    personne_data = db.get_personne_with_name(main_username)
+    db.create_user_intel(user.id, user.name, personne_data["id"])
+    await ctx.send(
+        f"Utilisateur {user.name} intégré à l'intelligence sous le nom {main_username}."
+    )
 
 
 async def insert_mention(
@@ -2445,262 +2485,742 @@ class FinalTechConfirmationView(discord.ui.View):
         await interaction.followup.send("❌ Création de la technologie annulée.")
 
 
-@bot.hybrid_command()
-async def annex(ctx, region_id):
-    return
+@bot.hybrid_command(
+    name="annex",
+    brief="Annexe une région au pays de l'utilisateur.",
+    usage="annex <region_id>",
+    description="Transfère la propriété d'une région vers le pays de l'utilisateur.",
+    help="""Annexe une région au pays de l'utilisateur qui exécute la commande.
+
+    FONCTIONNALITÉ :
+    - Transfère la propriété d'une région vers votre pays
+    - Met à jour automatiquement les statistiques de population
+    - Vérifie les permissions avant l'annexion
+
+    RESTRICTIONS :
+    - Vous devez appartenir à un pays
+    - La région doit exister
+    - Nécessite les permissions appropriées
+
+    ARGUMENTS :
+    - `<region_id>` : ID de la région à annexer
+
+    EXEMPLE :
+    - `annex 5` : Annexe la région avec l'ID 5 à votre pays
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
+@app_commands.autocomplete(region_id=free_region_autocomplete)
+async def annex(ctx, region_id: int):
+    """Annexe une région au pays de l'utilisateur."""
+    try:
+        # Get the player's country
+        player_country_id = CountryEntity(ctx.author, ctx.guild).to_dict().get("id", 0)
+        if not player_country_id:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Vous n'appartenez à aucun pays.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Check if region exists
+        region = db.get_region_by_id(region_id)
+        if not region:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"La région avec l'ID {region_id} n'existe pas.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Check permissions (assuming we need building permissions for annexing)
+        if not db.has_permission(player_country_id, str(ctx.author.id), "can_build"):
+            embed = discord.Embed(
+                title="❌ Permission refusée",
+                description="Vous n'avez pas la permission d'annexer des régions.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
 
 
-@bot.hybrid_command()
+        owner = db.get_region_by_id(region_id)["country_id"]
+
+        if owner and owner not in [0, "0"]:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Cette région est déjà possédée par un autre pays." if owner != player_country_id else "Vous possédez déjà cette région.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Transfer region ownership
+        success = db.transfer_region_ownership(region_id, int(player_country_id))
+        if not success:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Impossible d'annexer cette région.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Get country data for confirmation
+        country_data = db.get_country_datas(player_country_id)
+
+        embed = discord.Embed(
+            title="✅ Région annexée",
+            description=f"La région **{region['name']}** a été annexée avec succès par **{country_data['name']}**.",
+            color=all_color_int,
+        )
+        embed.add_field(name="Région", value=region["name"], inline=True)
+        embed.add_field(
+            name="Population", value=f"{region['population']:,}", inline=True
+        )
+        embed.add_field(
+            name="Continent", value=region["continent"] or "Non défini", inline=True
+        )
+
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        embed = discord.Embed(
+            title="❌ Erreur",
+            description=f"Une erreur s'est produite lors de l'annexion : {str(e)}",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
+
+
+@bot.hybrid_command(
+    name="add_player_to_country",
+    brief="Ajoute un joueur au gouvernement d'un pays (Admin uniquement).",
+    usage="add_player_to_country <user> <country>",
+    description="Ajoute un joueur au gouvernement d'un pays spécifique.",
+    help="""Ajoute un joueur au gouvernement d'un pays en tant qu'administrateur.
+
+    FONCTIONNALITÉ :
+    - Ajoute un joueur à un gouvernement de pays
+    - Trouve automatiquement un slot libre (1-5)
+    - Met à jour les rôles Discord appropriés
+    - Configure les permissions de base
+
+    RESTRICTIONS :
+    - Réservé aux administrateurs uniquement
+    - Le pays doit exister
+    - Maximum 5 membres par gouvernement
+
+    ARGUMENTS :
+    - `<user>` : Utilisateur Discord à ajouter
+    - `<country>` : Pays de destination
+
+    EXEMPLE :
+    - `add_player_to_country @utilisateur France`
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
 @app_commands.autocomplete(country=country_autocomplete)
 async def add_player_to_country(ctx, user: discord.Member, country: CountryConverter):
-    return
+    """Ajoute un joueur au gouvernement d'un pays."""
+    try:
+        # Check admin permissions
+        if not dUtils.is_authorized(ctx):
+            return await ctx.send(embed=dUtils.get_auth_embed())
+
+        country_dict = CountryEntity(country, ctx.guild).to_dict()
+        country_id = country_dict.get("id", 0)
+
+        if not country_id:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Pays introuvable.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Check if user is already in any government
+        existing_country = db.get_players_country(user.id)
+        if existing_country:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"{user.mention} fait déjà partie du gouvernement d'un pays.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Add player to government using the DB method
+        slot_number = db.add_player_to_government(int(country_id), str(user.id))
+
+        if slot_number is None:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Aucun slot disponible dans le gouvernement de ce pays.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Add player role and remove non-player role if needed
+        try:
+            country_role = ctx.guild.get_role(int(country_dict["role_id"]))
+            player_role = await db.get_player_role(ctx)
+            non_player_role = await db.get_non_player_role(ctx)
+
+            if country_role:
+                await user.add_roles(
+                    country_role,
+                    reason=f"Ajouté au gouvernement de {country_dict['name']}",
+                )
+            if player_role:
+                await user.add_roles(
+                    player_role,
+                    reason=f"Ajouté au gouvernement de {country_dict['name']}",
+                )
+            if non_player_role and non_player_role in user.roles:
+                await user.remove_roles(
+                    non_player_role,
+                    reason=f"Ajouté au gouvernement de {country_dict['name']}",
+                )
+        except Exception as e:
+            print(f"Error managing roles: {e}")
+
+        embed = discord.Embed(
+            title="✅ Joueur ajouté",
+            description=f"{user.mention} a été ajouté au gouvernement de **{country_dict['name']}**.",
+            color=all_color_int,
+        )
+        embed.add_field(name="Slot", value=f"#{slot_number}", inline=True)
+        embed.add_field(name="Pays", value=country_dict["name"], inline=True)
+        embed.add_field(
+            name="Permissions", value="Argent, Points, Construction", inline=True
+        )
+
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        embed = discord.Embed(
+            title="❌ Erreur",
+            description=f"Une erreur s'est produite : {str(e)}",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
 
 
-@bot.hybrid_command()
+@bot.hybrid_command(
+    name="remove_player_from_country",
+    brief="Retire un joueur du gouvernement d'un pays (Admin uniquement).",
+    usage="remove_player_from_country <user> <country>",
+    description="Retire un joueur du gouvernement d'un pays spécifique.",
+    help="""Retire un joueur du gouvernement d'un pays en tant qu'administrateur.
+
+    FONCTIONNALITÉ :
+    - Retire un joueur du gouvernement d'un pays
+    - Libère son slot gouvernemental
+    - Met à jour les rôles Discord appropriés
+    - Supprime ses permissions gouvernementales
+
+    RESTRICTIONS :
+    - Réservé aux administrateurs uniquement
+    - Le joueur doit faire partie du gouvernement du pays
+
+    ARGUMENTS :
+    - `<user>` : Utilisateur Discord à retirer
+    - `<country>` : Pays d'origine
+
+    EXEMPLE :
+    - `remove_player_from_country @utilisateur France`
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
 @app_commands.autocomplete(country=country_autocomplete)
 async def remove_player_from_country(
     ctx, user: discord.Member, country: CountryConverter
 ):
-    return
+    """Retire un joueur du gouvernement d'un pays."""
+    try:
+        # Check admin permissions
+        if not dUtils.is_authorized(ctx):
+            return await ctx.send(embed=dUtils.get_auth_embed())
+
+        country_entity = CountryEntity(country, ctx.guild)
+        country_id = country_entity.get_country_id()
+        country_dict = country_entity.to_dict()
+
+        if not country_id:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Pays introuvable.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Check if user is in this country's government
+        if not db.is_player_in_government(int(country_id), str(user.id)):
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"{user.mention} ne fait pas partie du gouvernement de **{country_dict['name']}**.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Remove player from government using the DB method
+        slot_number = db.remove_player_from_government(int(country_id), str(user.id))
+
+        if slot_number is None:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Impossible de retirer ce joueur du gouvernement.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Remove country role
+        try:
+            country_role = ctx.guild.get_role(int(country_dict["role_id"]))
+            player_role = await db.get_player_role(ctx)
+            non_player_role = await db.get_non_player_role(ctx)
+
+            if country_role and country_role in user.roles:
+                await user.remove_roles(
+                    country_role,
+                    reason=f"Retiré du gouvernement de {country_dict['name']}",
+                )
+
+            # Check if user is in any other government before removing player role
+            other_country = db.get_players_country(user.id)
+            if not other_country:
+                if player_role and player_role in user.roles:
+                    await user.remove_roles(
+                        player_role,
+                        reason=f"Retiré du gouvernement de {country_dict['name']}",
+                    )
+                if non_player_role:
+                    await user.add_roles(
+                        non_player_role,
+                        reason=f"Retiré du gouvernement de {country_dict['name']}",
+                    )
+        except Exception as e:
+            print(f"Error managing roles: {e}")
+
+        embed = discord.Embed(
+            title="✅ Joueur retiré",
+            description=f"{user.mention} a été retiré du gouvernement de **{country_dict['name']}**.",
+            color=all_color_int,
+        )
+        embed.add_field(name="Slot libéré", value=f"#{slot_number}", inline=True)
+        embed.add_field(name="Pays", value=country_dict["name"], inline=True)
+
+        await ctx.send(embed=embed)
+
+    except Exception as e:
+        embed = discord.Embed(
+            title="❌ Erreur",
+            description=f"Une erreur s'est produite : {str(e)}",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
 
 
-@bot.hybrid_command()
+@bot.hybrid_command(
+    name="add_region",
+    brief="Ajoute une nouvelle région (Admin uniquement).",
+    usage="add_region <region_name> <map_color> <population> [country]",
+    description="Ajoute une nouvelle région au système avec ses caractéristiques.",
+    help="""Ajoute une nouvelle région au système géographique.
+
+    FONCTIONNALITÉ :
+    - Crée une nouvelle région avec les paramètres spécifiés
+    - Assigne optionnellement la région à un pays
+    - Met à jour automatiquement les statistiques
+    - Génère un ID unique pour la région
+
+    RESTRICTIONS :
+    - Réservé aux administrateurs uniquement
+    - La couleur de carte doit être unique
+    - Le nom de région doit être unique
+
+    ARGUMENTS :
+    - `<region_name>` : Nom de la nouvelle région
+    - `<map_color>` : Couleur hexadécimale pour la carte (ex: #FF0000)
+    - `<population>` : Population initiale de la région
+    - `[country]` : Pays propriétaire (optionnel)
+
+    EXEMPLE :
+    - `add_region "Nouvelle Région" #FF0000 50000 France`
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
 @app_commands.autocomplete(country=country_autocomplete)
 async def add_region(
     ctx,
     region_name: str,
-    map_name: str,
+    map_color: str,
     population: int,
     country: CountryConverter = None,
 ):
-    return
+    """Ajoute une nouvelle région au système."""
+    try:
+        # Check admin permissions
+        if not dUtils.is_authorized(ctx):
+            return await ctx.send(embed=dUtils.get_auth_embed())
+
+        # Validate hex color format
+        if not map_color.startswith("#"):
+            map_color = "#" + map_color
+
+        if len(map_color) != 7:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="La couleur doit être au format hexadécimal (ex: #FF0000).",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Get country ID if specified
+        country_id = None
+        country_name = "Aucun"
+        if country:
+            country_dict = CountryEntity(country, ctx.guild).to_dict()
+            country_id = country_dict.get("id", 0)
+            if country_id:
+                country_name = country_dict["name"]
+
+        # Add region using the existing method
+        region_id = db.add_region_to_country(
+            country_id=country_id,
+            region_name=region_name,
+            population=population,
+            region_color_hex=map_color,
+            area=0,  # Default area
+            geographical_area_id=None,  # No geographical area by default
+        )
+
+        if region_id:
+            embed = discord.Embed(
+                title="✅ Région ajoutée",
+                description=f"La région **{region_name}** a été créée avec succès.",
+                color=all_color_int,
+            )
+            embed.add_field(name="ID de région", value=f"#{region_id}", inline=True)
+            embed.add_field(name="Population", value=f"{population:,}", inline=True)
+            embed.add_field(name="Pays propriétaire", value=country_name, inline=True)
+            embed.add_field(name="Couleur carte", value=map_color, inline=True)
+
+            await ctx.send(embed=embed)
+        else:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Impossible de créer la région. Vérifiez que le nom et la couleur sont uniques.",
+                color=error_color_int,
+            )
+            await ctx.send(embed=embed)
+
+    except Exception as e:
+        embed = discord.Embed(
+            title="❌ Erreur",
+            description=f"Une erreur s'est produite : {str(e)}",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
 
 
-@bot.hybrid_command()
+@bot.hybrid_command(
+    name="remove_region",
+    brief="Supprime une région du système (Admin uniquement).",
+    usage="remove_region <region_id>",
+    description="Supprime définitivement une région et toutes ses données associées.",
+    help="""Supprime une région du système géographique.
+
+    FONCTIONNALITÉ :
+    - Supprime définitivement une région
+    - Supprime automatiquement toutes les structures associées
+    - Met à jour les statistiques des pays
+    - Action irréversible
+
+    RESTRICTIONS :
+    - Réservé aux administrateurs uniquement
+    - La région doit exister
+    - Action irréversible
+
+    ARGUMENTS :
+    - `<region_id>` : ID de la région à supprimer
+
+    EXEMPLE :
+    - `remove_region 15` : Supprime la région avec l'ID 15
+
+    ⚠️ ATTENTION : Cette action est irréversible !
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
 @app_commands.autocomplete(region_id=region_autocomplete)
 async def remove_region(ctx, region_id: int):
-    return
+    """Supprime une région du système."""
+    try:
+        # Check admin permissions
+        if not dUtils.is_authorized(ctx):
+            return await ctx.send(embed=dUtils.get_auth_embed())
+
+        # Check if region exists
+        region = db.get_region_by_id(region_id)
+        if not region:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"La région avec l'ID {region_id} n'existe pas.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Get country info if region is owned
+        country_name = "Aucun"
+        if region["country_id"]:
+            country_data = db.get_country_datas(str(region["country_id"]))
+            if country_data:
+                country_name = country_data["name"]
+
+        # Confirmation message
+        embed = discord.Embed(
+            title="⚠️ Confirmation de suppression",
+            description=f"Êtes-vous sûr de vouloir supprimer la région **{region['name']}** ?\n\n"
+            f"**Informations de la région :**\n"
+            f"• Nom : {region['name']}\n"
+            f"• Population : {region['population']:,}\n"
+            f"• Pays propriétaire : {country_name}\n"
+            f"• Continent : {region['continent'] or 'Non défini'}\n\n"
+            f"⚠️ **Cette action est irréversible !**",
+            color=0xFF6B6B,
+        )
+
+        # Create confirmation view
+        class ConfirmationView(discord.ui.View):
+            def __init__(self):
+                super().__init__(timeout=30)
+
+            @discord.ui.button(label="✅ Confirmer", style=discord.ButtonStyle.danger)
+            async def confirm(
+                self, interaction: discord.Interaction, button: discord.ui.Button
+            ):
+                if interaction.user != ctx.author:
+                    await interaction.response.send_message(
+                        "Seul l'auteur de la commande peut confirmer.", ephemeral=True
+                    )
+                    return
+
+                # Remove the region
+                success = db.remove_region(region_id)
+
+                if success:
+                    embed = discord.Embed(
+                        title="✅ Région supprimée",
+                        description=f"La région **{region['name']}** a été supprimée avec succès.",
+                        color=all_color_int,
+                    )
+                else:
+                    embed = discord.Embed(
+                        title="❌ Erreur",
+                        description="Impossible de supprimer la région.",
+                        color=error_color_int,
+                    )
+
+                await interaction.response.edit_message(embed=embed, view=None)
+
+            @discord.ui.button(label="❌ Annuler", style=discord.ButtonStyle.gray)
+            async def cancel(
+                self, interaction: discord.Interaction, button: discord.ui.Button
+            ):
+                if interaction.user != ctx.author:
+                    await interaction.response.send_message(
+                        "Seul l'auteur de la commande peut annuler.", ephemeral=True
+                    )
+                    return
+
+                embed = discord.Embed(
+                    title="⏹️ Suppression annulée",
+                    description="La suppression de la région a été annulée.",
+                    color=0x95A5A6,
+                )
+                await interaction.response.edit_message(embed=embed, view=None)
+
+        view = ConfirmationView()
+        await ctx.send(embed=embed, view=view)
+
+    except Exception as e:
+        embed = discord.Embed(
+            title="❌ Erreur",
+            description=f"Une erreur s'est produite : {str(e)}",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
 
 
-@bot.hybrid_command()
+@bot.hybrid_command(
+    name="set_region_data",
+    brief="Modifie les données d'une région (Admin uniquement).",
+    usage="set_region_data <region_id> <key> <value>",
+    description="Modifie une propriété spécifique d'une région existante.",
+    help="""Modifie les données d'une région existante.
+
+    FONCTIONNALITÉ :
+    - Modifie les propriétés d'une région
+    - Supporte plusieurs types de données
+    - Met à jour automatiquement les statistiques
+    - Validation des valeurs selon le type
+
+    PROPRIÉTÉS MODIFIABLES :
+    - `name` : Nom de la région
+    - `population` : Population (nombre entier)
+    - `continent` : Continent (Europe, Asie, Afrique, Amerique, Oceanie, Moyen-Orient)
+    - `country_id` : ID du pays propriétaire (nombre entier ou null)
+
+    RESTRICTIONS :
+    - Réservé aux administrateurs uniquement
+    - La région doit exister
+    - La clé doit être valide
+
+    ARGUMENTS :
+    - `<region_id>` : ID de la région à modifier
+    - `<key>` : Propriété à modifier
+    - `<value>` : Nouvelle valeur
+
+    EXEMPLES :
+    - `set_region_data 5 name "Nouvelle Région"`
+    - `set_region_data 5 population 75000`
+    - `set_region_data 5 continent Europe`
+    - `set_region_data 5 country_id 3`
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
 @app_commands.autocomplete(region_id=region_autocomplete)
 async def set_region_data(ctx, region_id: int, key: str, value: str):
-    return
+    """Modifie les données d'une région."""
+    try:
+        # Check admin permissions
+        if not dUtils.is_authorized(ctx):
+            return await ctx.send(embed=dUtils.get_auth_embed())
 
+        # Check if region exists
+        region = db.get_region_by_id(region_id)
+        if not region:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"La région avec l'ID {region_id} n'existe pas.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
 
-# Add missing database methods if they don't exist
-def ensure_db_methods():
-    """Ensure required database methods exist."""
-    if not hasattr(db, "execute_query"):
+        # Valid keys and their types
+        valid_keys = {
+            "name": str,
+            "population": int,
+            "continent": str,
+            "country_id": int,
+        }
 
-        def execute_query(query, params=None):
-            """Execute a query and return results."""
-            try:
-                if params:
-                    db.cur.execute(query, params)
+        if key not in valid_keys:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"Clé invalide. Clés valides : {', '.join(valid_keys.keys())}",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Convert value to appropriate type
+        try:
+            if valid_keys[key] == int:
+                if value.lower() in ["null", "none", ""]:
+                    converted_value = None
                 else:
-                    db.cur.execute(query)
-
-                # If it's a SELECT query, return results
-                if query.strip().upper().startswith("SELECT"):
-                    return db.cur.fetchall()
+                    converted_value = int(value)
+            elif valid_keys[key] == str:
+                if key == "continent":
+                    valid_continents = [
+                        "Europe",
+                        "Asie",
+                        "Afrique",
+                        "Amerique",
+                        "Oceanie",
+                        "Moyen-Orient",
+                    ]
+                    if value not in valid_continents and value.lower() not in [
+                        "null",
+                        "none",
+                        "",
+                    ]:
+                        embed = discord.Embed(
+                            title="❌ Erreur",
+                            description=f"Continent invalide. Continents valides : {', '.join(valid_continents)}",
+                            color=error_color_int,
+                        )
+                        return await ctx.send(embed=embed)
+                    converted_value = (
+                        None if value.lower() in ["null", "none", ""] else value
+                    )
                 else:
-                    # For INSERT, UPDATE, DELETE, commit the transaction
-                    db.conn.commit()
-                    return db.cur.rowcount
-            except Exception as e:
-                print(f"Database query error: {e}")
-                return None
+                    converted_value = value
+            else:
+                converted_value = value
+        except ValueError:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"Impossible de convertir '{value}' en {valid_keys[key].__name__}.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
 
-        db.execute_query = execute_query
+        # Update the region data
+        kwargs = {key: converted_value}
+        success = db.update_region_data(region_id, **kwargs)
 
-    if not hasattr(db, "get_country_channel"):
+        if success:
+            # Get updated region data
+            updated_region = db.get_region_by_id(region_id)
 
-        def get_country_channel(country_id):
-            """Get country channel ID from database."""
-            try:
-                result = db.execute_query(
-                    "SELECT channel_id FROM Countries WHERE id = ?", (country_id,)
-                )
-                return result[0][0] if result else None
-            except Exception as e:
-                print(f"Error getting country channel: {e}")
-                # Try alternative column names
-                try:
-                    result = db.execute_query(
-                        "SELECT public_channel_id FROM Countries WHERE id = ?",
-                        (country_id,),
-                    )
-                    return result[0][0] if result else None
-                except:
-                    return None
+            embed = discord.Embed(
+                title="✅ Région modifiée",
+                description=f"La propriété **{key}** de la région **{updated_region['name']}** a été modifiée.",
+                color=all_color_int,
+            )
+            embed.add_field(name="Propriété", value=key, inline=True)
+            embed.add_field(
+                name="Ancienne valeur",
+                value=str(region[key]) if region[key] is not None else "Non défini",
+                inline=True,
+            )
+            embed.add_field(
+                name="Nouvelle valeur",
+                value=(
+                    str(converted_value)
+                    if converted_value is not None
+                    else "Non défini"
+                ),
+                inline=True,
+            )
 
-        db.get_country_channel = get_country_channel
+            await ctx.send(embed=embed)
+        else:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description="Impossible de modifier les données de la région.",
+                color=error_color_int,
+            )
+            await ctx.send(embed=embed)
 
-    if not hasattr(db, "add_technology"):
-
-        def add_technology(
-            name,
-            inspiration_name=None,
-            specialisation=None,
-            tech_type=None,
-            tech_level=1,
-            country_id=None,
-            dev_cost=0,
-            dev_time=0,
-            prod_cost=0,
-            slots_taken=1,
-            image_url=None,
-            tech_data=None,
-        ):
-            """Add technology to database."""
-            try:
-                # Check if Technologies table exists, if not create a basic one that matches the schema
-                db.execute_query(
-                    """
-                    CREATE TABLE IF NOT EXISTS Technologies (
-                        tech_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        name TEXT NOT NULL,
-                        cost INTEGER NOT NULL DEFAULT 0,
-                        specialisation TEXT NOT NULL CHECK (specialisation IN ('Terrestre', 'Aerienne', 'Navale', 'NA')) DEFAULT 'NA',
-                        development_time INTEGER NOT NULL DEFAULT 0,
-                        development_cost INTEGER NOT NULL DEFAULT 0,
-                        slots_taken FLOAT NOT NULL DEFAULT 1.0,
-                        original_name TEXT NOT NULL,
-                        technology_level INTEGER NOT NULL DEFAULT 1 CHECK (technology_level >= 1 AND technology_level <= 11),
-                        image_url TEXT,
-                        developed_by INTEGER,
-                        exported BOOLEAN DEFAULT FALSE,
-                        type TEXT NOT NULL,
-                        description TEXT,
-                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                        FOREIGN KEY (developed_by) REFERENCES Countries(country_id) ON DELETE SET NULL
-                    )
-                """
-                )
-
-                # Insert technology with proper mapping to database schema
-                query = """
-                INSERT INTO Technologies (
-                    name, cost, specialisation, development_time, 
-                    development_cost, slots_taken, original_name, technology_level, 
-                    image_url, developed_by, type, description
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """
-
-                # Map the parameters to the database schema
-                mapped_specialisation = (
-                    specialisation
-                    if specialisation in ["Terrestre", "Aerienne", "Navale", "NA"]
-                    else "NA"
-                )
-
-                db.execute_query(
-                    query,
-                    (
-                        name,  # name
-                        prod_cost or 0,  # cost (production cost)
-                        mapped_specialisation,  # specialisation
-                        dev_time or 0,  # development_time
-                        dev_cost or 0,  # development_cost
-                        float(slots_taken) if slots_taken else 1.0,  # slots_taken
-                        inspiration_name or name,  # original_name
-                        tech_level or 1,  # technology_level
-                        image_url,  # image_url
-                        country_id,  # developed_by
-                        tech_type or "unknown",  # type
-                        (
-                            json.dumps(tech_data) if tech_data else None
-                        ),  # description (storing JSON data)
-                    ),
-                )
-                print(f"Technology {name} added successfully to database")
-                return True
-            except Exception as e:
-                print(f"Error adding technology: {e}")
-                return False
-
-        db.add_technology = add_technology
-
-    if not hasattr(db, "get_tech_datas"):
-
-        def get_tech_datas(tech_type, tech_level, data_type):
-            """Get technology data ranges from database."""
-            try:
-                # This is a placeholder implementation
-                # You should replace this with actual database queries
-                base_costs = {
-                    "dev_cost": {
-                        1: [5000, 15000],
-                        2: [10000, 30000],
-                        3: [20000, 60000],
-                        4: [40000, 120000],
-                        5: [80000, 240000],
-                    },
-                    "dev_time": {
-                        1: [15, 45],
-                        2: [30, 90],
-                        3: [60, 180],
-                        4: [120, 360],
-                        5: [240, 720],
-                    },
-                    "prod_cost": {
-                        1: [500, 1500],
-                        2: [1000, 3000],
-                        3: [2000, 6000],
-                        4: [4000, 12000],
-                        5: [8000, 24000],
-                    },
-                    "slots_taken": {
-                        1: 1,
-                        2: 1,
-                        3: 2,
-                        4: 2,
-                        5: 3,
-                    },
-                }
-
-                # Ensure tech_level is within bounds and convert to int
-                try:
-                    tech_level = int(tech_level)
-                except (ValueError, TypeError):
-                    tech_level = 1
-                tech_level = max(1, min(tech_level, 5))
-
-                if data_type in base_costs and tech_level in base_costs[data_type]:
-                    result = base_costs[data_type][tech_level]
-                    print(
-                        f"get_tech_datas({tech_type}, {tech_level}, {data_type}) = {result}"
-                    )
-                    return result
-                else:
-                    # Default fallback values
-                    if data_type == "dev_cost":
-                        return [10000, 50000]
-                    elif data_type == "dev_time":
-                        return [30, 90]
-                    elif data_type == "prod_cost":
-                        return [1000, 5000]
-                    elif data_type == "slots_taken":
-                        return 1
-
-            except Exception as e:
-                print(f"Error getting tech data: {e}")
-                # Return safe defaults
-                if data_type == "dev_cost":
-                    return [10000, 50000]
-                elif data_type == "dev_time":
-                    return [30, 90]
-                elif data_type == "prod_cost":
-                    return [1000, 5000]
-                elif data_type == "slots_taken":
-                    return 1
-
-        db.get_tech_datas = get_tech_datas
-
-
-# Call the helper function to ensure methods exist
-ensure_db_methods()
+    except Exception as e:
+        embed = discord.Embed(
+            title="❌ Erreur",
+            description=f"Une erreur s'est produite : {str(e)}",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
 
 
 @bot.hybrid_command(

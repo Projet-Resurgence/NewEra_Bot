@@ -84,7 +84,8 @@ class Database:
             for name, sql in dbs_content.items():
                 print(f"{name}:\n{sql}\n")
         import_all_datas()
-        cur.executescript("""
+        cur.executescript(
+            """
                 UPDATE Regions SET country_id = 1 WHERE region_id = 1; -- Assign Testland to Europe
                 UPDATE Regions SET country_id = 1 WHERE region_id = 2; -- Assign Testland to Europe
                 UPDATE Regions SET country_id = 2 WHERE region_id = 3; -- Assign Debuglia to Europe
@@ -833,11 +834,7 @@ class Database:
         if result:
             return {
                 "geographical_area_id": result["geographical_area_id"],
-                "name": result["name"],
-                "delimitation_x_start": result["delimitation_x_start"],
-                "delimitation_x_end": result["delimitation_x_end"],
-                "delimitation_y_start": result["delimitation_y_start"],
-                "delimitation_y_end": result["delimitation_y_end"],
+                "name": result["name"]
             }
         return None
 
@@ -874,6 +871,143 @@ class Database:
         except Exception as e:
             print(f"Error updating region geographical area: {e}")
             return False
+
+    def get_region_by_id(self, region_id: int) -> dict:
+        """Récupère une région par son ID."""
+        self.cur.execute("SELECT * FROM Regions WHERE region_id = ?", (region_id,))
+        result = self.cur.fetchone()
+        if result:
+            return dict(result)
+        return None
+
+    def remove_region(self, region_id: int) -> bool:
+        """Supprime une région."""
+        try:
+            self.cur.execute("DELETE FROM Regions WHERE region_id = ?", (region_id,))
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error removing region: {e}")
+            return False
+
+    def update_region_data(self, region_id: int, **kwargs) -> bool:
+        """Met à jour les données d'une région."""
+        if not kwargs:
+            return False
+
+        # Valid columns for regions
+        valid_columns = [
+            "name",
+            "population",
+            "continent",
+            "geographical_area_id",
+            "country_id",
+        ]
+        updates = []
+        values = []
+
+        for key, value in kwargs.items():
+            if key in valid_columns:
+                updates.append(f"{key} = ?")
+                values.append(value)
+
+        if not updates:
+            return False
+
+        try:
+            query = f"UPDATE Regions SET {', '.join(updates)} WHERE region_id = ?"
+            values.append(region_id)
+            self.cur.execute(query, values)
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error updating region data: {e}")
+            return False
+
+    def transfer_region_ownership(self, region_id: int, new_country_id: int) -> bool:
+        """Transfère la propriété d'une région vers un autre pays."""
+        try:
+            self.cur.execute(
+                "UPDATE Regions SET country_id = ? WHERE region_id = ?",
+                (new_country_id, region_id),
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error transferring region ownership: {e}")
+            return False
+
+    def add_player_to_government(self, country_id: int, player_id: str) -> int:
+        """Ajoute un joueur au gouvernement d'un pays. Retourne le slot assigné ou None."""
+        # Find available slot
+        self.cur.execute(
+            "SELECT slot FROM Governments WHERE country_id = ? ORDER BY slot",
+            (country_id,),
+        )
+        used_slots = [row[0] for row in self.cur.fetchall()]
+
+        available_slot = None
+        for slot in range(1, 6):  # Slots 1-5
+            if slot not in used_slots:
+                available_slot = slot
+                break
+
+        if available_slot is None:
+            return None
+
+        try:
+            self.cur.execute(
+                """INSERT INTO Governments 
+                   (country_id, slot, player_id, can_spend_money, can_spend_points, can_build) 
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (country_id, available_slot, player_id, True, True, True),
+            )
+            self.conn.commit()
+            return available_slot
+        except Exception as e:
+            print(f"Error adding player to government: {e}")
+            return None
+
+    def remove_player_from_government(self, country_id: int, player_id: str) -> int:
+        """Retire un joueur du gouvernement d'un pays. Retourne le slot libéré ou None."""
+        # Get the slot first
+        self.cur.execute(
+            "SELECT slot FROM Governments WHERE country_id = ? AND player_id = ?",
+            (country_id, player_id),
+        )
+        result = self.cur.fetchone()
+
+        if not result:
+            return None
+
+        slot_number = result[0]
+
+        try:
+            self.cur.execute(
+                "DELETE FROM Governments WHERE country_id = ? AND player_id = ?",
+                (country_id, player_id),
+            )
+            self.conn.commit()
+            return slot_number
+        except Exception as e:
+            print(f"Error removing player from government: {e}")
+            return None
+
+    def get_government_by_country(self, country_id: int) -> list:
+        """Récupère tous les membres du gouvernement d'un pays."""
+        self.cur.execute(
+            "SELECT * FROM Governments WHERE country_id = ? ORDER BY slot",
+            (country_id,),
+        )
+        return [dict(row) for row in self.cur.fetchall()]
+
+    def is_player_in_government(self, country_id: int, player_id: str) -> bool:
+        """Vérifie si un joueur fait partie du gouvernement d'un pays."""
+        self.cur.execute(
+            "SELECT 1 FROM Governments WHERE country_id = ? AND player_id = ?",
+            (country_id, player_id),
+        )
+        return self.cur.fetchone() is not None
 
     async def get_tech_datas(self, tech_type: str, tech_level: int, key: str):
         """Récupère les données d'une technologie spécifique."""
@@ -1872,6 +2006,29 @@ class Database:
         )
         self.conn.commit()
         return True
+
+    def get_personne_with_name(self, pseudo: str):
+        """Récupère une personne par son pseudo."""
+        self.cur.execute("SELECT * FROM Personne WHERE nom_commun LIKE ?", (pseudo,))
+        return self.cur.fetchone()
+
+    def create_personne(self, pseudo: str, raison: str, gravite: int):
+        """Crée une nouvelle personne."""
+        if gravite < 1 or gravite > 3:
+            raise ValueError("La gravité doit être comprise entre 1 et 3.")
+        self.cur.execute(
+            "INSERT INTO Personne (nom_commun, raison, gravite) VALUES (?, ?, ?)",
+            (pseudo, raison, gravite),
+        )
+        self.conn.commit()
+
+    def create_user_intel(self, user_id: int, username: str, personne_id: int):
+        """Crée une nouvelle entrée d'intelligence pour un utilisateur."""
+        self.cur.execute(
+            "INSERT INTO Compte (id_discord, username, id_personne) VALUES (?, ?, ?)",
+            (user_id, username, personne_id),
+        )
+        self.conn.commit()
 
     def get_personne_info(self, id_personne: int):
         """Récupère les informations d'une personne."""
