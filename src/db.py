@@ -834,7 +834,7 @@ class Database:
         if result:
             return {
                 "geographical_area_id": result["geographical_area_id"],
-                "name": result["name"]
+                "name": result["name"],
             }
         return None
 
@@ -2692,3 +2692,171 @@ class Database:
 
             return_value[country_id]["total"] = total_maintenance
         return return_value
+
+    # --- Debt management methods ---
+
+    def create_debt(
+        self,
+        debt_reference: str,
+        country_id: int,
+        original_amount: int,
+        remaining_amount: int,
+        interest_rate: float,
+        max_years: int,
+    ) -> bool:
+        """Create a new debt record for a country."""
+        try:
+            self.cur.execute(
+                """INSERT INTO Debts (debt_reference, country_id, original_amount, 
+                   remaining_amount, interest_rate, max_years) 
+                   VALUES (?, ?, ?, ?, ?, ?)""",
+                (
+                    debt_reference,
+                    country_id,
+                    original_amount,
+                    remaining_amount,
+                    interest_rate,
+                    max_years,
+                ),
+            )
+            self.conn.commit()
+            return True
+        except sqlite3.IntegrityError as e:
+            print(f"Error creating debt: {e}")
+            return False
+
+    def get_debt_by_reference(self, debt_reference: str) -> dict:
+        """Get debt information by reference number."""
+        self.cur.execute(
+            """SELECT d.debt_id, d.debt_reference, d.country_id, c.name as country_name,
+               d.original_amount, d.remaining_amount, d.interest_rate, d.max_years,
+               d.created_at
+               FROM Debts d
+               JOIN Countries c ON d.country_id = c.country_id
+               WHERE d.debt_reference = ?""",
+            (debt_reference,),
+        )
+        result = self.cur.fetchone()
+        return dict(result) if result else None
+
+    def get_debts_by_country(self, country_id: int) -> list:
+        """Get all debts for a specific country."""
+        self.cur.execute(
+            """SELECT debt_id, debt_reference, original_amount, remaining_amount,
+               interest_rate, max_years, created_at
+               FROM Debts 
+               WHERE country_id = ?
+               ORDER BY remaining_amount DESC""",
+            (country_id,),
+        )
+        results = self.cur.fetchall()
+        return [dict(row) for row in results]
+
+    def get_total_debt_by_country(self, country_id: int) -> dict:
+        """Get total debt statistics for a country."""
+        self.cur.execute(
+            """SELECT COUNT(*) as debt_count, 
+               COALESCE(SUM(original_amount), 0) as total_borrowed,
+               COALESCE(SUM(remaining_amount), 0) as total_remaining
+               FROM Debts 
+               WHERE country_id = ?""",
+            (country_id,),
+        )
+        result = self.cur.fetchone()
+        return (
+            dict(result)
+            if result
+            else {"debt_count": 0, "total_borrowed": 0, "total_remaining": 0}
+        )
+
+    def update_debt_amount(self, debt_reference: str, amount_paid: int) -> bool:
+        """Update the remaining debt amount after a payment."""
+        try:
+            # Check current remaining amount
+            debt = self.get_debt_by_reference(debt_reference)
+            if not debt:
+                return False
+
+            new_remaining = debt["remaining_amount"] - amount_paid
+
+            if new_remaining <= 0:
+                # Debt fully paid, delete it
+                self.cur.execute(
+                    "DELETE FROM Debts WHERE debt_reference = ?", (debt_reference,)
+                )
+            else:
+                # Update remaining amount
+                self.cur.execute(
+                    "UPDATE Debts SET remaining_amount = ? WHERE debt_reference = ?",
+                    (new_remaining, debt_reference),
+                )
+
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error updating debt: {e}")
+            return False
+
+    def debt_reference_exists(self, debt_reference: str) -> bool:
+        """Check if a debt reference already exists."""
+        self.cur.execute(
+            "SELECT 1 FROM Debts WHERE debt_reference = ?", (debt_reference,)
+        )
+        return self.cur.fetchone() is not None
+
+    def generate_debt_reference(self, country_id: int) -> str:
+        """Generate a unique debt reference number."""
+        import random
+        import string
+
+        attempts = 0
+        while attempts < 10:  # Prevent infinite loop
+            random_digits = "".join(random.choices(string.digits, k=4))
+            random_letters = "".join(random.choices(string.ascii_uppercase, k=2))
+            reference = f"{country_id}_{random_digits}{random_letters}"
+
+            if not self.debt_reference_exists(reference):
+                return reference
+            attempts += 1
+
+        # Fallback with timestamp
+        import time
+
+        timestamp = str(int(time.time()))[-6:]
+        return f"{country_id}_{timestamp}"
+
+    def get_country_gdp(self, country_id: int) -> int:
+        """Get GDP for debt calculation purposes."""
+        self.cur.execute("SELECT gdp FROM Stats WHERE country_id = ?", (country_id,))
+        result = self.cur.fetchone()
+        if result and result[0]:
+            return result[0]
+
+        # Fallback to starting amount from settings
+        starting_amount = self.get_setting("starting_amount_money")
+        return int(starting_amount) if starting_amount else 1000000
+
+    def get_country_stability(self, country_id: int) -> int:
+        """Get country stability for debt eligibility."""
+        # For now, return a default value since stability isn't in current schema
+        # This can be extended when stability is implemented
+        return 100
+
+    def get_country_power_status(self, country_id: int) -> str:
+        """Get country geopolitical power status for interest rate calculation."""
+        # TODO: Implement actual power status calculation
+        # For now, return a default middle tier
+        # This should be based on GDP, military strength, territory, etc.
+        gdp = self.get_country_gdp(country_id)
+
+        # Simple GDP-based classification for now
+        if gdp >= 10000000:  # 10M+
+            return "Superpuissance"
+        elif gdp >= 5000000:  # 5M+
+            return "Grande Puissance"
+        elif gdp >= 2000000:  # 2M+
+            return "Puissance majeure"
+        elif gdp >= 1000000:  # 1M+
+            return "Puissance mineure"
+        else:
+            return "Non Puissance"

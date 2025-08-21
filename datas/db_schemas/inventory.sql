@@ -21,3 +21,17 @@ CREATE TABLE IF NOT EXISTS InventoryPricings (
     price INTEGER NOT NULL,
     maintenance INTEGER NOT NULL
 );
+
+-- Table des dettes/emprunts
+CREATE TABLE IF NOT EXISTS Debts (
+    debt_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    debt_reference TEXT NOT NULL UNIQUE,
+    country_id INTEGER NOT NULL,
+    original_amount INTEGER NOT NULL,
+    remaining_amount INTEGER NOT NULL,
+    interest_rate REAL NOT NULL,
+    max_years INTEGER NOT NULL CHECK (max_years BETWEEN 1 AND 10),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (country_id) REFERENCES Countries(country_id)
+        ON DELETE CASCADE
+);

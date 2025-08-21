@@ -10,129 +10,12 @@ from shared_utils import (
     CountryEntity,
     CountryConverter,
     country_autocomplete,
+    eco_logger,
     amount_converter,
     ERROR_COLOR_INT,
     P_POINTS_COLOR_INT,
     D_POINTS_COLOR_INT,
 )
-
-
-class EcoLogEvent:
-    """Event logging class for economic transactions."""
-
-    def __init__(
-        self,
-        code,
-        amount,
-        user1,
-        user2=None,
-        type=1,
-        money_color_int=None,
-        p_points_color_int=None,
-        d_points_color_int=None,
-        code_list=None,
-    ):
-        from text_formatting import convert
-
-        self.code = code
-        self.amount = convert(str(amount)) if len(str(amount)) > 3 else amount
-        self.user1 = user1
-        self.user2 = user2
-        self.type = type
-        self.money_color_int = money_color_int or int("FFF005", 16)
-        self.p_points_color_int = p_points_color_int or int("006AFF", 16)
-        self.d_points_color_int = d_points_color_int or int("8b1bd1", 16)
-        self.code_list = code_list or []
-
-    def is_valid_code(self):
-        return self.code in self.code_list
-
-    def get_embed(self):
-        if self.code.startswith("M"):
-            return self._money_embed()
-        elif self.code.startswith("P"):
-            return self._points_embed()
-        return None
-
-    def _money_embed(self):
-        templates = {
-            "M1": (
-                "Nouvelle transaction entre joueurs",
-                ":moneybag: L'utilisateur {u1} a donné {amt} à {u2}.",
-            ),
-            "M2": (
-                "<a:NE_Alert:1261090848024690709> Ajout d'argent",
-                ":moneybag: {u1} s'est fait ajouter {amt} par {u2}.",
-            ),
-            "M3": (
-                "<a:NE_Alert:1261090848024690709> Argent défini",
-                ":moneybag: {u1} s'est fait définir son argent à {amt} par {u2}.",
-            ),
-            "M4": ("Argent payé", ":moneybag: {u1} a payé {amt} à la banque."),
-            "M5": (
-                "<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> Retrait d'argent",
-                ":moneybag: {u1} s'est fait retirer {amt} par {u2}.",
-            ),
-            "MR": (
-                "<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> Reset de l'économie",
-                ":moneybag: {u1} a réinitialisé l'économie.",
-            ),
-            "MRR": (
-                "<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> Tentative de reset",
-                ":moneybag: {u1} a tenté de réinitialiser l'économie.",
-            ),
-        }
-
-        title, desc_template = templates.get(self.code, (None, None))
-        if not title:
-            return None
-
-        desc = desc_template.format(
-            u1=f"{self.user1.name} ({self.user1.id})",
-            u2=f"{self.user2.name} ({self.user2.id})" if self.user2 else "❓",
-            amt=self.amount,
-        )
-        return discord.Embed(title=title, description=desc, color=self.money_color_int)
-
-    def _points_embed(self):
-        p_type = "Points politiques" if self.type == 1 else "Points diplomatiques"
-        color = self.p_points_color_int if self.type == 1 else self.d_points_color_int
-
-        templates = {
-            "P1": (
-                f"<a:NE_Alert:1261090848024690709> {p_type} ajoutés",
-                ":blue_circle: {u1} s'est fait ajouter {amt} {p_type} par {u2}.",
-            ),
-            "P2": (
-                f"<a:NE_Alert:1261090848024690709> {p_type} définis",
-                ":blue_circle: {u1} s'est fait définir ses {p_type} à {amt} par {u2}.",
-            ),
-            "P3": (f"{p_type} utilisé", ":blue_circle: {u1} a utilisé {amt} {p_type}."),
-            "P4": (
-                f"<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> {p_type} retirés",
-                ":blue_circle: {u1} s'est fait retirer {amt} {p_type} par {u2}.",
-            ),
-            "PR": (
-                f"<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> Reset des {p_type}",
-                ":blue_circle: {u1} a réinitialisé les {p_type}.",
-            ),
-            "PRR": (
-                f"<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> Tentative de reset",
-                ":blue_circle: {u1} a tenté de réinitialiser les {p_type}.",
-            ),
-        }
-
-        title, desc_template = templates.get(self.code, (None, None))
-        if not title:
-            return None
-
-        desc = desc_template.format(
-            u1=f"{self.user1.name} ({self.user1.id})",
-            u2=f"{self.user2.name} ({self.user2.id})" if self.user2 else "❓",
-            amt=self.amount,
-            p_type=p_type,
-        )
-        return discord.Embed(title=title, description=desc, color=color)
 
 
 class Points(commands.Cog):
@@ -148,50 +31,6 @@ class Points(commands.Cog):
         # Get utilities instances
         self.db = get_db()
         self.dUtils = get_discord_utils(bot, self.db)
-
-        # We'll get code_list from main.json when needed
-        self.code_list = []
-
-    async def load_code_list(self):
-        """Load code_list from main.json if not already loaded."""
-        if not self.code_list:
-            try:
-                import json
-
-                with open("datas/main.json") as f:
-                    json_data = json.load(f)
-                    self.code_list = json_data["code_list"]
-            except Exception as e:
-                print(f"Failed to load code_list: {e}")
-                self.code_list = ["P1", "P2", "P3", "P4", "PR", "PRR"]  # Fallback
-
-    async def eco_logger(self, code, amount, user1, user2=None, type=1):
-        """Log economic events to the designated channel."""
-        await self.load_code_list()
-        log_channel_id = self.db.get_setting("eco_log_channel_id")
-        log_channel_id = int(log_channel_id) if log_channel_id else None
-        log_channel = self.bot.get_channel(log_channel_id) if log_channel_id else None
-        event = EcoLogEvent(
-            code,
-            amount,
-            user1,
-            user2,
-            type,
-            self.money_color_int,
-            self.p_points_color_int,
-            self.d_points_color_int,
-            self.code_list,
-        )
-
-        if not event.is_valid_code():
-            print("Erreur de code : Le code donné n'est pas bon.")
-            return
-
-        embed = event.get_embed()
-        if embed:
-            await log_channel.send(embed=embed)
-        else:
-            print("Code non reconnu dans les mappings.")
 
     async def _remove_points_generic(
         self,
@@ -253,7 +92,9 @@ class Points(commands.Cog):
             description=f"{emoji} **{payment_amount}** ont été retirés des points de {target_name}.",
             color=color,
         )
-        await self.eco_logger("P4", payment_amount, target_obj, ctx.author, point_type)
+        await eco_logger(
+            "REMOVE_POINTS", payment_amount, target_obj, ctx.author, point_type
+        )
         await ctx.send(embed=embed)
 
     async def _show_points_generic(
@@ -318,7 +159,7 @@ class Points(commands.Cog):
         )
 
         # Journalisation de l'opération
-        await self.eco_logger("P2", amount, target_obj, ctx.author, point_type)
+        await eco_logger("SET_POINTS", amount, target_obj, ctx.author, point_type)
 
         await ctx.send(embed=embed)
 
@@ -348,7 +189,7 @@ class Points(commands.Cog):
             description=f"{emoji} **{amount}** ont été ajoutés à l'utilisateur {target_name}.",
             color=color,
         )
-        await self.eco_logger("P1", amount, target_obj, ctx.author, point_type)
+        await eco_logger("ADD_POINTS", amount, target_obj, ctx.author, point_type)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(
@@ -820,7 +661,7 @@ class Points(commands.Cog):
             color=self.p_points_color_int,
         )
 
-        await self.eco_logger("P3", payment_amount, country["role"], None, 1)
+        await eco_logger("USE_POINTS", payment_amount, country["role"], point_type=1)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(
@@ -908,7 +749,7 @@ class Points(commands.Cog):
             color=self.d_points_color_int,
         )
 
-        await self.eco_logger("P3", payment_amount, country["role"], None, 2)
+        await eco_logger("USE_POINTS", payment_amount, country["role"], point_type=2)
         await ctx.send(embed=embed)
 
 

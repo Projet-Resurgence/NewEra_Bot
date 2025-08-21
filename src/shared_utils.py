@@ -664,6 +664,7 @@ async def region_autocomplete(
 
     return choices
 
+
 async def free_region_autocomplete(
     interaction: discord.Interaction,
     current: str,
@@ -686,7 +687,7 @@ async def free_region_autocomplete(
         cursor = db_instance.cur
         if current_lower:
             cursor.execute(
-            """
+                """
             SELECT r.region_id, r.name, r.population, r.geographical_area_id
             FROM Regions r
             JOIN GeographicalAreas g ON r.geographical_area_id = g.geographical_area_id
@@ -695,11 +696,11 @@ async def free_region_autocomplete(
             ORDER BY r.name
             LIMIT 25
             """,
-            (f"{current_lower}%", f"{current_lower}%")
+                (f"{current_lower}%", f"{current_lower}%"),
             )
         else:
             cursor.execute(
-            """
+                """
             SELECT r.region_id, r.name, r.population, r.geographical_area_id
             FROM Regions r
             WHERE (r.country_id = 0 OR r.country_id IS NULL)
@@ -713,7 +714,10 @@ async def free_region_autocomplete(
             region_id, region_name, population, geographical_area_id = region
             geographical_area = db_instance.get_geographical_area(geographical_area_id)
 
-            if current_lower in region_name.lower() or current_lower in geographical_area['name'].lower():
+            if (
+                current_lower in region_name.lower()
+                or current_lower in geographical_area["name"].lower()
+            ):
                 choices.append(
                     app_commands.Choice(
                         name=f"🌍 {geographical_area['name']}: {region_name} (Pop: {population:,})",
@@ -725,6 +729,7 @@ async def free_region_autocomplete(
         print(f"Error in region_autocomplete: {e}")
 
     return choices
+
 
 async def factory_autocomplete(
     interaction: discord.Interaction,
@@ -786,6 +791,7 @@ async def factory_autocomplete(
 
     return choices[:25]  # Discord limit
 
+
 async def technocentre_autocomplete(
     interaction: discord.Interaction,
     current: str,
@@ -845,6 +851,7 @@ async def technocentre_autocomplete(
         print(f"Error in technocentre_autocomplete: {e}")
 
     return choices[:25]  # Discord limit
+
 
 async def technology_autocomplete(
     interaction: discord.Interaction,
@@ -1089,6 +1096,333 @@ async def technology_autocomplete(
     return choices
 
 
+async def loan_years_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[int]]:
+    """Autocomplete for loan years (1-10 years only)."""
+    valid_years = [i for i in range(1, 11)]
+
+    if current:
+        try:
+            current_int = int(current)
+            filtered_years = [
+                year for year in valid_years if str(year).startswith(str(current_int))
+            ]
+        except ValueError:
+            filtered_years = valid_years
+    else:
+        filtered_years = valid_years
+
+    return [
+        app_commands.Choice(name=f"{year} ans", value=year) for year in filtered_years
+    ]
+
+
+async def loan_reference_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for loan references in repay commands.
+    Returns a list of active loan references for the user's country.
+    """
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance or not interaction.guild:
+        return choices
+
+    try:
+        # Get user's country
+        country_entity = CountryEntity(interaction.user, interaction.guild)
+        country_id = country_entity.get_country_id()
+
+        if not country_id:
+            return choices
+
+        # Get active debts for the user's country
+        debts = db_instance.get_debts_by_country(country_id)
+
+        for debt in debts:
+            ref = debt["debt_reference"]
+            remaining = debt["remaining_amount"]
+
+            # Filter based on current input
+            if current_lower in ref.lower():
+                choices.append(
+                    app_commands.Choice(
+                        name=f"{ref} (Restant: {remaining:,})", value=ref
+                    )
+                )
+
+    except Exception as e:
+        print(f"Error in loan_reference_autocomplete: {e}")
+
+    return choices[:25]  # Discord limit
+
+
+# ============================================================================
+# ECO LOGGER SYSTEM - Unified economic event logging
+# ============================================================================
+
+
+class EcoLogEvent:
+    """Unified event logging class for all economic transactions."""
+
+    def __init__(
+        self,
+        code: str,
+        amount: int,
+        user1: discord.User,
+        user2: discord.User = None,
+        point_type: int = 1,
+        extra_data: dict = None,
+    ):
+        from currency import convert
+
+        self.code = code
+        self.amount = convert(str(amount)) if len(str(amount)) > 3 else amount
+        self.user1 = user1
+        self.user2 = user2
+        self.point_type = point_type  # 1=political, 2=diplomatic
+        self.extra_data = extra_data or {}
+
+        # Color constants
+        self.money_color_int = MONEY_COLOR_INT
+        self.p_points_color_int = P_POINTS_COLOR_INT
+        self.d_points_color_int = D_POINTS_COLOR_INT
+        self.error_color_int = ERROR_COLOR_INT
+
+    def get_embed(self):
+        """Generate the appropriate embed based on the code."""
+        # Money-related transactions
+        if self.code in [
+            "TRANSFER",
+            "ADD_MONEY",
+            "SET_MONEY",
+            "PAYMENT",
+            "REMOVE_MONEY",
+            "LOAN_TAKEN",
+            "LOAN_REPAID",
+            "ECONOMY_RESET",
+            "ECONOMY_RESET_ATTEMPT",
+        ]:
+            return self._money_embed()
+
+        # Points-related transactions
+        elif self.code in [
+            "ADD_POINTS",
+            "SET_POINTS",
+            "USE_POINTS",
+            "REMOVE_POINTS",
+            "POINTS_RESET",
+            "POINTS_RESET_ATTEMPT",
+        ]:
+            return self._points_embed()
+
+        return None
+
+    def _money_embed(self):
+        """Generate embed for money-related transactions."""
+        alert = "<a:NE_Alert:1261090848024690709>"
+
+        templates = {
+            "TRANSFER": (
+                "💰 Transfert entre pays",
+                ":moneybag: **{u1}** a transféré **{amt}** à **{u2}**.",
+            ),
+            "ADD_MONEY": (
+                "{} Ajout d'argent administratif".format(alert),
+                ":moneybag: **{u1}** s'est fait ajouter **{amt}** par **{u2}**.",
+            ),
+            "SET_MONEY": (
+                "{} Solde défini administrativement".format(alert),
+                ":moneybag: **{u1}** s'est fait définir son solde à **{amt}** par **{u2}**.",
+            ),
+            "PAYMENT": (
+                "💸 Paiement effectué",
+                ":moneybag: **{u1}** a payé **{amt}** à la banque.",
+            ),
+            "REMOVE_MONEY": (
+                "{} {} Retrait d'argent administratif".format(alert, alert),
+                ":moneybag: **{u1}** s'est fait retirer **{amt}** par **{u2}**.",
+            ),
+            "LOAN_TAKEN": (
+                "🏦 Emprunt contracté",
+                ":bank: **{u1}** a contracté un emprunt de **{amt}** auprès de la banque.",
+            ),
+            "LOAN_REPAID": (
+                "💳 Remboursement d'emprunt",
+                ":bank: **{u1}** a remboursé **{amt}** d'emprunt à la banque.",
+            ),
+            "ECONOMY_RESET": (
+                "{} {} {} RESET ÉCONOMIQUE COMPLET".format(alert, alert, alert),
+                ":moneybag: **{u1}** a réinitialisé l'économie entière.",
+            ),
+            "ECONOMY_RESET_ATTEMPT": (
+                "{} {} {} {} TENTATIVE DE RESET ÉCONOMIQUE".format(
+                    alert, alert, alert, alert
+                ),
+                ":moneybag: **{u1}** a tenté de réinitialiser l'économie.",
+            ),
+        }
+
+        title, desc_template = templates.get(self.code, (None, None))
+        if not title:
+            return None
+
+        desc = desc_template.format(
+            u1=f"{self.user1.name} ({self.user1.id})",
+            u2=f"{self.user2.name} ({self.user2.id})" if self.user2 else "❓",
+            amt=self.amount,
+        )
+
+        embed = discord.Embed(title=title, description=desc, color=self.money_color_int)
+
+        # Add extra data if available
+        if self.extra_data:
+            if "reference" in self.extra_data:
+                embed.add_field(
+                    name="Référence", value=self.extra_data["reference"], inline=True
+                )
+            if "interest_rate" in self.extra_data:
+                embed.add_field(
+                    name="Taux d'intérêt",
+                    value=f"{self.extra_data['interest_rate']:.2f}%",
+                    inline=True,
+                )
+            if "duration" in self.extra_data:
+                embed.add_field(
+                    name="Durée",
+                    value=f"{self.extra_data['duration']} ans",
+                    inline=True,
+                )
+
+        return embed
+
+    def _points_embed(self):
+        """Generate embed for points-related transactions."""
+        alert = "<a:NE_Alert:1261090848024690709>"
+        p_type = "points politiques" if self.point_type == 1 else "points diplomatiques"
+        emoji = ":blue_circle:" if self.point_type == 1 else ":purple_circle:"
+        color = (
+            self.p_points_color_int if self.point_type == 1 else self.d_points_color_int
+        )
+
+        templates = {
+            "ADD_POINTS": (
+                "{} Ajout de {}".format(alert, p_type),
+                "{} **{{u1}}** s'est fait ajouter **{{amt}} {}** par **{{u2}}**.".format(
+                    emoji, p_type
+                ),
+            ),
+            "SET_POINTS": (
+                "{} {} définis".format(alert, p_type.capitalize()),
+                "{} **{{u1}}** s'est fait définir ses **{}** à **{{amt}}** par **{{u2}}**.".format(
+                    emoji, p_type
+                ),
+            ),
+            "USE_POINTS": (
+                "Utilisation de {}".format(p_type),
+                "{} **{{u1}}** a utilisé **{{amt}} {}**.".format(emoji, p_type),
+            ),
+            "REMOVE_POINTS": (
+                "{} {} Retrait de {}".format(alert, alert, p_type),
+                "{} **{{u1}}** s'est fait retirer **{{amt}} {}** par **{{u2}}**.".format(
+                    emoji, p_type
+                ),
+            ),
+            "POINTS_RESET": (
+                "{} {} {} RESET des {}".format(alert, alert, alert, p_type),
+                "{} **{{u1}}** a réinitialisé les {}.".format(emoji, p_type),
+            ),
+            "POINTS_RESET_ATTEMPT": (
+                "{} {} {} {} TENTATIVE DE RESET".format(alert, alert, alert, alert),
+                "{} **{{u1}}** a tenté de réinitialiser les {}.".format(emoji, p_type),
+            ),
+        }
+
+        title, desc_template = templates.get(self.code, (None, None))
+        if not title:
+            return None
+
+        desc = desc_template.format(
+            u1=f"{self.user1.name} ({self.user1.id})",
+            u2=f"{self.user2.name} ({self.user2.id})" if self.user2 else "❓",
+            amt=self.amount,
+        )
+
+        return discord.Embed(title=title, description=desc, color=color)
+
+
+async def eco_logger(
+    code: str,
+    amount: int,
+    user1: discord.User,
+    user2: discord.User = None,
+    point_type: int = 1,
+    extra_data: dict = None,
+):
+    """
+    Unified economic event logger function.
+
+    Args:
+        code: Event code (TRANSFER, ADD_MONEY, USE_POINTS, etc.)
+        amount: Amount involved in the transaction
+        user1: Primary user (the one affected by the transaction)
+        user2: Secondary user (the one performing the action, if different)
+        point_type: Type of points for point transactions (1=political, 2=diplomatic)
+        extra_data: Additional data to include in the log (dict)
+    """
+    try:
+        # Get database and bot instances
+        db_instance = get_db()
+        if not db_instance:
+            print("Error in eco_logger: Database instance not available")
+            return
+
+        # Get the eco log channel
+        log_channel_id = db_instance.get_setting("eco_log_channel_id")
+        if not log_channel_id:
+            print("Error in eco_logger: No eco_log_channel_id setting found")
+            return
+
+        # We need to get the bot instance to get the channel
+        # This will be set during bot initialization
+        if not hasattr(eco_logger, "_bot_instance"):
+            print("Error in eco_logger: Bot instance not set")
+            return
+
+        bot = eco_logger._bot_instance
+        log_channel = bot.get_channel(int(log_channel_id))
+
+        if not log_channel:
+            print(f"Error in eco_logger: Channel {log_channel_id} not found")
+            return
+
+        # Create and send the log event
+        event = EcoLogEvent(code, amount, user1, user2, point_type, extra_data)
+        embed = event.get_embed()
+
+        if embed:
+            await log_channel.send(embed=embed)
+        else:
+            print(f"Error in eco_logger: Unknown code '{code}'")
+
+    except Exception as e:
+        print(f"Error in eco_logger: {e}")
+
+
+def set_eco_logger_bot(bot):
+    """Set the bot instance for the eco_logger function."""
+    eco_logger._bot_instance = bot
+
+
 # Color constants used across cogs
 ERROR_COLOR_INT = int("FF5733", 16)
 MONEY_COLOR_INT = int("FFF005", 16)
@@ -1116,6 +1450,11 @@ __all__ = [
     "technocentre_autocomplete",
     "region_autocomplete",
     "technology_autocomplete",
+    "loan_years_autocomplete",
+    "loan_reference_autocomplete",
+    "EcoLogEvent",
+    "eco_logger",
+    "set_eco_logger_bot",
     "STRUCTURE_TYPES",
     "ALL_BUILDABLE_TYPES",
     "SPECIALISATIONS",

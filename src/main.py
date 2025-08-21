@@ -28,6 +28,13 @@ import pytz
 import string
 import locale
 import traceback
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as EC
+import tempfile
+import atexit
 
 # Import centralized utilities
 from shared_utils import (
@@ -37,6 +44,7 @@ from shared_utils import (
     CountryEntity,
     CountryConverter,
     country_autocomplete,
+    set_eco_logger_bot,
     ERROR_COLOR_INT as error_color_int,
     MONEY_COLOR_INT as money_color_int,
     P_POINTS_COLOR_INT as p_points_color_int,
@@ -158,6 +166,7 @@ async def on_ready():
     await bot.tree.sync()
     polling_notion.start()
     update_rp_date.start()
+    polling_ovh.start()
 
 
 rmbg = RemoveBg(removebg_apikey, "error.log")
@@ -189,6 +198,7 @@ usefulDatas = UsefulDatas(bat_types, bat_buffs, unit_types)
 
 # Initialize utilities early for debug_init
 initialize_utilities(bot, bat_types, bat_buffs, unit_types)
+set_eco_logger_bot(bot)  # Set bot instance for eco_logger
 db = get_db()
 dUtils = get_discord_utils(bot, db)
 notion_handler = NotionHandler(notion_token, bot)
@@ -242,6 +252,75 @@ async def polling_notion():
         await notion_handler.check_for_updates()
     except Exception as e:
         print(f"Erreur lors du polling Notion: {e}")
+
+
+URL = "https://www.ovhcloud.com/fr/vps/configurator/?planCode=vps-2025-model3&brick=VPS%2BModel%2B3&pricing=upfront12&processor=%20&vcore=8__vCore&storage=200__SSD__NVMe"
+TARGET_LOCATIONS = [
+    "France - Gravelines",
+    "France - Strasbourg",
+]
+previous_status = {loc: False for loc in TARGET_LOCATIONS}
+
+# Création d'un driver global à l'init du bot
+options = Options()
+options.add_argument("--headless=new")
+options.add_argument("--no-sandbox")
+options.add_argument("--disable-dev-shm-usage")
+options.add_argument("--disable-gpu")
+# options.add_argument(f"--user-data-dir={tmp_profile}")  # plus besoin, driver unique
+driver = webdriver.Chrome(options=options)
+
+# Fermer correctement le driver à l'arrêt du bot
+atexit.register(lambda: driver.quit())
+
+
+def check_vps_availability():
+    status = {}
+    driver.get(URL)
+
+    for loc in TARGET_LOCATIONS:
+        try:
+            # Attendre que le h5 avec le texte apparaisse (max 10s)
+            h5 = WebDriverWait(driver, 10).until(
+                EC.presence_of_element_located(
+                    (By.XPATH, f"//h5[contains(text(), '{loc}')]")
+                )
+            )
+            container = h5.find_element(
+                By.XPATH, "./ancestor::div[contains(@class,'option-tile')]"
+            )
+            disabled = "disabled" in container.get_attribute(
+                "class"
+            ) or container.find_elements(By.XPATH, ".//input[@disabled]")
+            status[loc] = not disabled
+        except:
+            status[loc] = None
+
+    return status
+
+
+@tasks.loop(minutes=10)
+async def polling_ovh():
+    CHANNEL_ID = 1396669237539635320
+    global previous_status
+    channel = bot.get_channel(CHANNEL_ID)
+
+    status = check_vps_availability()
+
+    for loc, available in status.items():
+        prev = previous_status.get(loc)
+
+        if prev is None:
+            previous_status[loc] = available
+
+        if available == prev:
+            continue
+
+        if available:
+            await channel.send(f"✅ Un VPS-3 est DISPONIBLE à **{loc}** ! 🎉")
+        else:
+            await channel.send(f"❌ Le VPS-3 à **{loc}** n’est pas/plus dispo.")
+        previous_status[loc] = available
 
 
 async def update_map():
@@ -2545,13 +2624,16 @@ async def annex(ctx, region_id: int):
             )
             return await ctx.send(embed=embed)
 
-
         owner = db.get_region_by_id(region_id)["country_id"]
 
         if owner and owner not in [0, "0"]:
             embed = discord.Embed(
                 title="❌ Erreur",
-                description="Cette région est déjà possédée par un autre pays." if owner != player_country_id else "Vous possédez déjà cette région.",
+                description=(
+                    "Cette région est déjà possédée par un autre pays."
+                    if owner != player_country_id
+                    else "Vous possédez déjà cette région."
+                ),
                 color=error_color_int,
             )
             return await ctx.send(embed=embed)

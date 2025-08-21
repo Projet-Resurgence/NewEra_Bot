@@ -14,6 +14,9 @@ from shared_utils import (
     CountryEntity,
     CountryConverter,
     country_autocomplete,
+    loan_years_autocomplete,
+    loan_reference_autocomplete,
+    eco_logger,
     convert,
     amount_converter,
     ERROR_COLOR_INT,
@@ -34,50 +37,6 @@ class Economy(commands.Cog):
         # Get utilities instances
         self.db = get_db()
         self.dUtils = get_discord_utils(bot, self.db)
-
-        # We'll get code_list from main.json when needed
-        self.code_list = []
-
-    async def load_code_list(self):
-        """Load code_list from main.json if not already loaded."""
-        if not self.code_list:
-            try:
-                import json
-
-                with open("datas/main.json") as f:
-                    json_data = json.load(f)
-                    self.code_list = json_data["code_list"]
-            except Exception as e:
-                print(f"Failed to load code_list: {e}")
-                self.code_list = ["M1", "M2", "M3", "M4", "M5", "MR", "MRR"]  # Fallback
-
-    async def eco_logger(self, code, amount, user1, user2=None, type=1):
-        """Log economic events to the designated channel."""
-        await self.load_code_list()
-        log_channel_id = self.db.get_setting("eco_log_channel_id")
-        log_channel_id = int(log_channel_id) if log_channel_id else None
-        log_channel = self.bot.get_channel(log_channel_id) if log_channel_id else None
-        event = EcoLogEvent(
-            code,
-            amount,
-            user1,
-            user2,
-            type,
-            self.money_color_int,
-            self.p_points_color_int,
-            self.d_points_color_int,
-            self.code_list,
-        )
-
-        if not event.is_valid_code():
-            print("Erreur de code : Le code donné n'est pas bon.")
-            return
-
-        embed = event.get_embed()
-        if embed:
-            await log_channel.send(embed=embed)
-        else:
-            print("Code non reconnu dans les mappings.")
 
     @commands.hybrid_command(
         name="bal",
@@ -260,8 +219,8 @@ class Economy(commands.Cog):
             description=f":moneybag: **{convert(str(payment_amount))}** ont été donnés à {country.get('role').mention}.",
             color=self.money_color_int,
         )
-        await self.eco_logger(
-            "M1", payment_amount, author.get("role"), country.get("role")
+        await eco_logger(
+            "TRANSFER", payment_amount, author.get("role"), country.get("role")
         )
         await ctx.send(embed=transa_embed)
 
@@ -337,7 +296,7 @@ class Economy(commands.Cog):
             color=self.money_color_int,
         )
 
-        await self.eco_logger("M2", amount, country.get("role"), ctx.author)
+        await eco_logger("ADD_MONEY", amount, country.get("role"), ctx.author)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(
@@ -434,7 +393,9 @@ class Economy(commands.Cog):
             description=f":moneybag: **{convert(str(payment_amount))}** ont été retirés du pays {country.get('role').mention}.",
             color=self.money_color_int,
         )
-        await self.eco_logger("M5", payment_amount, country.get("role"), ctx.author)
+        await eco_logger(
+            "REMOVE_MONEY", payment_amount, country.get("role"), ctx.author
+        )
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(
@@ -504,7 +465,7 @@ class Economy(commands.Cog):
             description=f":moneybag: **{convert(str(amount))}** ont été définis pour {country.get('role').mention}.",
             color=self.money_color_int,
         )
-        await self.eco_logger("M3", amount, country.get("role"), ctx.author)
+        await eco_logger("SET_MONEY", amount, country.get("role"), ctx.author)
         await ctx.send(embed=embed)
 
     @commands.hybrid_command(
@@ -578,124 +539,605 @@ class Economy(commands.Cog):
             description=f":moneybag: **{convert(str(payment_amount))}** ont été payés au bot.",
             color=self.money_color_int,
         )
-        await self.eco_logger("M4", payment_amount, country.get("role"), ctx.author)
+        await eco_logger("PAYMENT", payment_amount, country.get("role"))
         await ctx.send(embed=embed)
 
+    # --- Debt Management Commands ---
 
-class EcoLogEvent:
-    """Event logging class for economic transactions."""
+    @commands.hybrid_command(
+        name="loan",
+        brief="Demande un emprunt bancaire selon votre statut géopolitique.",
+        usage="loan <amount> <years>",
+        description="Contracte un emprunt avec taux d'intérêt basé sur le statut du pays.",
+        help="""Demande un emprunt bancaire avec conditions selon votre statut géopolitique.
 
-    def __init__(
-        self,
-        code,
-        amount,
-        user1,
-        user2=None,
-        type=1,
-        money_color_int=None,
-        p_points_color_int=None,
-        d_points_color_int=None,
-        code_list=None,
-    ):
-        self.code = code
-        self.amount = convert(str(amount)) if len(str(amount)) > 3 else amount
-        self.user1 = user1
-        self.user2 = user2
-        self.type = type
-        self.money_color_int = money_color_int or int("FFF005", 16)
-        self.p_points_color_int = p_points_color_int or int("006AFF", 16)
-        self.d_points_color_int = d_points_color_int or int("8b1bd1", 16)
-        self.code_list = code_list or []
+        FONCTIONNALITÉ :
+        - Calcul automatique du taux d'intérêt selon le statut géopolitique
+        - Validation de l'éligibilité basée sur le PIB et la stabilité
+        - Génération automatique d'une référence unique pour le prêt
+        - Ajout immédiat des fonds au trésor national
 
-    def is_valid_code(self):
-        return self.code in self.code_list
+        TAUX D'INTÉRÊT PAR STATUT :
+        - Superpuissance : 0.0% - 1.0%
+        - Grande Puissance : 1.0% - 2.0%
+        - Puissance majeure : 2.0% - 4.0%
+        - Puissance mineure : 4.0% - 6.0%
+        - Non Puissance : 6.0% - 10.0%
 
-    def get_embed(self):
-        if self.code.startswith("M"):
-            return self._money_embed()
-        elif self.code.startswith("P"):
-            return self._points_embed()
-        return None
+        CONDITIONS D'ÉLIGIBILITÉ :
+        - Le montant total des dettes ne peut excéder 50% du PIB
+        - La stabilité du pays doit être supérieure à 20
+        - Durée : entre 2 et 5 ans
 
-    def _money_embed(self):
-        templates = {
-            "M1": (
-                "Nouvelle transaction entre joueurs",
-                ":moneybag: L'utilisateur {u1} a donné {amt} à {u2}.",
-            ),
-            "M2": (
-                "<a:NE_Alert:1261090848024690709> Ajout d'argent",
-                ":moneybag: {u1} s'est fait ajouter {amt} par {u2}.",
-            ),
-            "M3": (
-                "<a:NE_Alert:1261090848024690709> Argent défini",
-                ":moneybag: {u1} s'est fait définir son argent à {amt} par {u2}.",
-            ),
-            "M4": ("Argent payé", ":moneybag: {u1} a payé {amt} à la banque."),
-            "M5": (
-                "<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> Retrait d'argent",
-                ":moneybag: {u1} s'est fait retirer {amt} par {u2}.",
-            ),
-            "MR": (
-                "<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> Reset de l'économie",
-                ":moneybag: {u1} a réinitialisé l'économie.",
-            ),
-            "MRR": (
-                "<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> Tentative de reset",
-                ":moneybag: {u1} a tenté de réinitialiser l'économie.",
-            ),
-        }
+        ARGUMENTS :
+        - `<amount>` : Montant de l'emprunt (entier positif)
+        - `<years>` : Durée du prêt en années (2-5 ans)
 
-        title, desc_template = templates.get(self.code, (None, None))
-        if not title:
-            return None
+        EXEMPLES :
+        - `loan 1000000 3` : Emprunter 1M sur 3 ans
+        - `loan 500000 5` : Emprunter 500K sur 5 ans
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    @app_commands.autocomplete(years=loan_years_autocomplete)
+    async def loan(self, ctx, amount: int, years: int):
+        """Request a bank loan based on geopolitical status."""
+        try:
+            # Get country information
+            country_entity = CountryEntity(ctx.author, ctx.guild)
+            country_id = country_entity.get_country_id()
 
-        desc = desc_template.format(
-            u1=f"{self.user1.name} ({self.user1.id})",
-            u2=f"{self.user2.name} ({self.user2.id})" if self.user2 else "❓",
-            amt=self.amount,
-        )
-        return discord.Embed(title=title, description=desc, color=self.money_color_int)
+            if not country_id:
+                embed = discord.Embed(
+                    title="❌ Erreur",
+                    description="Vous devez appartenir à un pays pour demander un emprunt.",
+                    color=self.error_color_int,
+                )
+                return await ctx.send(embed=embed)
 
-    def _points_embed(self):
-        p_type = "Points politiques" if self.type == 1 else "Points diplomatiques"
-        color = self.p_points_color_int if self.type == 1 else self.d_points_color_int
+            # Validation des paramètres
+            if amount <= 0:
+                embed = discord.Embed(
+                    title="❌ Erreur",
+                    description="Le montant de l'emprunt doit être positif.",
+                    color=self.error_color_int,
+                )
+                return await ctx.send(embed=embed)
 
-        templates = {
-            "P1": (
-                f"<a:NE_Alert:1261090848024690709> {p_type} ajoutés",
-                ":blue_circle: {u1} s'est fait ajouter {amt} {p_type} par {u2}.",
-            ),
-            "P2": (
-                f"<a:NE_Alert:1261090848024690709> {p_type} définis",
-                ":blue_circle: {u1} s'est fait définir ses {p_type} à {amt} par {u2}.",
-            ),
-            "P3": (f"{p_type} utilisé", ":blue_circle: {u1} a utilisé {amt} {p_type}."),
-            "P4": (
-                f"<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> {p_type} retirés",
-                ":blue_circle: {u1} s'est fait retirer {amt} {p_type} par {u2}.",
-            ),
-            "PR": (
-                f"<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> Reset des {p_type}",
-                ":blue_circle: {u1} a réinitialisé les {p_type}.",
-            ),
-            "PRR": (
-                f"<a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> <a:NE_Alert:1261090848024690709> Tentative de reset",
-                ":blue_circle: {u1} a tenté de réinitialiser les {p_type}.",
-            ),
-        }
+            if years < 1 or years > 10:
+                embed = discord.Embed(
+                    title="❌ Erreur",
+                    description="La durée de l'emprunt doit être entre 1 et 10 ans.",
+                    color=self.error_color_int,
+                )
+                return await ctx.send(embed=embed)
 
-        title, desc_template = templates.get(self.code, (None, None))
-        if not title:
-            return None
+            # Get country data for eligibility check
+            country_dict = country_entity.to_dict()
+            country_name = country_dict["name"]
 
-        desc = desc_template.format(
-            u1=f"{self.user1.name} ({self.user1.id})",
-            u2=f"{self.user2.name} ({self.user2.id})" if self.user2 else "❓",
-            amt=self.amount,
-            p_type=p_type,
-        )
-        return discord.Embed(title=title, description=desc, color=color)
+            # Check current debt
+            debt_stats = self.db.get_total_debt_by_country(country_id)
+            current_debt = debt_stats["total_remaining"]
+
+            # Get GDP for debt capacity check
+            gdp = self.db.get_country_gdp(country_id)
+
+            # Check stability
+            stability = self.db.get_country_stability(country_id)
+
+            # Eligibility checks
+            total_debt_after = current_debt + amount
+            if total_debt_after > gdp * 0.5:  # 50% of GDP limit
+                embed = discord.Embed(
+                    title="❌ Emprunt refusé",
+                    description=f"Désolé **{country_name}**, nous ne pouvons vous accorder ce prêt.\n\n"
+                    f"**Raison :** Le montant excède votre capacité de 50% de votre PIB.\n"
+                    f"**PIB actuel :** {convert(str(gdp))}\n"
+                    f"**Dette actuelle :** {convert(str(current_debt))}\n"
+                    f"**Limite d'endettement :** {convert(str(int(gdp * 0.5)))}",
+                    color=self.error_color_int,
+                )
+                embed.set_thumbnail(
+                    url="https://cdn.discordapp.com/emojis/1163227223109668935.png"
+                )
+                return await ctx.send(embed=embed)
+
+            if stability < 20:
+                embed = discord.Embed(
+                    title="❌ Emprunt refusé",
+                    description=f"Désolé **{country_name}**, nous ne pouvons vous accorder ce prêt.\n\n"
+                    f"**Raison :** Votre stabilité ne permet pas des prêts sans risquer la faillite.\n"
+                    f"**Stabilité requise :** 20 minimum\n"
+                    f"**Stabilité actuelle :** {stability}",
+                    color=self.error_color_int,
+                )
+                embed.set_thumbnail(
+                    url="https://cdn.discordapp.com/emojis/1163227223109668935.png"
+                )
+                return await ctx.send(embed=embed)
+
+            # Calculate interest rate based on geopolitical status
+            power_status = self.db.get_country_power_status(country_id)
+
+            import random
+
+            interest_rates = {
+                "Superpuissance": random.uniform(0.0, 1.0),
+                "Grande Puissance": random.uniform(1.0, 2.0),
+                "Puissance majeure": random.uniform(2.0, 4.0),
+                "Puissance mineure": random.uniform(4.0, 6.0),
+                "Non Puissance": random.uniform(6.0, 10.0),
+            }
+
+            interest_rate = round(interest_rates.get(power_status, 5.0), 2)
+
+            # Calculate total amount to repay
+            total_repayment = amount + (amount * interest_rate / 100)
+            total_repayment = int(total_repayment)
+
+            # Generate unique reference
+            debt_reference = self.db.generate_debt_reference(country_id)
+
+            # Create debt record
+            success = self.db.create_debt(
+                debt_reference,
+                country_id,
+                amount,
+                total_repayment,
+                interest_rate,
+                years,
+            )
+
+            if not success:
+                embed = discord.Embed(
+                    title="❌ Erreur",
+                    description="Impossible de créer l'enregistrement de dette.",
+                    color=self.error_color_int,
+                )
+                return await ctx.send(embed=embed)
+
+            # Add money to country balance
+            self.db.give_balance(country_id, amount)
+
+            # Log the transaction
+            await eco_logger(
+                "LOAN_TAKEN",
+                amount,
+                ctx.author,
+                extra_data={
+                    "reference": debt_reference,
+                    "interest_rate": interest_rate,
+                    "duration": years,
+                },
+            )
+
+            # Success response
+            embed = discord.Embed(
+                title="✅ Emprunt accordé",
+                description=f"Votre demande d'emprunt de **{convert(str(amount))}** est acceptée sous ces conditions :",
+                color=self.money_color_int,
+            )
+            embed.add_field(
+                name="💰 Montant emprunté", value=convert(str(amount)), inline=True
+            )
+            embed.add_field(
+                name="📈 Taux d'intérêt", value=f"{interest_rate}%", inline=True
+            )
+            embed.add_field(name="⏰ Durée", value=f"{years} ans", inline=True)
+            embed.add_field(
+                name="💸 Somme à rembourser",
+                value=convert(str(total_repayment)),
+                inline=True,
+            )
+            embed.add_field(
+                name="🏷️ Référence du prêt", value=f"`{debt_reference}`", inline=True
+            )
+            embed.add_field(
+                name="🏛️ Statut géopolitique", value=power_status, inline=True
+            )
+            embed.set_footer(text="Fonds versés immédiatement au trésor national")
+            embed.set_thumbnail(
+                url="https://cdn.discordapp.com/emojis/1163227223109668935.png"
+            )
+
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"Une erreur s'est produite lors de la demande d'emprunt : {str(e)}",
+                color=self.error_color_int,
+            )
+            await ctx.send(embed=embed)
+
+    @commands.hybrid_command(
+        name="check_debt",
+        brief="Vérifie les informations d'un emprunt spécifique ou vos emprunts totaux.",
+        usage="check_debt [reference]",
+        description="Affiche les détails d'un emprunt ou un résumé de tous vos emprunts.",
+        help="""Consulte les informations détaillées sur vos emprunts.
+
+        FONCTIONNALITÉ :
+        - Sans référence : affiche un résumé de tous vos emprunts
+        - Avec référence : affiche les détails complets d'un emprunt spécifique
+        - Informations sur les montants, taux et échéances
+
+        ARGUMENTS :
+        - `[reference]` : Optionnel. Référence du prêt à consulter
+
+        EXEMPLES :
+        - `check_debt` : Résumé de tous vos emprunts
+        - `check_debt 123_4567AB` : Détails de l'emprunt spécifique
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    async def check_debt(self, ctx, reference: str = None):
+        """Check debt information by reference or show debt summary."""
+        try:
+            if reference:
+                # Show specific debt details
+                debt = self.db.get_debt_by_reference(reference)
+
+                if not debt:
+                    embed = discord.Embed(
+                        title="❌ Emprunt introuvable",
+                        description=f"L'emprunt avec la référence `{reference}` n'a pas été trouvé.",
+                        color=self.error_color_int,
+                    )
+                    return await ctx.send(embed=embed)
+
+                embed = discord.Embed(
+                    title="📋 Détails de l'emprunt",
+                    description=f"Informations pour l'emprunt `{reference}`",
+                    color=self.money_color_int,
+                )
+                embed.add_field(
+                    name="🏛️ Pays contracteur", value=debt["country_name"], inline=True
+                )
+                embed.add_field(
+                    name="💰 Somme empruntée",
+                    value=convert(str(debt["original_amount"])),
+                    inline=True,
+                )
+                embed.add_field(
+                    name="📈 Taux d'intérêt",
+                    value=f"{debt['interest_rate']}%",
+                    inline=True,
+                )
+                embed.add_field(
+                    name="⏰ Durée", value=f"{debt['max_years']} ans", inline=True
+                )
+                embed.add_field(
+                    name="💸 Somme à rembourser",
+                    value=convert(str(debt["remaining_amount"])),
+                    inline=True,
+                )
+                embed.add_field(
+                    name="📅 Date de création",
+                    value=debt["created_at"][:10],
+                    inline=True,
+                )
+                embed.set_thumbnail(
+                    url="https://cdn.discordapp.com/emojis/1163227223109668935.png"
+                )
+
+            else:
+                # Show debt summary for the user's country
+                country_entity = CountryEntity(ctx.author, ctx.guild)
+                country_id = country_entity.get_country_id()
+
+                if not country_id:
+                    embed = discord.Embed(
+                        title="❌ Erreur",
+                        description="Vous devez appartenir à un pays pour consulter les emprunts.",
+                        color=self.error_color_int,
+                    )
+                    return await ctx.send(embed=embed)
+
+                debt_stats = self.db.get_total_debt_by_country(country_id)
+                country_dict = country_entity.to_dict()
+
+                embed = discord.Embed(
+                    title="📊 Résumé des emprunts",
+                    description=f"État des emprunts pour **{country_dict['name']}**",
+                    color=self.money_color_int,
+                )
+                embed.add_field(
+                    name="📈 Nombre d'emprunts",
+                    value=str(debt_stats["debt_count"]),
+                    inline=True,
+                )
+                embed.add_field(
+                    name="💰 Total emprunté",
+                    value=convert(str(debt_stats["total_borrowed"])),
+                    inline=True,
+                )
+                embed.add_field(
+                    name="💸 Total à rembourser",
+                    value=convert(str(debt_stats["total_remaining"])),
+                    inline=True,
+                )
+                embed.set_thumbnail(
+                    url="https://cdn.discordapp.com/emojis/1163227223109668935.png"
+                )
+
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"Une erreur s'est produite : {str(e)}",
+                color=self.error_color_int,
+            )
+            await ctx.send(embed=embed)
+
+    @commands.hybrid_command(
+        name="repay_debt",
+        brief="Rembourse tout ou partie d'un emprunt.",
+        usage="repay_debt <reference> [amount]",
+        description="Effectue un remboursement total ou partiel d'un emprunt existant.",
+        help="""Rembourse un emprunt existant de manière totale ou partielle.
+
+        FONCTIONNALITÉ :
+        - Remboursement partiel ou total d'un emprunt
+        - Suppression automatique de l'emprunt si entièrement remboursé
+        - Vérification automatique des fonds disponibles
+        - Mise à jour instantanée du solde
+
+        ARGUMENTS :
+        - `<reference>` : Référence du prêt à rembourser
+        - `[amount]` : Optionnel. Montant à rembourser (défaut : totalité)
+
+        EXEMPLES :
+        - `repay_debt 123_4567AB` : Remboursement total
+        - `repay_debt 123_4567AB 500000` : Remboursement partiel de 500K
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    @app_commands.autocomplete(reference=loan_reference_autocomplete)
+    async def repay_debt(self, ctx, reference: str, amount: int = 0):
+        """Repay a debt partially or fully."""
+        try:
+            # Get country information
+            country_entity = CountryEntity(ctx.author, ctx.guild)
+            country_id = country_entity.get_country_id()
+
+            if not country_id:
+                embed = discord.Embed(
+                    title="❌ Erreur",
+                    description="Vous devez appartenir à un pays pour rembourser un emprunt.",
+                    color=self.error_color_int,
+                )
+                return await ctx.send(embed=embed)
+
+            # Check if debt exists
+            debt = self.db.get_debt_by_reference(reference)
+
+            if not debt:
+                embed = discord.Embed(
+                    title="❌ Emprunt introuvable",
+                    description=f"L'emprunt avec la référence `{reference}` n'a pas été trouvé.",
+                    color=self.error_color_int,
+                )
+                return await ctx.send(embed=embed)
+
+            # Verify the debt belongs to the user's country
+            if debt["country_id"] != country_id:
+                embed = discord.Embed(
+                    title="❌ Accès refusé",
+                    description="Vous ne pouvez rembourser que les emprunts de votre propre pays.",
+                    color=self.error_color_int,
+                )
+                return await ctx.send(embed=embed)
+
+            # Determine repayment amount
+            remaining_debt = debt["remaining_amount"]
+            repayment_amount = (
+                remaining_debt if amount == 0 or amount >= remaining_debt else amount
+            )
+
+            if repayment_amount <= 0:
+                embed = discord.Embed(
+                    title="❌ Erreur",
+                    description="Le montant de remboursement doit être positif.",
+                    color=self.error_color_int,
+                )
+                return await ctx.send(embed=embed)
+
+            # Check if country has enough money
+            if not self.db.has_enough_balance(country_id, repayment_amount):
+                current_balance = self.db.get_balance(country_id)
+                embed = discord.Embed(
+                    title="❌ Fonds insuffisants",
+                    description=f"Impossible de rembourser {convert(str(repayment_amount))}.\n\n"
+                    f"**Solde actuel :** {convert(str(current_balance))}\n"
+                    f"**Montant requis :** {convert(str(repayment_amount))}",
+                    color=self.error_color_int,
+                )
+                return await ctx.send(embed=embed)
+
+            # Process repayment
+            self.db.take_balance(country_id, repayment_amount)
+            success = self.db.update_debt_amount(reference, repayment_amount)
+
+            if not success:
+                # Refund the money if debt update failed
+                self.db.give_balance(country_id, repayment_amount)
+                embed = discord.Embed(
+                    title="❌ Erreur",
+                    description="Impossible de traiter le remboursement.",
+                    color=self.error_color_int,
+                )
+                return await ctx.send(embed=embed)
+
+            # Log the transaction
+            await eco_logger(
+                "LOAN_REPAID",
+                repayment_amount,
+                ctx.author,
+                extra_data={"reference": reference},
+            )
+
+            # Success response
+            is_full_repayment = repayment_amount >= remaining_debt
+            remaining_after = max(0, remaining_debt - repayment_amount)
+
+            embed = discord.Embed(
+                title="✅ Remboursement effectué",
+                description=f"Remboursement de **{convert(str(repayment_amount))}** effectué avec succès.",
+                color=self.money_color_int,
+            )
+            embed.add_field(name="🏷️ Référence", value=f"`{reference}`", inline=True)
+            embed.add_field(
+                name="💸 Montant remboursé",
+                value=convert(str(repayment_amount)),
+                inline=True,
+            )
+            embed.add_field(
+                name="📊 Statut",
+                value=(
+                    "Entièrement remboursé"
+                    if is_full_repayment
+                    else f"Reste : {convert(str(remaining_after))}"
+                ),
+                inline=True,
+            )
+            embed.set_thumbnail(
+                url="https://cdn.discordapp.com/emojis/1163227223109668935.png"
+            )
+
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"Une erreur s'est produite lors du remboursement : {str(e)}",
+                color=self.error_color_int,
+            )
+            await ctx.send(embed=embed)
+
+    @commands.hybrid_command(
+        name="list_debts",
+        brief="Affiche la liste détaillée des emprunts d'un pays.",
+        usage="list_debts [country]",
+        description="Liste tous les emprunts actifs d'un pays avec leurs détails.",
+        help="""Affiche la liste complète des emprunts d'un pays.
+
+        FONCTIONNALITÉ :
+        - Liste tous les emprunts actifs d'un pays
+        - Affiche les références, montants et échéances
+        - Triés par montant restant décroissant
+        - Informations détaillées pour chaque emprunt
+
+        ARGUMENTS :
+        - `[country]` : Optionnel. Pays à consulter (défaut : votre pays)
+
+        EXEMPLES :
+        - `list_debts` : Vos emprunts
+        - `list_debts @France` : Emprunts de la France
+        """,
+        hidden=False,
+        enabled=True,
+        case_insensitive=True,
+    )
+    @app_commands.autocomplete(country=country_autocomplete)
+    async def list_debts(self, ctx, country: CountryConverter = None):
+        """List all debts for a country."""
+        try:
+            if country is None:
+                # Use the author's country
+                country_entity = CountryEntity(ctx.author, ctx.guild)
+                country_id = country_entity.get_country_id()
+
+                if not country_id:
+                    embed = discord.Embed(
+                        title="❌ Erreur",
+                        description="Vous devez appartenir à un pays ou spécifier un pays à consulter.",
+                        color=self.error_color_int,
+                    )
+                    return await ctx.send(embed=embed)
+
+                country_dict = country_entity.to_dict()
+            else:
+                # Use the specified country
+                country_entity = CountryEntity(country, ctx.guild)
+                country_id = country_entity.get_country_id()
+                country_dict = country_entity.to_dict()
+
+            # Get all debts for the country
+            debts = self.db.get_debts_by_country(country_id)
+
+            if not debts:
+                embed = discord.Embed(
+                    title="📊 Liste des emprunts",
+                    description=f"**{country_dict['name']}** n'a aucun emprunt actif.",
+                    color=self.money_color_int,
+                )
+                embed.set_thumbnail(
+                    url="https://cdn.discordapp.com/emojis/1163227223109668935.png"
+                )
+                return await ctx.send(embed=embed)
+
+            # Create the embed with debt list
+            embed = discord.Embed(
+                title="📊 Liste des emprunts",
+                description=f"Emprunts actifs de **{country_dict['name']}**",
+                color=self.money_color_int,
+            )
+
+            debt_list = []
+            for debt in debts:
+                debt_info = (
+                    f"**🏷️ Référence :** `{debt['debt_reference']}`\n"
+                    f"**💸 Montant à rembourser :** {convert(str(debt['remaining_amount']))}\n"
+                    f"**📈 Taux :** {debt['interest_rate']}% | **⏰ Durée :** {debt['max_years']} ans\n"
+                )
+                debt_list.append(debt_info)
+
+            # Split into multiple embeds if too long
+            debt_text = "\n".join(debt_list)
+
+            if len(debt_text) > 2000:
+                # Split the list for multiple embeds
+                embed.add_field(
+                    name=f"📋 {len(debts)} emprunt(s) trouvé(s)",
+                    value="Liste trop longue, utilisez `check_debt <référence>` pour les détails.",
+                    inline=False,
+                )
+            else:
+                embed.add_field(
+                    name=f"📋 {len(debts)} emprunt(s) trouvé(s)",
+                    value=debt_text,
+                    inline=False,
+                )
+
+            # Add summary
+            debt_stats = self.db.get_total_debt_by_country(country_id)
+            embed.add_field(
+                name="📊 Résumé",
+                value=f"**Total à rembourser :** {convert(str(debt_stats['total_remaining']))}",
+                inline=False,
+            )
+            embed.set_thumbnail(
+                url="https://cdn.discordapp.com/emojis/1163227223109668935.png"
+            )
+
+            await ctx.send(embed=embed)
+
+        except Exception as e:
+            embed = discord.Embed(
+                title="❌ Erreur",
+                description=f"Une erreur s'est produite : {str(e)}",
+                color=self.error_color_int,
+            )
+            await ctx.send(embed=embed)
 
 
 async def setup(bot):
