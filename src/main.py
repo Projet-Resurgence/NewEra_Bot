@@ -305,8 +305,6 @@ async def polling_ovh():
     status = check_vps_availability()
     for loc, available in status.items():
         prev = previous_status.get(loc)
-        if prev is None:
-            previous_status[loc] = available
         if available == prev:
             continue
         if available:
@@ -314,7 +312,6 @@ async def polling_ovh():
         else:
             await channel.send(f"❌ Le VPS-3 à **{loc}** n’est pas/plus dispo.")
         previous_status[loc] = available
-
 
 async def update_map():
     """Update the daily map in the designated channel with continental and world statistics."""
@@ -1496,8 +1493,7 @@ async def create_country(
         "oceanie": 992368253580087377,
         "moyen-orient": 951163668102520833,
     }
-    player_role = await dUtils.get_player_role(ctx)
-    non_player_role = await dUtils.get_non_player_role(ctx)
+    player_role = await db.get_player_role(ctx)
     if not dUtils.is_authorized(ctx):
         return await ctx.send(embed=dUtils.get_auth_embed())
 
@@ -1533,7 +1529,6 @@ async def create_country(
     await channel.send(f"Bienvenue dans le pays de {country_name} !")
     await user.add_roles(role, reason=f"Création du pays {country_name}")
     await user.add_roles(player_role, reason=f"Création du pays {country_name}")
-    await user.remove_roles(non_player_role, reason=f"Création du pays {country_name}")
     await ctx.send(f"Le pays {country_name} a été créé avec succès.")
 
 
@@ -3093,7 +3088,6 @@ async def add_player_to_country(ctx, user: discord.Member, country: CountryConve
         try:
             country_role = ctx.guild.get_role(int(country_dict["role_id"]))
             player_role = await db.get_player_role(ctx)
-            non_player_role = await db.get_non_player_role(ctx)
 
             if country_role:
                 await user.add_roles(
@@ -3103,11 +3097,6 @@ async def add_player_to_country(ctx, user: discord.Member, country: CountryConve
             if player_role:
                 await user.add_roles(
                     player_role,
-                    reason=f"Ajouté au gouvernement de {country_dict['name']}",
-                )
-            if non_player_role and non_player_role in user.roles:
-                await user.remove_roles(
-                    non_player_role,
                     reason=f"Ajouté au gouvernement de {country_dict['name']}",
                 )
         except Exception as e:
@@ -3209,7 +3198,6 @@ async def remove_player_from_country(
         try:
             country_role = ctx.guild.get_role(int(country_dict["role_id"]))
             player_role = await db.get_player_role(ctx)
-            non_player_role = await db.get_non_player_role(ctx)
 
             if country_role and country_role in user.roles:
                 await user.remove_roles(
@@ -3223,11 +3211,6 @@ async def remove_player_from_country(
                 if player_role and player_role in user.roles:
                     await user.remove_roles(
                         player_role,
-                        reason=f"Retiré du gouvernement de {country_dict['name']}",
-                    )
-                if non_player_role:
-                    await user.add_roles(
-                        non_player_role,
                         reason=f"Retiré du gouvernement de {country_dict['name']}",
                     )
         except Exception as e:

@@ -1074,11 +1074,7 @@ class Database:
         ]
 
     async def get_player_role(self, ctx):
-        role_id = self.db.get_setting("player_role_id")
-        return ctx.guild.get_role(role_id)
-
-    async def get_non_player_role(self, ctx):
-        role_id = self.db.get_setting("non_player_role_id")
+        role_id = int(self.get_setting("player_role_id"))
         return ctx.guild.get_role(role_id)
 
     def get_players_government(self, player_id: int) -> str:
