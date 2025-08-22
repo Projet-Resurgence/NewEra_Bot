@@ -21,7 +21,7 @@ from currency import *
 from db import *
 from notion_handler import *
 from discord_utils import *
-from text_formatting import *
+from text_formatting import convert_country_name
 from typing import Union
 from PIL import Image
 import pytz
@@ -56,6 +56,9 @@ from shared_utils import (
     structure_autocomplete,
     region_autocomplete,
     free_region_autocomplete,
+    ideology_autocomplete,
+    continent_autocomplete,
+    color_autocomplete,
     STRUCTURE_TYPES,
     SPECIALISATIONS,
     convert,
@@ -312,6 +315,7 @@ async def polling_ovh():
         else:
             await channel.send(f"❌ Le VPS-3 à **{loc}** n’est pas/plus dispo.")
         previous_status[loc] = available
+
 
 async def update_map():
     """Update the daily map in the designated channel with continental and world statistics."""
@@ -1454,82 +1458,423 @@ def is_valid_lvl(type: int, lvl: int):
 
 @bot.hybrid_command(
     name="create_country",
-    brief="Crée un pays, en lui attribuant ses ressources, son rôle, et son salon.",
-    usage="create_country <membre> <emoji_drapeau> <nom_sans_espace> <continent>",
-    description="create_country <membre> <emoji_drapeau> <nom_sans_espace> <continent>",
-    help="""Crée un pays, en lui attribuant ses ressources, son rôle, et son salon.
+    brief="Crée un nouveau pays avec toutes ses caractéristiques.",
+    usage="create_country <user> <country_flag> <country_name> <continent> <color> <economic_ideology> <political_ideology> <region>",
+    description="Crée un nouveau pays complet avec ses ressources, rôle Discord, salon, idéologies et territoire.",
+    help="""Crée un nouveau pays avec toutes ses caractéristiques dans le système de jeu.
+
+    FONCTIONNALITÉ :
+    - Création complète d'un nouveau pays dans la base de données
+    - Attribution d'un rôle Discord avec couleur personnalisée
+    - Création d'un salon public pour le pays
+    - Attribution des idéologies économique et politique
+    - Assignation d'un territoire de départ
+    - Initialisation des ressources de base
+    - Configuration du gouvernement avec le joueur comme dirigeant
+
     ARGUMENTS :
-    - `<membre>` : Le membre Discord auquel attribuer le pays (mention ou ID).
-    - `<emoji_drapeau>` : Emoji représentant le drapeau du pays.
-    - `<nom_sans_espace>` : Nom du pays, sans espaces (utilisez des underscores `_` si besoin).
-    - `<continent>` : Le nom ou ID du continent (Europe, Amérique, Asie, Afrique, Océanie, Moyen-Orient).
+    - `<user>` : Le membre Discord qui dirigera le pays (mention ou ID)
+    - `<country_flag>` : Emoji représentant le drapeau du pays
+    - `<country_name>` : Nom du pays (espaces autorisés)
+    - `<continent>` : Continent où créer le salon (avec autocomplétion)
+    - `<color>` : Couleur hexadécimale pour le rôle Discord (avec autocomplétion des couleurs courantes)
+    - `<economic_ideology>` : Idéologie économique (avec autocomplétion)
+    - `<political_ideology>` : Idéologie politique (avec autocomplétion)
+    - `<region>` : Région de départ à attribuer au pays (avec autocomplétion)
+
+    PERMISSIONS :
+    - Réservé aux administrateurs uniquement
+    - Nécessite les permissions Discord appropriées
+
     EXEMPLE :
-    - `create_country @membre :flag_fr: France Europe` : Crée le pays France sur le continent Europe pour membre.
+    - `create_country @utilisateur 🇫🇷 France Europe #0066CC 1 2 15` : 
+      Crée la France avec le drapeau français, couleur bleue, idéologies spécifiées et région 15
+
+    NOTES :
+    - Le nom du pays sera formaté automatiquement pour Discord
+    - Le joueur recevra automatiquement le rôle de dirigeant avec toutes les permissions
+    - Les ressources de départ seront automatiquement attribuées
+    - Un salon public sera créé dans la catégorie du continent choisi
     """,
     hidden=False,
     enabled=True,
     case_insensitive=True,
 )
+@commands.has_permissions(administrator=True)
+@app_commands.describe(
+    user="Le membre Discord qui dirigera le pays",
+    country_flag="Emoji représentant le drapeau du pays",
+    country_name="Nom du pays (espaces autorisés)",
+    continent="Continent où créer le salon du pays",
+    color="Couleur hexadécimale pour le rôle Discord (avec autocomplétion)",
+    economic_ideology="Idéologie économique du pays",
+    political_ideology="Idéologie politique du pays",
+    region="Région de départ à attribuer au pays",
+)
+@app_commands.autocomplete(
+    continent=continent_autocomplete,
+    color=color_autocomplete,
+    economic_ideology=ideology_autocomplete,
+    political_ideology=ideology_autocomplete,
+    region=free_region_autocomplete,
+)
 async def create_country(
-    ctx,
-    user: discord.Member = commands.parameter(
-        description="ID ou mention du membre auquel attribuer le pays"
-    ),
-    country_flag=commands.parameter(
-        description="Emoji représentant le drapeau du pays"
-    ),
-    country_name=commands.parameter(
-        description="Nom du pays sans espaces. Remplacez les espaces par des underscores `_`."
-    ),
-    continent: discord.CategoryChannel = commands.parameter(
-        description="ID ou nom du continent (Europe, Amérique, Asie, etc.). Accents et majuscules autorisés."
-    ),
+    ctx: commands.Context,
+    user: discord.Member,
+    country_flag: str,
+    country_name: str,
+    continent: str,
+    color: str,
+    economic_ideology: str,
+    political_ideology: str,
+    region: str,
 ) -> None:
-    continents = {
-        "europe": 955479237001891870,
-        "amerique": 952314456870907934,
-        "asie": 1243672298381381816,
-        "afrique": 961678827933794314,
-        "oceanie": 992368253580087377,
-        "moyen-orient": 951163668102520833,
-    }
-    player_role = await db.get_player_role(ctx)
+    """Create a new country with all its characteristics."""
+
+    # Validate authorization
     if not dUtils.is_authorized(ctx):
         return await ctx.send(embed=dUtils.get_auth_embed())
 
-    # Initialize country resources directly
-    country_entity = CountryEntity(user, ctx.guild).to_dict()
-    if country_entity and country_entity.get("id"):
-        country_id = country_entity["id"]
-        db.set_balance(country_id, starting_amounts["money"])
-        db.set_points(country_id, starting_amounts["pp"], 1)  # Political points
-        db.set_points(country_id, starting_amounts["pd"], 2)  # Diplomatic points
+    # Validate and parse color
+    role_color = await _parse_role_color(ctx, color)
+    if role_color is None:
+        return
 
-    country_name = country_name.replace("_", " ")
-    role_name = f"《{country_flag}》{country_name}"
-    country_name = convert_country_name(country_name)
-    channel_name = f"「{country_flag}」{country_name}"
-    channel = await continent.create_text_channel(channel_name)
-    role = await ctx.guild.create_role(name=role_name)
+    # Validate continent and get category
+    continent_category = await _get_continent_category(ctx, continent)
+    if continent_category is None:
+        return
+
+    # Validate ideologies
+    economic_doctrine = await _validate_ideology(ctx, economic_ideology, "Économie")
+    if economic_doctrine is None:
+        return
+
+    political_doctrine = await _validate_ideology(ctx, political_ideology, "Idéologie")
+    if political_doctrine is None:
+        return
+
+    # Validate region
+    region_data = await _validate_region(ctx, region)
+    if region_data is None:
+        return
+
+    # Format country name and create Discord elements
+    formatted_country_name = convert_country_name(country_name)
+    role_name = "《{}》{}".format(country_flag, country_name)
+    channel_name = "「{}」{}".format(country_flag, formatted_country_name)
+
+    try:
+        # Create Discord role and channel
+        role = await ctx.guild.create_role(name=role_name, color=role_color)
+        channel = await continent_category.create_text_channel(channel_name)
+
+        # Set channel permissions
+        await _setup_channel_permissions(channel, ctx.guild, role)
+
+        # Get player role for assignment
+        player_role = await db.get_player_role(ctx)
+
+        # Database operations in transaction
+        country_id = await _create_country_database_entries(
+            country_name,
+            str(role.id),
+            str(channel.id),
+            user.id,
+            economic_ideology,
+            political_ideology,
+            region,
+        )
+
+        if country_id is None:
+            # Cleanup Discord elements on database failure
+            await role.delete(reason="Database creation failed")
+            await channel.delete(reason="Database creation failed")
+            embed = discord.Embed(
+                title="❌ Erreur de création",
+                description="Échec de la création du pays en base de données.",
+                color=error_color_int,
+            )
+            return await ctx.send(embed=embed)
+
+        # Initialize country resources
+        await _initialize_country_resources(country_id)
+
+        # Assign roles to user
+        await user.add_roles(
+            role, player_role, reason="Création du pays {}".format(country_name)
+        )
+
+        # Send welcome message in country channel
+        await channel.send("Bienvenue dans le pays de {} !".format(country_name))
+
+        # Send success confirmation
+        await _send_creation_success(
+            ctx, country_name, user, economic_doctrine, political_doctrine, region_data
+        )
+
+    except Exception as e:
+        print(f"Error creating country: {e}")
+        embed = discord.Embed(
+            title="❌ Erreur de création",
+            description="Une erreur est survenue lors de la création du pays.",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
+
+
+async def _parse_role_color(ctx: commands.Context, color_input: str) -> discord.Color:
+    """Parse and validate the color input for the Discord role."""
+    try:
+        # Remove # if present
+        if color_input.startswith("#"):
+            color_input = color_input[1:]
+
+        # Convert hex to integer
+        color_int = int(color_input, 16)
+        return discord.Color(color_int)
+
+    except ValueError:
+        embed = discord.Embed(
+            title="❌ Couleur invalide",
+            description="La couleur doit être au format hexadécimal (ex: #FF0000 ou FF0000).",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
+        return None
+
+
+async def _get_continent_category(
+    ctx: commands.Context, continent_name: str
+) -> discord.CategoryChannel:
+    """Get the Discord category for the specified continent."""
+    category_id = db.get_continent_category_id(continent_name)
+
+    if category_id is None:
+        embed = discord.Embed(
+            title="❌ Continent invalide",
+            description="Continent non reconnu. Utilisez l'autocomplétion pour voir les options disponibles.",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
+        return None
+
+    category = ctx.guild.get_channel(category_id)
+    if not isinstance(category, discord.CategoryChannel):
+        embed = discord.Embed(
+            title="❌ Catégorie introuvable",
+            description="La catégorie Discord pour ce continent n'existe pas.",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
+        return None
+
+    return category
+
+
+async def _validate_ideology(
+    ctx: commands.Context, ideology_id: str, expected_category: str
+) -> dict:
+    """Validate that the ideology exists and belongs to the correct category."""
+    try:
+        doctrine_id = int(ideology_id)
+        doctrine = db.get_doctrine_by_id(doctrine_id)
+
+        if doctrine is None:
+            embed = discord.Embed(
+                title="❌ Idéologie invalide",
+                description="L'idéologie spécifiée n'existe pas.",
+                color=error_color_int,
+            )
+            await ctx.send(embed=embed)
+            return None
+
+        if doctrine["category"] != expected_category:
+            embed = discord.Embed(
+                title="❌ Catégorie d'idéologie incorrecte",
+                description="L'idéologie '{}' appartient à la catégorie '{}', pas '{}'.".format(
+                    doctrine["name"], doctrine["category"], expected_category
+                ),
+                color=error_color_int,
+            )
+            await ctx.send(embed=embed)
+            return None
+
+        return doctrine
+
+    except ValueError:
+        embed = discord.Embed(
+            title="❌ ID d'idéologie invalide",
+            description="L'ID d'idéologie doit être un nombre entier.",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
+        return None
+
+
+async def _validate_region(ctx: commands.Context, region_id: str) -> dict:
+    """Validate that the region exists and is available."""
+    try:
+        region_id_int = int(region_id)
+        region_data = db.get_region_by_id_detailed(region_id_int)
+
+        if region_data is None:
+            embed = discord.Embed(
+                title="❌ Région invalide",
+                description="La région spécifiée n'existe pas.",
+                color=error_color_int,
+            )
+            await ctx.send(embed=embed)
+            return None
+
+        # Check if region is available (no owner)
+        current_owner = db.get_region_by_id(region_id_int)
+        if current_owner and current_owner.get("country_id") not in [None, 0]:
+            embed = discord.Embed(
+                title="❌ Région occupée",
+                description="La région '{}' appartient déjà à un autre pays.".format(
+                    region_data["name"]
+                ),
+                color=error_color_int,
+            )
+            await ctx.send(embed=embed)
+            return None
+
+        return region_data
+
+    except ValueError:
+        embed = discord.Embed(
+            title="❌ ID de région invalide",
+            description="L'ID de région doit être un nombre entier.",
+            color=error_color_int,
+        )
+        await ctx.send(embed=embed)
+        return None
+
+
+async def _setup_channel_permissions(
+    channel: discord.TextChannel, guild: discord.Guild, country_role: discord.Role
+) -> None:
+    """Set up permissions for the country channel."""
+    # Default role - can view but not send
     await channel.set_permissions(
-        ctx.guild.default_role,
+        guild.default_role,
         manage_webhooks=False,
         view_channel=True,
         read_messages=True,
         send_messages=False,
     )
+
+    # Country role - full permissions
     await channel.set_permissions(
-        role,
+        country_role,
         manage_webhooks=True,
         view_channel=True,
         read_messages=True,
         send_messages=True,
         manage_messages=True,
     )
-    await channel.send(f"Bienvenue dans le pays de {country_name} !")
-    await user.add_roles(role, reason=f"Création du pays {country_name}")
-    await user.add_roles(player_role, reason=f"Création du pays {country_name}")
-    await ctx.send(f"Le pays {country_name} a été créé avec succès.")
+
+
+async def _create_country_database_entries(
+    country_name: str,
+    role_id: str,
+    channel_id: str,
+    player_id: int,
+    economic_ideology: str,
+    political_ideology: str,
+    region_id: str,
+) -> int:
+    """Create all database entries for the new country."""
+    try:
+        # Insert country
+        country_id = db.insert_country(country_name, role_id, channel_id)
+        if country_id is None:
+            return None
+
+        # Insert government leader
+        if not db.insert_government_leader(country_id, str(player_id)):
+            return None
+
+        # Insert country stats
+        if not db.insert_country_stats(country_id, 0):
+            return None
+
+        # Update region ownership
+        if not db.update_region_owner(int(region_id), country_id):
+            return None
+
+        # Add ideologies
+        if not db.add_country_doctrine(country_id, int(economic_ideology)):
+            return None
+
+        if not db.add_country_doctrine(country_id, int(political_ideology)):
+            return None
+
+        return country_id
+
+    except Exception as e:
+        print(f"Error in database country creation: {e}")
+        return None
+
+
+async def _initialize_country_resources(country_id: int) -> None:
+    """Initialize starting resources for the new country."""
+    db.set_balance(country_id, starting_amounts["money"])
+    db.set_points(country_id, starting_amounts["pol_points"], 1)  # Political points
+    db.set_points(country_id, starting_amounts["diplo_points"], 2)  # Diplomatic points
+
+
+async def _send_creation_success(
+    ctx: commands.Context,
+    country_name: str,
+    user: discord.Member,
+    economic_doctrine: dict,
+    political_doctrine: dict,
+    region_data: dict,
+) -> None:
+    """Send a detailed success message for country creation."""
+    embed = discord.Embed(
+        title="✅ Pays créé avec succès",
+        description="Le pays **{}** a été créé et configuré.".format(country_name),
+        color=all_color_int,
+    )
+
+    embed.add_field(name="👑 Dirigeant", value=user.mention, inline=True)
+
+    embed.add_field(
+        name="💰 Idéologie économique", value=economic_doctrine["name"], inline=True
+    )
+
+    embed.add_field(
+        name="🏛️ Idéologie politique", value=political_doctrine["name"], inline=True
+    )
+
+    embed.add_field(
+        name="🌍 Territoire de départ",
+        value="{} ({})".format(
+            region_data["name"], region_data["geographical_area"] or "Zone inconnue"
+        ),
+        inline=True,
+    )
+
+    embed.add_field(
+        name="👥 Population initiale",
+        value="{:,} habitants".format(region_data["population"]),
+        inline=True,
+    )
+
+    embed.add_field(
+        name="💵 Ressources de départ",
+        value="Balance: {:,}\nPoints politiques: {:,}\nPoints diplomatiques: {:,}".format(
+            starting_amounts["money"],
+            starting_amounts["pol_points"],
+            starting_amounts["diplo_points"],
+        ),
+        inline=False,
+    )
+
+    await ctx.send(embed=embed)
 
 
 @bot.hybrid_command(

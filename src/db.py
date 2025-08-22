@@ -2856,3 +2856,157 @@ class Database:
             return "Puissance mineure"
         else:
             return "Non Puissance"
+
+    # Country creation helper methods
+    def insert_country(
+        self,
+        name: str,
+        role_id: str,
+        public_channel_id: str,
+        secret_channel_id: str = None,
+    ) -> int:
+        """Insert a new country into the Countries table and return the country_id."""
+        try:
+            self.cur.execute(
+                """INSERT INTO Countries (name, role_id, public_channel_id, secret_channel_id) 
+                   VALUES (?, ?, ?, ?)""",
+                (name, role_id, public_channel_id, secret_channel_id),
+            )
+            country_id = self.cur.lastrowid
+
+            # Initialize inventory for the new country
+            self.cur.execute(
+                """INSERT INTO Inventory (country_id, balance, pol_points, diplo_points, tech_points) 
+                   VALUES (?, 0, 0, 0, 0)""",
+                (country_id,),
+            )
+
+            self.conn.commit()
+            return country_id
+        except Exception as e:
+            print(f"Error inserting country: {e}")
+            self.conn.rollback()
+            return None
+
+    def insert_government_leader(self, country_id: int, player_id: str) -> bool:
+        """Insert a player as the leader (slot 1) of a government with full permissions."""
+        try:
+            self.cur.execute(
+                """INSERT INTO Governments 
+                   (country_id, slot, player_id, can_spend_money, can_spend_points, 
+                    can_sign_treaties, can_build, can_recruit, can_produce, can_declare_war) 
+                   VALUES (?, 1, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (country_id, player_id, True, True, True, True, True, True, True),
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error inserting government leader: {e}")
+            self.conn.rollback()
+            return False
+
+    def insert_country_stats(self, country_id: int, initial_gdp: int = 0) -> bool:
+        """Insert initial stats for a new country."""
+        try:
+            self.cur.execute(
+                """INSERT INTO Stats (country_id, gdp) VALUES (?, ?)""",
+                (country_id, initial_gdp),
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error inserting country stats: {e}")
+            self.conn.rollback()
+            return False
+
+    def update_region_owner(self, region_id: int, country_id: int) -> bool:
+        """Update the owner of a region."""
+        try:
+            self.cur.execute(
+                """UPDATE Regions SET country_id = ? WHERE region_id = ?""",
+                (country_id, region_id),
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error updating region owner: {e}")
+            self.conn.rollback()
+            return False
+
+    def add_country_doctrine(self, country_id: int, doctrine_id: int) -> bool:
+        """Add a doctrine to a country."""
+        try:
+            self.cur.execute(
+                """INSERT INTO CountryDoctrines (country_id, doctrine_id) 
+                   VALUES (?, ?)""",
+                (country_id, doctrine_id),
+            )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            print(f"Error adding country doctrine: {e}")
+            self.conn.rollback()
+            return False
+
+    def get_doctrine_by_id(self, doctrine_id: int) -> dict:
+        """Get doctrine information by ID."""
+        try:
+            self.cur.execute(
+                """SELECT doctrine_id, name, category, description 
+                   FROM Doctrines WHERE doctrine_id = ?""",
+                (doctrine_id,),
+            )
+            result = self.cur.fetchone()
+            if result:
+                return {
+                    "doctrine_id": result[0],
+                    "name": result[1],
+                    "category": result[2],
+                    "description": result[3],
+                }
+            return None
+        except Exception as e:
+            print(f"Error getting doctrine: {e}")
+            return None
+
+    def get_region_by_id_detailed(self, region_id: int) -> dict:
+        """Get detailed region information by ID."""
+        try:
+            self.cur.execute(
+                """SELECT r.region_id, r.name, r.population, r.continent, 
+                          g.name as geographical_area_name
+                   FROM Regions r 
+                   LEFT JOIN GeographicalAreas g ON r.geographical_area_id = g.geographical_area_id
+                   WHERE r.region_id = ?""",
+                (region_id,),
+            )
+            result = self.cur.fetchone()
+            if result:
+                return {
+                    "region_id": result[0],
+                    "name": result[1],
+                    "population": result[2],
+                    "continent": result[3],
+                    "geographical_area": result[4],
+                }
+            return None
+        except Exception as e:
+            print(f"Error getting region details: {e}")
+            return None
+
+    def get_continent_category_id(self, continent_name: str) -> int:
+        """Get the Discord category ID for a continent."""
+        # These should be loaded from settings/config
+        continent_mapping = {
+            "europe": "europe_category_id",
+            "amérique": "america_category_id",
+            "asie": "asia_category_id",
+            "afrique": "africa_category_id",
+            "océanie": "oceania_category_id",
+            "moyen-orient": "middle_east_category_id",
+        }
+
+        setting_key = continent_mapping.get(continent_name.lower())
+        if setting_key:
+            return int(self.get_setting(setting_key))
+        return None

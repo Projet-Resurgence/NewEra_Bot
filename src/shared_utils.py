@@ -47,7 +47,11 @@ def get_discord_utils(bot=None, db=None):
 class CountryEntity:
     """Centralized CountryEntity class used across all cogs."""
 
-    def __init__(self, entity: Union[discord.User, discord.Member, discord.Role, discord.TextChannel], guild: discord.Guild):
+    def __init__(
+        self,
+        entity: Union[discord.User, discord.Member, discord.Role, discord.TextChannel],
+        guild: discord.Guild,
+    ):
         self.entity = entity
         self.guild = guild
 
@@ -58,7 +62,7 @@ class CountryEntity:
     @property
     def is_role(self) -> bool:
         return isinstance(self.entity, discord.Role)
-    
+
     @property
     def is_channel(self) -> bool:
         return isinstance(self.entity, discord.TextChannel)
@@ -94,7 +98,13 @@ class CountryEntity:
             }
         role = self.guild.get_role(int(datas.get("role_id")))
         channel = self.guild.get_channel(int(datas.get("public_channel_id")))
-        return {"name": datas.get("name"), "id": country_id, "role": role, "channel": channel}
+        return {
+            "name": datas.get("name"),
+            "id": country_id,
+            "role": role,
+            "channel": channel,
+        }
+
 
 class CountryConverter(commands.Converter):
     """Centralized CountryConverter class used across all cogs."""
@@ -164,12 +174,15 @@ class CountryConverter(commands.Converter):
             country_id = db_instance.get_country_by_name(country_name.capitalize())
             if not country_id:
                 return None
-            role = ctx.guild.get_role(int(db_instance.get_country_role_with_id(country_id)))
+            role = ctx.guild.get_role(
+                int(db_instance.get_country_role_with_id(country_id))
+            )
             if not role:
                 return None
             return CountryEntity(role, ctx.guild)
         except Exception:
             return None
+
 
 async def country_autocomplete(
     interaction: discord.Interaction,
@@ -1203,6 +1216,162 @@ async def loan_reference_autocomplete(
     return choices[:25]  # Discord limit
 
 
+async def ideology_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for ideology selection based on doctrine categories.
+    Returns economic and political ideologies from the Doctrines table.
+    """
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance:
+        return choices
+
+    try:
+        cursor = db_instance.cur
+        # Get ideologies from Doctrines table
+        cursor.execute(
+            """
+            SELECT doctrine_id, name, category 
+            FROM Doctrines 
+            WHERE category IN ('Économie', 'Idéologie') 
+            ORDER BY category, name
+        """
+        )
+        doctrines = cursor.fetchall()
+
+        category_emojis = {"Économie": "💰", "Idéologie": "🏛️"}
+
+        for doctrine in doctrines:
+            doctrine_id, name, category = doctrine
+
+            if current_lower in name.lower():
+                emoji = category_emojis.get(category, "📋")
+                choices.append(
+                    app_commands.Choice(
+                        name=f"{emoji} {name} ({category})", value=str(doctrine_id)
+                    )
+                )
+
+    except Exception as e:
+        print(f"Error in ideology_autocomplete: {e}")
+
+    return choices[:25]  # Discord limit
+
+
+async def continent_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for continent selection.
+    Returns available continents for country creation.
+    """
+    continents = [
+        ("Europe", "🌍"),
+        ("Amérique", "🌎"),
+        ("Asie", "🌏"),
+        ("Afrique", "🌍"),
+        ("Océanie", "🌊"),
+        ("Moyen-Orient", "🏜️"),
+    ]
+
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    for continent_name, emoji in continents:
+        if current_lower in continent_name.lower():
+            choices.append(
+                app_commands.Choice(
+                    name=f"{emoji} {continent_name}", value=continent_name
+                )
+            )
+
+    return choices
+
+
+async def color_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for color selection in Discord roles.
+    Returns common colors with their hex values and display names.
+    """
+    # Predefined color palette with hex values and names
+    colors = [
+        ("Rouge", "FF0000", "🔴"),
+        ("Bleu", "0066FF", "🔵"),
+        ("Vert", "00FF00", "🟢"),
+        ("Jaune", "FFFF00", "🟡"),
+        ("Orange", "FF8000", "🟠"),
+        ("Violet", "8000FF", "🟣"),
+        ("Rose", "FF69B4", "🩷"),
+        ("Cyan", "00FFFF", "🩵"),
+        ("Blanc", "FFFFFF", "⚪"),
+        ("Noir", "000000", "⚫"),
+        ("Gris", "808080", "🔘"),
+        ("Marron", "8B4513", "🤎"),
+        ("Bleu Marine", "000080", "🔷"),
+        ("Vert Forêt", "228B22", "🟢"),
+        ("Rouge Bordeaux", "800020", "🟥"),
+        ("Or", "FFD700", "🟨"),
+        ("Argent", "C0C0C0", "⚪"),
+        ("Turquoise", "40E0D0", "🩵"),
+        ("Lavande", "E6E6FA", "🟣"),
+        ("Saumon", "FA8072", "🐟"),
+        ("Bleu Roi", "4169E1", "💙"),
+        ("Vert Lime", "32CD32", "🟢"),
+        ("Magenta", "FF00FF", "💖"),
+        ("Indigo", "4B0082", "🔮"),
+        ("Corail", "FF7F50", "🪸")
+    ]
+    
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    # If user typed a hex value directly, validate and suggest it
+    if current_lower:
+        # Check if it's a hex color (with or without #)
+        hex_pattern = r'^#?([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$'
+        if re.match(hex_pattern, current):
+            clean_hex = current.upper().replace('#', '')
+            # Expand 3-digit hex to 6-digit
+            if len(clean_hex) == 3:
+                clean_hex = ''.join([c*2 for c in clean_hex])
+            choices.append(
+                app_commands.Choice(
+                    name=f"🎨 Couleur personnalisée #{clean_hex}",
+                    value=clean_hex
+                )
+            )
+
+    # Add predefined colors that match the search
+    for color_name, hex_value, emoji in colors:
+        if (not current_lower or 
+            current_lower in color_name.lower() or 
+            current_lower in hex_value.lower()):
+            choices.append(
+                app_commands.Choice(
+                    name=f"{emoji} {color_name} (#{hex_value})",
+                    value=hex_value
+                )
+            )
+
+    return choices[:25]  # Discord limit
+
+
 # ============================================================================
 # ECO LOGGER SYSTEM - Unified economic event logging
 # ============================================================================
@@ -1486,9 +1655,13 @@ __all__ = [
     "factory_autocomplete",
     "technocentre_autocomplete",
     "region_autocomplete",
+    "free_region_autocomplete",
     "technology_autocomplete",
     "loan_years_autocomplete",
     "loan_reference_autocomplete",
+    "ideology_autocomplete",
+    "continent_autocomplete",
+    "color_autocomplete",
     "EcoLogEvent",
     "eco_logger",
     "set_eco_logger_bot",
