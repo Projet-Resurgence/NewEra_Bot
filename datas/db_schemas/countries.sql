@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS Governments (
 CREATE TABLE IF NOT EXISTS Doctrines (
     doctrine_id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
-    category TEXT CHECK (category IN ('Régime', 'Idéologie', 'Économie', 'Religieux')),
+    category TEXT CHECK (category IN ('Ideologie', 'Economie')),
     description TEXT,
     discord_role_id TEXT,
     bonus_json JSONB  -- exemple : { "production_bonus": 0.1, "culture_penalty": -0.05 }

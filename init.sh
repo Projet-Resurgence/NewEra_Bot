@@ -3,13 +3,16 @@ set -e  # Arrêter le script en cas d'erreur
 
 echo "[+] Installing system dependencies"
 sudo apt update
-sudo apt install -y python3 python-is-python3 python3-pip python3-venv
+sudo apt install -y python3.10 python3.10-venv python3.10-pip python3.10-dev python-is-python3
 
 echo "[+] Creating virtual environment"
 python3 -m venv venv
 
 echo "[+] Activating virtual environment"
 source venv/bin/activate
+
+echo "[+] Installing build tools"
+pip install --upgrade pip setuptools wheel
 
 echo "[+] Installing Python dependencies"
 pip install --upgrade pip

@@ -1216,13 +1216,13 @@ async def loan_reference_autocomplete(
     return choices[:25]  # Discord limit
 
 
-async def ideology_autocomplete(
+async def economy_doctrines_autocomplete(
     interaction: discord.Interaction,
     current: str,
 ) -> List[app_commands.Choice[str]]:
     """
-    Autocomplete function for ideology selection based on doctrine categories.
-    Returns economic and political ideologies from the Doctrines table.
+    Autocomplete function for economic doctrines selection based on doctrine categories.
+    Returns economic ideologies from the Doctrines table.
     """
     choices = []
     current_lower = current.lower()
@@ -1241,22 +1241,20 @@ async def ideology_autocomplete(
             """
             SELECT doctrine_id, name, category 
             FROM Doctrines 
-            WHERE category IN ('Économie', 'Idéologie') 
+            WHERE category IN ('Economie') 
             ORDER BY category, name
         """
         )
         doctrines = cursor.fetchall()
 
-        category_emojis = {"Économie": "💰", "Idéologie": "🏛️"}
-
         for doctrine in doctrines:
             doctrine_id, name, category = doctrine
 
             if current_lower in name.lower():
-                emoji = category_emojis.get(category, "📋")
+                emoji = "💰"
                 choices.append(
                     app_commands.Choice(
-                        name=f"{emoji} {name} ({category})", value=str(doctrine_id)
+                        name=f"{emoji} {name}", value=str(doctrine_id)
                     )
                 )
 
@@ -1265,6 +1263,52 @@ async def ideology_autocomplete(
 
     return choices[:25]  # Discord limit
 
+async def ideology_doctrines_autocomplete(
+    interaction: discord.Interaction,
+    current: str,
+) -> List[app_commands.Choice[str]]:
+    """
+    Autocomplete function for ideology selection based on doctrine categories.
+    Returns political ideologies from the Doctrines table.
+    """
+    choices = []
+    current_lower = current.lower()
+    current_lower = re.sub(r"[^\w\s]", "", current_lower)
+    current_lower = current_lower.strip()
+
+    # Get database instance
+    db_instance = get_db()
+    if not db_instance:
+        return choices
+
+    try:
+        cursor = db_instance.cur
+        # Get ideologies from Doctrines table
+        cursor.execute(
+            """
+            SELECT doctrine_id, name, category 
+            FROM Doctrines 
+            WHERE category IN ('Ideologie') 
+            ORDER BY category, name
+        """
+        )
+        doctrines = cursor.fetchall()
+
+        for doctrine in doctrines:
+            doctrine_id, name, category = doctrine
+
+            if current_lower in name.lower():
+                emoji = "🏛️"
+                choices.append(
+                    app_commands.Choice(
+                        name=f"{emoji} {name}", value=str(doctrine_id)
+                    )
+                )
+
+    except Exception as e:
+        print(f"Error in ideology_autocomplete: {e}")
+
+    return choices[:25]  # Discord limit
 
 async def continent_autocomplete(
     interaction: discord.Interaction,
@@ -1297,79 +1341,6 @@ async def continent_autocomplete(
             )
 
     return choices
-
-
-async def color_autocomplete(
-    interaction: discord.Interaction,
-    current: str,
-) -> List[app_commands.Choice[str]]:
-    """
-    Autocomplete function for color selection in Discord roles.
-    Returns common colors with their hex values and display names.
-    """
-    # Predefined color palette with hex values and names
-    colors = [
-        ("Rouge", "FF0000", "🔴"),
-        ("Bleu", "0066FF", "🔵"),
-        ("Vert", "00FF00", "🟢"),
-        ("Jaune", "FFFF00", "🟡"),
-        ("Orange", "FF8000", "🟠"),
-        ("Violet", "8000FF", "🟣"),
-        ("Rose", "FF69B4", "🩷"),
-        ("Cyan", "00FFFF", "🩵"),
-        ("Blanc", "FFFFFF", "⚪"),
-        ("Noir", "000000", "⚫"),
-        ("Gris", "808080", "🔘"),
-        ("Marron", "8B4513", "🤎"),
-        ("Bleu Marine", "000080", "🔷"),
-        ("Vert Forêt", "228B22", "🟢"),
-        ("Rouge Bordeaux", "800020", "🟥"),
-        ("Or", "FFD700", "🟨"),
-        ("Argent", "C0C0C0", "⚪"),
-        ("Turquoise", "40E0D0", "🩵"),
-        ("Lavande", "E6E6FA", "🟣"),
-        ("Saumon", "FA8072", "🐟"),
-        ("Bleu Roi", "4169E1", "💙"),
-        ("Vert Lime", "32CD32", "🟢"),
-        ("Magenta", "FF00FF", "💖"),
-        ("Indigo", "4B0082", "🔮"),
-        ("Corail", "FF7F50", "🪸")
-    ]
-    
-    choices = []
-    current_lower = current.lower()
-    current_lower = re.sub(r"[^\w\s]", "", current_lower)
-    current_lower = current_lower.strip()
-
-    # If user typed a hex value directly, validate and suggest it
-    if current_lower:
-        # Check if it's a hex color (with or without #)
-        hex_pattern = r'^#?([0-9A-Fa-f]{6}|[0-9A-Fa-f]{3})$'
-        if re.match(hex_pattern, current):
-            clean_hex = current.upper().replace('#', '')
-            # Expand 3-digit hex to 6-digit
-            if len(clean_hex) == 3:
-                clean_hex = ''.join([c*2 for c in clean_hex])
-            choices.append(
-                app_commands.Choice(
-                    name=f"🎨 Couleur personnalisée #{clean_hex}",
-                    value=clean_hex
-                )
-            )
-
-    # Add predefined colors that match the search
-    for color_name, hex_value, emoji in colors:
-        if (not current_lower or 
-            current_lower in color_name.lower() or 
-            current_lower in hex_value.lower()):
-            choices.append(
-                app_commands.Choice(
-                    name=f"{emoji} {color_name} (#{hex_value})",
-                    value=hex_value
-                )
-            )
-
-    return choices[:25]  # Discord limit
 
 
 # ============================================================================
@@ -1661,7 +1632,6 @@ __all__ = [
     "loan_reference_autocomplete",
     "ideology_autocomplete",
     "continent_autocomplete",
-    "color_autocomplete",
     "EcoLogEvent",
     "eco_logger",
     "set_eco_logger_bot",
