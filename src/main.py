@@ -1,6 +1,5 @@
 import discord
 from discord import app_commands
-from pyutil import filereplace
 from discord.ext import commands
 from datetime import datetime, timedelta, timezone
 import asyncio
@@ -56,9 +55,9 @@ from shared_utils import (
     structure_autocomplete,
     region_autocomplete,
     free_region_autocomplete,
-    ideology_autocomplete,
+    economy_doctrines_autocomplete,
+    ideology_doctrines_autocomplete,
     continent_autocomplete,
-    color_autocomplete,
     STRUCTURE_TYPES,
     SPECIALISATIONS,
     convert,
@@ -169,7 +168,7 @@ async def on_ready():
     await bot.tree.sync()
     polling_notion.start()
     update_rp_date.start()
-    polling_ovh.start()
+    #polling_ovh.start()
 
 
 rmbg = RemoveBg(removebg_apikey, "error.log")
@@ -1477,7 +1476,7 @@ def is_valid_lvl(type: int, lvl: int):
     - `<country_flag>` : Emoji représentant le drapeau du pays
     - `<country_name>` : Nom du pays (espaces autorisés)
     - `<continent>` : Continent où créer le salon (avec autocomplétion)
-    - `<color>` : Couleur hexadécimale pour le rôle Discord (avec autocomplétion des couleurs courantes)
+    - `<color>` : Couleur hexadécimale pour le rôle Discord (ex: #FF0000)
     - `<economic_ideology>` : Idéologie économique (avec autocomplétion)
     - `<political_ideology>` : Idéologie politique (avec autocomplétion)
     - `<region>` : Région de départ à attribuer au pays (avec autocomplétion)
@@ -1506,16 +1505,15 @@ def is_valid_lvl(type: int, lvl: int):
     country_flag="Emoji représentant le drapeau du pays",
     country_name="Nom du pays (espaces autorisés)",
     continent="Continent où créer le salon du pays",
-    color="Couleur hexadécimale pour le rôle Discord (avec autocomplétion)",
+    color="Couleur hexadécimale pour le rôle Discord (ex: #FF0000)",
     economic_ideology="Idéologie économique du pays",
     political_ideology="Idéologie politique du pays",
     region="Région de départ à attribuer au pays",
 )
 @app_commands.autocomplete(
     continent=continent_autocomplete,
-    color=color_autocomplete,
-    economic_ideology=ideology_autocomplete,
-    political_ideology=ideology_autocomplete,
+    economic_ideology=economy_doctrines_autocomplete,
+    political_ideology=ideology_doctrines_autocomplete,
     region=free_region_autocomplete,
 )
 async def create_country(
@@ -1546,11 +1544,11 @@ async def create_country(
         return
 
     # Validate ideologies
-    economic_doctrine = await _validate_ideology(ctx, economic_ideology, "Économie")
+    economic_doctrine = await _validate_ideology(ctx, economic_ideology, "Economie")
     if economic_doctrine is None:
         return
 
-    political_doctrine = await _validate_ideology(ctx, political_ideology, "Idéologie")
+    political_doctrine = await _validate_ideology(ctx, political_ideology, "Ideologie")
     if political_doctrine is None:
         return
 
@@ -1860,16 +1858,16 @@ async def _send_creation_success(
 
     embed.add_field(
         name="👥 Population initiale",
-        value="{:,} habitants".format(region_data["population"]),
+        value="{:,} habitants".format(int(region_data["population"])),
         inline=True,
     )
 
     embed.add_field(
         name="💵 Ressources de départ",
         value="Balance: {:,}\nPoints politiques: {:,}\nPoints diplomatiques: {:,}".format(
-            starting_amounts["money"],
-            starting_amounts["pol_points"],
-            starting_amounts["diplo_points"],
+            int(starting_amounts["money"]),
+            int(starting_amounts["pol_points"]),
+            int(starting_amounts["diplo_points"]),
         ),
         inline=False,
     )

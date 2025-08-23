@@ -2,10 +2,10 @@ aiohttp==3.12.15
 discord.py==2.5.2
 groq==0.30.0
 notion_client==2.4.0
-numpy==1.24.0
+numpy==1.26.4
 Pillow==11.3.0
 python-dotenv==1.1.1
-python_util==1.2.1
+python-util==1.2.1
 pytz==2022.1
 pyutil==3.3.6
 removebg==0.4
