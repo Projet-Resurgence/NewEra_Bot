@@ -2918,6 +2918,31 @@ class Database:
             print(f"Error inserting country stats: {e}")
             self.conn.rollback()
             return False
+        
+    def get_countries_doctrines(self, country_id: int) -> list:
+        """Get all doctrines associated with a country."""
+        try:
+            self.cur.execute(
+                """SELECT d.doctrine_id, d.name, d.category, d.description, d.discord_role_id
+                   FROM Doctrines d
+                   JOIN CountryDoctrines cd ON d.doctrine_id = cd.doctrine_id
+                   WHERE cd.country_id = ?""",
+                (country_id,),
+            )
+            results = self.cur.fetchall()
+            return [
+                {
+                    "doctrine_id": row[0],
+                    "name": row[1],
+                    "category": row[2],
+                    "description": row[3],
+                    "discord_role_id": row[4],
+                }
+                for row in results
+            ]
+        except Exception as e:
+            print(f"Error getting country doctrines: {e}")
+            return []
 
     def update_region_owner(self, region_id: int, country_id: int) -> bool:
         """Update the owner of a region."""
@@ -2952,7 +2977,7 @@ class Database:
         """Get doctrine information by ID."""
         try:
             self.cur.execute(
-                """SELECT doctrine_id, name, category, description 
+                """SELECT doctrine_id, name, category, description, discord_role_id
                    FROM Doctrines WHERE doctrine_id = ?""",
                 (doctrine_id,),
             )
@@ -2963,6 +2988,7 @@ class Database:
                     "name": result[1],
                     "category": result[2],
                     "description": result[3],
+                    "discord_role_id": result[4],
                 }
             return None
         except Exception as e:

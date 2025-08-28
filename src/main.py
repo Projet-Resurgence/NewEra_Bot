@@ -35,6 +35,9 @@ from selenium.webdriver.support import expected_conditions as EC
 import tempfile
 import atexit
 
+# Import async database
+from asyncdb import AsyncDatabase
+
 # Import centralized utilities
 from shared_utils import (
     initialize_utilities,
@@ -84,7 +87,6 @@ notion_token = dotenv_values(".env")["NOTION_TOKEN"]
 
 _orig_print = print
 
-
 def print(*args, **kwargs):
     _orig_print(*args, flush=True, **kwargs)
 
@@ -98,6 +100,8 @@ bot = commands.Bot(
 groq_client = Groq(api_key=groq_api_key)
 last_groq_query_time = datetime.now(timezone.utc)
 
+# Active/désactive le verrou global
+COMMANDS_LOCKED = True  
 
 async def load_cogs():
     """Load all cogs for the bot."""
@@ -347,214 +351,22 @@ async def update_map():
             except Exception as e:
                 print(f"[Map Update] Error deleting message: {e}")
 
-        # Continental data list
-        continents = [
-            "Europe",
-            "Asie",
-            "Afrique",
-            "Amerique",
-            "Oceanie",
-            "Moyen-Orient",
-        ]
-
-        print("[Map Update] Generating continental maps...")
-
-        # Generate maps for each continent
-        for continent in continents:
-            try:
-                print(f"[Map Update] Processing continent: {continent}")
-
-                # Get continental statistics
-                continental_stats = get_continental_statistics(continent)
-
-                # Generate the continental map
-                output_path = await mapping_cog.generate_filtered_map_async(
-                    "Continent", continent, is_regions_map=False
-                )
-
-                # if output_path and os.path.exists(output_path): was the old condition, decided to reverse it to allow unnesting
-                if not output_path or not os.path.exists(output_path):
-                    print(f"[Map Update] Failed to generate map for {continent}")
-                    continue
-                # Create embed with continental statistics
-                embed = discord.Embed(
-                    title=f"🌍 {continent} - Carte Politique",
-                    color=all_color_int,
-                )
-
-                # Add statistical fields
-                embed.add_field(
-                    name="📊 Statistiques Générales",
-                    value=f"🏛️ **Pays total:** {continental_stats['total_countries']}\n"
-                    f"👤 **Pays joués:** {continental_stats['played_countries']}\n"
-                    f"🏳️ **Pays libres:** {continental_stats['unplayed_countries']}\n"
-                    f"📍 **Régions totales:** {continental_stats['total_regions']}",
-                    inline=True,
-                )
-
-                embed.add_field(
-                    name="🗺️ Contrôle Territorial",
-                    value=f"🎯 **Régions contrôlées:** {continental_stats['controlled_regions']}\n"
-                    f"🆓 **Régions libres:** {continental_stats['free_regions']}\n"
-                    f"📈 **% contrôlé:** {continental_stats['control_percentage']:.1f}%\n"
-                    f"🔓 **% libre:** {continental_stats['free_percentage']:.1f}%",
-                    inline=True,
-                )
-
-                embed.add_field(
-                    name="⏰ Mise à jour",
-                    value=f"📅 **Date:** {datetime.now(pytz.timezone('Europe/Paris')).strftime('%d/%m/%Y')}\n"
-                    f"🕐 **Heure:** <t:{int(datetime.now(pytz.timezone('Europe/Paris')).timestamp())}>",
-                    inline=False,
-                )
-
-                # Send the continental map
-                file = discord.File(output_path, filename=f"{continent}_map.png")
-                embed.set_image(url=f"attachment://{continent}_map.png")
-
-                await map_channel.send(embed=embed, file=file)
-                print(f"[Map Update] Sent map for {continent}")
-
-            except Exception as e:
-                print(f"[Map Update] Error processing continent {continent}: {e}")
-
-        # Generate world map with global statistics
-        try:
-            print("[Map Update] Generating world map...")
-
-            # Get global statistics
-            world_stats = get_world_statistics()
-
-            # Generate the world map
-            output_path = await mapping_cog.generate_filtered_map_async(
-                "All", None, is_regions_map=False
-            )
-
-            if output_path and os.path.exists(output_path):
-                # Create embed with world statistics
-                embed = discord.Embed(
-                    title="🌍 Monde - Carte Politique Globale",
-                    description="Vue d'ensemble de l'état géopolitique mondial",
-                    color=all_color_int,
-                )
-
-                # Add global statistical fields
-                embed.add_field(
-                    name="🌐 Statistiques Mondiales",
-                    value=f"🏛️ **Pays total:** {world_stats['total_countries']}\n"
-                    f"👤 **Pays joués:** {world_stats['played_countries']}\n"
-                    f"🏳️ **Pays libres:** {world_stats['unplayed_countries']}\n"
-                    f"📍 **Régions totales:** {world_stats['total_regions']}",
-                    inline=True,
-                )
-
-                embed.add_field(
-                    name="🗺️ Contrôle Global",
-                    value=f"🎯 **Régions contrôlées:** {world_stats['controlled_regions']}\n"
-                    f"🆓 **Régions libres:** {world_stats['free_regions']}\n"
-                    f"📈 **% contrôlé:** {world_stats['control_percentage']:.1f}%\n"
-                    f"🔓 **% libre:** {world_stats['free_percentage']:.1f}%",
-                    inline=True,
-                )
-
-                embed.add_field(
-                    name="📈 Répartition par Continent",
-                    value="\n".join(
-                        [
-                            f"🌍 **{cont}:** {get_continent_country_count(cont)} pays"
-                            for cont in continents
-                        ]
-                    ),
-                    inline=False,
-                )
-
-                embed.add_field(
-                    name="⏰ Mise à jour Quotidienne",
-                    value=f"📅 **Date:** {datetime.now(pytz.timezone('Europe/Paris')).strftime('%d/%m/%Y')}\n"
-                    f"🕐 **Heure:** <t:{int(datetime.now(pytz.timezone('Europe/Paris')).timestamp())}>\n"
-                    f"🔄 **Prochaine:** <t:{int((datetime.now(pytz.timezone('Europe/Paris')).replace(hour=7, minute=0, second=0, microsecond=0) + timedelta(days=1)).timestamp())}>",
-                    inline=False,
-                )
-
-                # Send the world map
-                file = discord.File(output_path, filename="world_map.png")
-                embed.set_image(url="attachment://world_map.png")
-
-                await map_channel.send(embed=embed, file=file)
-                print("[Map Update] Sent world map")
-            else:
-                print("[Map Update] Failed to generate world map")
-
-        except Exception as e:
-            print(f"[Map Update] Error generating world map: {e}")
+        # Generate all maps in parallel and send them to Discord
+        await mapping_cog.generate_all_maps_async(map_channel)
 
         print("[Map Update] Daily map update completed successfully")
 
     except Exception as e:
         print(f"[Map Update] Error in update_map: {e}")
         import traceback
-
         traceback.print_exc()
 
 
-def get_continental_statistics(continent: str) -> dict:
-    """Get statistics for a specific continent."""
+async def get_continental_statistics(continent: str) -> dict:
+    """Get statistics for a specific continent using async database."""
     try:
-        cursor = db.cur
-
-        # Get all regions in the continent
-        cursor.execute("SELECT COUNT(*) FROM Regions WHERE continent = ?", (continent,))
-        total_regions = cursor.fetchone()[0]
-
-        # Get controlled regions (regions with country_id)
-        cursor.execute(
-            "SELECT COUNT(*) FROM Regions WHERE continent = ? AND country_id IS NOT NULL",
-            (continent,),
-        )
-        controlled_regions = cursor.fetchone()[0]
-
-        # Get free regions
-        free_regions = total_regions - controlled_regions
-
-        # Get unique countries in the continent
-        cursor.execute(
-            "SELECT COUNT(DISTINCT country_id) FROM Regions WHERE continent = ? AND country_id IS NOT NULL",
-            (continent,),
-        )
-        played_countries = cursor.fetchone()[0]
-
-        # Get total countries (including those without regions)
-        cursor.execute(
-            """SELECT COUNT(DISTINCT c.country_id) 
-               FROM Countries c 
-               LEFT JOIN Regions r ON c.country_id = r.country_id 
-               WHERE r.continent = ? OR r.continent IS NULL""",
-            (continent,),
-        )
-        total_countries_result = cursor.fetchone()[0]
-
-        total_countries = max(played_countries, total_countries_result)
-        unplayed_countries = max(0, total_countries - played_countries)
-
-        # Calculate percentages
-        control_percentage = (
-            (controlled_regions / total_regions * 100) if total_regions > 0 else 0
-        )
-        free_percentage = (
-            (free_regions / total_regions * 100) if total_regions > 0 else 0
-        )
-
-        return {
-            "total_regions": total_regions,
-            "controlled_regions": controlled_regions,
-            "free_regions": free_regions,
-            "total_countries": total_countries,
-            "played_countries": played_countries,
-            "unplayed_countries": unplayed_countries,
-            "control_percentage": control_percentage,
-            "free_percentage": free_percentage,
-        }
-
+        async_db = AsyncDatabase()
+        return await async_db.get_continental_statistics_async(continent)
     except Exception as e:
         print(f"Error getting continental statistics for {continent}: {e}")
         return {
@@ -569,53 +381,11 @@ def get_continental_statistics(continent: str) -> dict:
         }
 
 
-def get_world_statistics() -> dict:
-    """Get global world statistics."""
+async def get_world_statistics() -> dict:
+    """Get global world statistics using async database."""
     try:
-        cursor = db.cur
-
-        # Get all regions worldwide
-        cursor.execute("SELECT COUNT(*) FROM Regions")
-        total_regions = cursor.fetchone()[0]
-
-        # Get controlled regions (regions with country_id)
-        cursor.execute("SELECT COUNT(*) FROM Regions WHERE country_id IS NOT NULL")
-        controlled_regions = cursor.fetchone()[0]
-
-        # Get free regions
-        free_regions = total_regions - controlled_regions
-
-        # Get total countries
-        cursor.execute("SELECT COUNT(*) FROM Countries")
-        total_countries = cursor.fetchone()[0]
-
-        # Get played countries (countries that have at least one region)
-        cursor.execute(
-            "SELECT COUNT(DISTINCT country_id) FROM Regions WHERE country_id IS NOT NULL"
-        )
-        played_countries = cursor.fetchone()[0]
-
-        unplayed_countries = total_countries - played_countries
-
-        # Calculate percentages
-        control_percentage = (
-            (controlled_regions / total_regions * 100) if total_regions > 0 else 0
-        )
-        free_percentage = (
-            (free_regions / total_regions * 100) if total_regions > 0 else 0
-        )
-
-        return {
-            "total_regions": total_regions,
-            "controlled_regions": controlled_regions,
-            "free_regions": free_regions,
-            "total_countries": total_countries,
-            "played_countries": played_countries,
-            "unplayed_countries": unplayed_countries,
-            "control_percentage": control_percentage,
-            "free_percentage": free_percentage,
-        }
-
+        async_db = AsyncDatabase()
+        return await async_db.get_world_statistics_async()
     except Exception as e:
         print(f"Error getting world statistics: {e}")
         return {
@@ -630,28 +400,24 @@ def get_world_statistics() -> dict:
         }
 
 
-def get_continent_country_count(continent: str) -> int:
-    """Get the number of countries in a specific continent."""
+async def get_continent_country_count(continent: str) -> int:
+    """Get the number of countries in a specific continent using async database."""
     try:
-        cursor = db.cur
-        cursor.execute(
-            "SELECT COUNT(DISTINCT country_id) FROM Regions WHERE continent = ? AND country_id IS NOT NULL",
-            (continent,),
-        )
-        return cursor.fetchone()[0]
+        async_db = AsyncDatabase()
+        return await async_db.get_continent_country_count_async(continent)
     except Exception as e:
         print(f"Error getting country count for {continent}: {e}")
         return 0
 
-
 RP_UPDATE_INTERVAL = 60
 # RP_UPDATE_INTERVAL = 5
 
+mapping_debug = False
 
 @tasks.loop(seconds=RP_UPDATE_INTERVAL)
 async def update_rp_date():
     now = datetime.now(pytz.timezone("Europe/Paris"))  # ou "UTC"
-    if not (now.hour == 7 and now.minute == 0):
+    if not (now.hour == 17 and now.minute == 20) and not mapping_debug:
         return
     await db.advance_playday(bot)
     # Process production cycle
@@ -706,6 +472,14 @@ async def before():
 
 
 ###
+
+
+@bot.check
+async def global_command_lock(ctx):
+    if dUtils.is_authorized(ctx) or not COMMANDS_LOCKED:
+        return True
+    # Message d’erreur personnalisé
+    raise commands.CheckFailure("⚠️ Les commandes du bot sont temporairement désactivées.")
 
 
 @bot.hybrid_command(
@@ -914,7 +688,6 @@ async def on_member_update(before: discord.Member, after: discord.Member):
             bot,
             f"🔇 **MUTE/TIMEOUT** : {after} ({after.id}) jusqu'à {after.timed_out_until}",
         )
-
 
 # 4️⃣ Log tous les messages envoyés (gravité = 3)
 @bot.event
@@ -1454,7 +1227,6 @@ def is_valid_lvl(type: int, lvl: int):
     else:
         return False
 
-
 @bot.hybrid_command(
     name="create_country",
     brief="Crée un nouveau pays avec toutes ses caractéristiques.",
@@ -1552,6 +1324,16 @@ async def create_country(
     if political_doctrine is None:
         return
 
+    doctrine_role_ids = {
+        "economic": int((economic_doctrine.get("discord_role_id"))),
+        "political": int((political_doctrine.get("discord_role_id"))),
+    }
+
+    doctrine_roles = {
+        "economic": ctx.guild.get_role(doctrine_role_ids.get("economic")),
+        "political": ctx.guild.get_role(doctrine_role_ids.get("political")),
+    }
+
     # Validate region
     region_data = await _validate_region(ctx, region)
     if region_data is None:
@@ -1598,9 +1380,11 @@ async def create_country(
         # Initialize country resources
         await _initialize_country_resources(country_id)
 
+        roles_to_add = [role, player_role] + list(doctrine_roles.values())
+
         # Assign roles to user
         await user.add_roles(
-            role, player_role, reason="Création du pays {}".format(country_name)
+            *roles_to_add, reason="Création du pays {}".format(country_name)
         )
 
         # Send welcome message in country channel
@@ -1873,6 +1657,227 @@ async def _send_creation_success(
     )
 
     await ctx.send(embed=embed)
+
+async def remove_roles_from_player(ctx, player: discord.Member, country_id: int):
+    """Remove rp roles from a player."""
+    player_role = await db.get_player_role(ctx)
+    doctrine_roles_ids = db.get_countries_doctrines(country_id)
+    doctrines_roles = [ctx.guild.get_role(int(role_id.get("discord_role_id"))) for role_id in doctrine_roles_ids if ctx.guild.get_role(int(role_id.get("discord_role_id"))) is not None]
+    roles = [player_role] + [doctrine for doctrine in doctrines_roles if doctrine in player.roles]
+    try:
+        await player.remove_roles(*roles)
+    except Exception as e:
+        print(f"Error removing roles from player {player.name}: {e}")
+
+async def add_countries_roles_to_player(ctx, player: discord.Member, country_id: int):
+    """Add rp roles to a player."""
+    player_role = await db.get_player_role(ctx)
+    doctrine_roles_ids = db.get_countries_doctrines(country_id)
+    doctrines_roles = [ctx.guild.get_role(int(role_id.get("discord_role_id"))) for role_id in doctrine_roles_ids if ctx.guild.get_role(int(role_id.get("discord_role_id"))) is not None]
+    roles = [player_role] + [doctrine for doctrine in doctrines_roles if doctrine not in player.roles]
+    try:
+        await player.add_roles(*roles)
+    except Exception as e:
+        print(f"Error adding roles to player {player.name}: {e}")
+
+@bot.hybrid_command(
+    name="delete_country",
+    brief="Supprime un pays existant.",
+    usage="delete_country <country>",
+    description="Supprime un pays existant de la base de données avec tous ses éléments associés.",
+    help="""Supprime complètement un pays existant du système.
+
+    FONCTIONNALITÉ :
+    - Supprime les salons Discord (public et secret)
+    - Supprime le rôle Discord du pays
+    - Libère toutes les régions occupées par le pays
+    - Efface toutes les données du pays en base
+    - Supprime gouvernements, inventaires, structures, etc.
+
+    PROCESSUS DE SUPPRESSION :
+    1. Vérification des permissions administrateur
+    2. Récupération des données du pays
+    3. Suppression des éléments Discord (salons, rôle)
+    4. Libération des territoires (regions → NULL)
+    5. Suppression complète en base de données
+
+    RESTRICTIONS :
+    - Réservé aux super-administrateurs uniquement
+    - Action irréversible - aucune récupération possible
+    - Toutes les données liées seront perdues
+
+    ARGUMENTS :
+    - `<country>` : Pays à supprimer (rôle Discord avec autocomplétion)
+
+    EXEMPLE :
+    - `delete_country @《🇫🇷》France` : Supprime complètement la France
+
+    ⚠️ ATTENTION : Cette action est définitive et irréversible !
+    """,
+    hidden=False,
+    enabled=True,
+    case_insensitive=True,
+)
+@app_commands.autocomplete(country=country_autocomplete)
+async def delete_country(ctx, country: CountryConverter):
+    """Supprime complètement un pays existant."""
+    # Check super admin permissions
+    if ctx.author.id not in bi_admins_id:
+        embed = discord.Embed(
+            title="❌ Accès refusé",
+            description="Cette commande est réservée aux super-administrateurs uniquement.",
+            color=error_color_int,
+        )
+        return await ctx.send(embed=embed)
+
+    country_id = country.get("id")
+
+    if country_id is None:
+        embed = discord.Embed(
+            title="❌ Pays introuvable",
+            description="Le pays spécifié n'existe pas dans la base de données.",
+            color=error_color_int,
+        )
+        return await ctx.send(embed=embed)
+
+    country_data = db.get_country_datas(str(country_id))
+    if not country_data:
+        embed = discord.Embed(
+            title="❌ Données manquantes",
+            description="Impossible de récupérer les données du pays.",
+            color=error_color_int,
+        )
+        return await ctx.send(embed=embed)
+
+    country_name = country_data["name"]
+    
+    # Confirmation embed
+    embed = discord.Embed(
+        title="⚠️ Confirmation de suppression",
+        description=f"**ATTENTION** : Vous êtes sur le point de supprimer définitivement le pays **{country_name}**.\n\n"
+                   f"Cette action va :\n"
+                   f"• Supprimer les salons Discord\n"
+                   f"• Supprimer le rôle Discord\n"
+                   f"• Libérer toutes les régions\n"
+                   f"• Effacer toutes les données en base\n\n"
+                   f"**Cette action est IRRÉVERSIBLE !**\n\n"
+                   f"Tapez `CONFIRMER` pour procéder à la suppression.",
+        color=error_color_int,
+    )
+    
+    await ctx.send(embed=embed)
+    
+    # Wait for confirmation
+    def check(m):
+        return m.author == ctx.author and m.channel == ctx.channel and m.content.upper() == "CONFIRMER"
+    
+    try:
+        await bot.wait_for('message', check=check, timeout=30.0)
+    except:
+        embed = discord.Embed(
+            title="❌ Suppression annulée",
+            description="Délai d'attente dépassé. Suppression annulée.",
+            color=error_color_int,
+        )
+        return await ctx.send(embed=embed)
+
+    # Start deletion process
+    await ctx.send("🔄 Début de la suppression du pays...")
+    
+    deletion_log = []
+    # Step 0: Remove all RP roles (player role, doctrines roles) from players
+    players = db.get_government_by_country(country_id)
+    for player in players:
+        try:
+            player_member = ctx.guild.get_member(int(player["player_id"]))
+            await remove_roles_from_player(ctx, player_member, country_id)
+            deletion_log.append(f"✅ Rôles supprimés de {player_member.name}")
+        except Exception as e:
+            print(f"Error removing roles from player {player.name}: {e}")
+            deletion_log.append(f"❌ Erreur lors de la suppression des rôles de {player_member.name}: {e}")
+            return
+
+    
+    # Step 1: Try to delete Discord channels
+    try:
+        # Delete public channel
+        if country_data["public_channel_id"]:
+            public_channel = ctx.guild.get_channel(int(country_data["public_channel_id"]))
+            if public_channel:
+                await public_channel.delete(reason=f"Suppression du pays {country_name}")
+                deletion_log.append("✅ Salon public supprimé")
+            else:
+                deletion_log.append("⚠️ Salon public déjà supprimé ou introuvable")
+        
+        # Delete secret channel if exists
+        if country_data["secret_channel_id"]:
+            secret_channel = ctx.guild.get_channel(int(country_data["secret_channel_id"]))
+            if secret_channel:
+                await secret_channel.delete(reason=f"Suppression du pays {country_name}")
+                deletion_log.append("✅ Salon secret supprimé")
+            else:
+                deletion_log.append("⚠️ Salon secret déjà supprimé ou introuvable")
+    except Exception as e:
+        deletion_log.append(f"❌ Erreur lors de la suppression des salons: {e}")
+
+    # Step 2: Try to delete Discord role
+    try:
+        if country_data["role_id"]:
+            role = ctx.guild.get_role(int(country_data["role_id"]))
+            if role:
+                await role.delete(reason=f"Suppression du pays {country_name}")
+                deletion_log.append("✅ Rôle Discord supprimé")
+            else:
+                deletion_log.append("⚠️ Rôle Discord déjà supprimé ou introuvable")
+    except Exception as e:
+        deletion_log.append(f"❌ Erreur lors de la suppression du rôle: {e}")
+
+    # Step 3: Free all regions owned by this country
+    try:
+        # Get all regions owned by this country
+        db.cur.execute("SELECT region_id, name FROM Regions WHERE country_id = ?", (country_id,))
+        regions = db.cur.fetchall()
+        freed_regions = 0
+        
+        for region in regions:
+            db.cur.execute(
+                "UPDATE Regions SET country_id = NULL WHERE region_id = ? AND country_id = ?",
+                (region["region_id"], country_id)
+            )
+            freed_regions += 1
+        
+        if freed_regions > 0:
+            deletion_log.append(f"✅ {freed_regions} région(s) libérée(s)")
+        else:
+            deletion_log.append("ℹ️ Aucune région à libérer")
+            
+        db.conn.commit()
+    except Exception as e:
+        deletion_log.append(f"❌ Erreur lors de la libération des régions: {e}")
+
+    # Step 4: Delete all country data from database
+    try:
+        # Most tables have CASCADE DELETE, so deleting from Countries table should handle most
+        db.cur.execute("DELETE FROM Countries WHERE country_id = ?", (country_id,))
+        db.cur.execute("DELETE FROM Governments WHERE country_id = ?", (country_id,))
+        db.cur.execute("DELETE FROM CountryDoctrines WHERE country_id = ?", (country_id,))
+        db.cur.execute("DELETE FROM Inventory WHERE country_id = ?", (country_id,))
+        db.cur.execute("DELETE FROM Stats WHERE country_id = ?", (country_id,))
+        db.conn.commit()
+        deletion_log.append("✅ Toutes les données du pays supprimées de la base")
+    except Exception as e:
+        deletion_log.append(f"❌ Erreur lors de la suppression des données: {e}")
+        db.conn.rollback()
+
+    # Send final report
+    embed = discord.Embed(
+        title="🗑️ Suppression terminée",
+        description=f"Suppression du pays **{country_name}** terminée.\n\n**Rapport :**\n" + "\n".join(deletion_log),
+        color=all_color_int if "❌" not in "\n".join(deletion_log) else error_color_int,
+    )
+    
+    await ctx.send(embed=embed)
+    
 
 
 @bot.hybrid_command(
@@ -3395,8 +3400,7 @@ async def add_player_to_country(ctx, user: discord.Member, country: CountryConve
         if not dUtils.is_authorized(ctx):
             return await ctx.send(embed=dUtils.get_auth_embed())
 
-        country_dict = CountryEntity(country, ctx.guild).to_dict()
-        country_id = country_dict.get("id", 0)
+        country_id = country.get("id")
 
         if not country_id:
             embed = discord.Embed(
@@ -3429,29 +3433,24 @@ async def add_player_to_country(ctx, user: discord.Member, country: CountryConve
 
         # Add player role and remove non-player role if needed
         try:
-            country_role = ctx.guild.get_role(int(country_dict["role_id"]))
-            player_role = await db.get_player_role(ctx)
+            country_role = country.get("role")
 
             if country_role:
                 await user.add_roles(
                     country_role,
-                    reason=f"Ajouté au gouvernement de {country_dict['name']}",
+                    reason=f"Ajouté au gouvernement de {country.get('name')}",
                 )
-            if player_role:
-                await user.add_roles(
-                    player_role,
-                    reason=f"Ajouté au gouvernement de {country_dict['name']}",
-                )
+            await add_countries_roles_to_player(ctx, user, country_id)
         except Exception as e:
             print(f"Error managing roles: {e}")
 
         embed = discord.Embed(
             title="✅ Joueur ajouté",
-            description=f"{user.mention} a été ajouté au gouvernement de **{country_dict['name']}**.",
+            description=f"{user.mention} a été ajouté au gouvernement de **{country.get('name')}**.",
             color=all_color_int,
         )
         embed.add_field(name="Slot", value=f"#{slot_number}", inline=True)
-        embed.add_field(name="Pays", value=country_dict["name"], inline=True)
+        embed.add_field(name="Pays", value=country.get("name"), inline=True)
         embed.add_field(
             name="Permissions", value="Argent, Points, Construction", inline=True
         )
@@ -3505,9 +3504,7 @@ async def remove_player_from_country(
         if not dUtils.is_authorized(ctx):
             return await ctx.send(embed=dUtils.get_auth_embed())
 
-        country_entity = CountryEntity(country, ctx.guild)
-        country_id = country_entity.get_country_id()
-        country_dict = country_entity.to_dict()
+        country_id = country.get("id")
 
         if not country_id:
             embed = discord.Embed(
@@ -3521,7 +3518,7 @@ async def remove_player_from_country(
         if not db.is_player_in_government(int(country_id), str(user.id)):
             embed = discord.Embed(
                 title="❌ Erreur",
-                description=f"{user.mention} ne fait pas partie du gouvernement de **{country_dict['name']}**.",
+                description=f"{user.mention} ne fait pas partie du gouvernement de **{country.get('name')}**.",
                 color=error_color_int,
             )
             return await ctx.send(embed=embed)
@@ -3539,33 +3536,26 @@ async def remove_player_from_country(
 
         # Remove country role
         try:
-            country_role = ctx.guild.get_role(int(country_dict["role_id"]))
-            player_role = await db.get_player_role(ctx)
+            country_role = country.get("role")
 
             if country_role and country_role in user.roles:
                 await user.remove_roles(
                     country_role,
-                    reason=f"Retiré du gouvernement de {country_dict['name']}",
+                    reason=f"Retiré du gouvernement de {country.get('name')}",
                 )
 
-            # Check if user is in any other government before removing player role
-            other_country = db.get_players_country(user.id)
-            if not other_country:
-                if player_role and player_role in user.roles:
-                    await user.remove_roles(
-                        player_role,
-                        reason=f"Retiré du gouvernement de {country_dict['name']}",
-                    )
+            await remove_roles_from_player(ctx, user, country_id)
+
         except Exception as e:
             print(f"Error managing roles: {e}")
 
         embed = discord.Embed(
             title="✅ Joueur retiré",
-            description=f"{user.mention} a été retiré du gouvernement de **{country_dict['name']}**.",
+            description=f"{user.mention} a été retiré du gouvernement de **{country.get('name')}**.",
             color=all_color_int,
         )
         embed.add_field(name="Slot libéré", value=f"#{slot_number}", inline=True)
-        embed.add_field(name="Pays", value=country_dict["name"], inline=True)
+        embed.add_field(name="Pays", value=country.get("name"), inline=True)
 
         await ctx.send(embed=embed)
 
@@ -4169,5 +4159,22 @@ async def edit_country_stats(ctx, country: CountryConverter, stat: str, value: s
     except ValueError:
         return await ctx.send("Valeur invalide pour la statistique spécifiée.")
 
+async def count_lines_in_dir(dir:str):
+    count = 0
+    for root, dirs, files in os.walk(dir):
+        for filename in files:
+            if filename.endswith(".py") and (not filename.startswith("__") and not filename.startswith(".") and "venv" not in root):
+                with open(os.path.join(root, filename), 'r', encoding='utf-8') as f:
+                    for line in f:
+                        count += 1
+    return count
+
+@bot.hybrid_command()
+async def lsv(ctx):
+    count = await count_lines_in_dir("src") + await count_lines_in_dir("admin-panel")
+    calc = count / 11000
+    list = ["Mon ancêtre s'appelait GND Bot. Même développeur, mais moins de fonctionnalités (et de lignes de code) !", "Le code fait actuellement : " + str(count) + " lignes soit " + str(calc) + " fois le nombre de lignes de la trilogie du Seigneur des Anneaux.", "Je suis un bot", "Ayubo est le joueur ayant cumulé le plus de défaites sur le serveur, toutes V confondues avec un total de 5 guerres perdues et une moyenne de 2.5 guerres perdues par V. Son ratio est d'environ 0.15!"]
+    elt = "Le saviez vous ? " + random.choice(list)
+    await ctx.channel.send(elt)
 
 bot.run(token)

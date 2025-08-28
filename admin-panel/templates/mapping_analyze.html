@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% block title %}Mapping Analysis{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="bi bi-search"></i> Mapping Analysis</h2>
+        <a href="{{ url_for('mapping_list') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Mapping Files
+        </a>
+    </div>
+    
+    {% if analysis_results %}
+    <div class="row">
+        {% for result in analysis_results %}
+        <div class="col-md-12 mb-4">
+            <div class="card content-card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="bi bi-map"></i> {{ result.name }}
+                        {% if result.status == 'Perfect Match' %}
+                            <span class="badge bg-success ms-2">{{ result.status }}</span>
+                        {% elif result.status == 'Minor Issues' %}
+                            <span class="badge bg-warning ms-2">{{ result.status }}</span>
+                        {% elif result.status == 'Major Issues' %}
+                            <span class="badge bg-danger ms-2">{{ result.status }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary ms-2">{{ result.status }}</span>
+                        {% endif %}
+                    </h5>
+                    <small class="text-muted">
+                        PNG: {{ result.png_file }} | CSV: {{ result.csv_file }}
+                    </small>
+                </div>
+                <div class="card-body">
+                    {% if result.error %}
+                        <div class="alert alert-danger">
+                            <i class="bi bi-exclamation-triangle"></i> Error: {{ result.error }}
+                        </div>
+                    {% else %}
+                        <div class="row mb-3">
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h6>CSV Colors</h6>
+                                    <span class="badge bg-primary fs-6">{{ result.total_csv_colors }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h6>PNG Colors</h6>
+                                    <span class="badge bg-info fs-6">{{ result.total_png_colors }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h6>Matched</h6>
+                                    <span class="badge bg-success fs-6">{{ result.matched_colors }}</span>
+                                </div>
+                            </div>
+                            <div class="col-md-3">
+                                <div class="text-center">
+                                    <h6>Unmatched</h6>
+                                    <span class="badge bg-warning fs-6">{{ result.unmatched_csv|length + result.unmatched_png|length }}</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        {% if result.unmatched_csv %}
+                        <div class="mb-3">
+                            <h6><i class="bi bi-exclamation-circle text-warning"></i> Colors in CSV but not in PNG ({{ result.unmatched_csv|length }}):</h6>
+                            <div class="color-grid">
+                                {% for color in result.unmatched_csv %}
+                                <div class="color-item">
+                                    <div class="color-swatch" style="background-color: {{ color }};"></div>
+                                    <small>{{ color }}</small>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if result.unmatched_png %}
+                        <div class="mb-3">
+                            <h6><i class="bi bi-exclamation-circle text-info"></i> Colors in PNG but not in CSV ({{ result.unmatched_png|length }}):</h6>
+                            <div class="color-grid">
+                                {% for color in result.unmatched_png %}
+                                <div class="color-item">
+                                    <div class="color-swatch" style="background-color: {{ color }};"></div>
+                                    <small>{{ color }}</small>
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                        {% endif %}
+                        
+                        {% if not result.unmatched_csv and not result.unmatched_png %}
+                        <div class="alert alert-success">
+                            <i class="bi bi-check-circle"></i> Perfect match! All colors in CSV and PNG files are identical.
+                        </div>
+                        {% endif %}
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> No mapping files found to analyze. 
+        <a href="{{ url_for('import_mapping') }}">Import some mapping files</a> first.
+    </div>
+    {% endif %}
+</div>
+
+<style>
+.color-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.color-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.color-swatch {
+    width: 40px;
+    height: 40px;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    margin-bottom: 5px;
+}
+
+.color-swatch:hover {
+    border-color: #666;
+    cursor: pointer;
+}
+</style>
+{% endblock %}

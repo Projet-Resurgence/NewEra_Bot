@@ -1,0 +1,141 @@
+{% extends "base.html" %}
+{% block title %}Mapping Analysis{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="bi bi-search"></i> Mapping Analysis</h2>
+        <a href="{{ url_for('mapping_list') }}" class="btn btn-secondary">
+            <i class="bi bi-arrow-left"></i> Back to Mappings
+        </a>
+    </div>
+
+    {% if not analysis %}
+    <!-- File Upload Form -->
+    <div class="card content-card p-4 mb-4">
+        <h5 class="mb-3">Upload Files for Analysis</h5>
+        <p class="text-muted mb-4">Upload a PNG map file and corresponding CSV file to analyze color matches and mismatches.</p>
+        
+        <form method="POST" enctype="multipart/form-data">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="png_file" class="form-label">PNG Map File</label>
+                    <input type="file" class="form-control" id="png_file" name="png_file" accept=".png" required>
+                    <div class="form-text">Select a PNG image file containing the map.</div>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="csv_file" class="form-label">CSV Data File</label>
+                    <input type="file" class="form-control" id="csv_file" name="csv_file" accept=".csv" required>
+                    <div class="form-text">Select a CSV file containing color data.</div>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-search"></i> Analyze Files
+            </button>
+        </form>
+    </div>
+    {% else %}
+    <!-- Analysis Results -->
+    <div class="card content-card p-4 mb-4">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5>Analysis Results</h5>
+            <span class="badge {% if analysis.status == 'Perfect Match' %}bg-success{% elif analysis.status == 'Minor Issues' %}bg-warning text-dark{% else %}bg-danger{% endif %}">
+                {{ analysis.status }}
+            </span>
+        </div>
+        
+        <div class="row mb-4">
+            <div class="col-md-6">
+                <p><strong>PNG File:</strong> {{ analysis.png_filename }}</p>
+                <p><strong>Total PNG Colors:</strong> {{ analysis.png_total }}</p>
+            </div>
+            <div class="col-md-6">
+                <p><strong>CSV File:</strong> {{ analysis.csv_filename }}</p>
+                <p><strong>Total CSV Colors:</strong> {{ analysis.csv_total }}</p>
+            </div>
+        </div>
+        
+        <div class="row">
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h3 class="text-success">{{ analysis.matched_total }}</h3>
+                        <p class="mb-0">Matched Colors</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h3 class="text-warning">{{ analysis.unmatched_csv|length }}</h3>
+                        <p class="mb-0">CSV Only</p>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="card bg-light">
+                    <div class="card-body text-center">
+                        <h3 class="text-info">{{ analysis.unmatched_png|length }}</h3>
+                        <p class="mb-0">PNG Only</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+    {% if analysis and analysis.unmatched_csv %}
+    <div class="card content-card p-4 mb-4">
+        <h5 class="text-warning"><i class="bi bi-exclamation-triangle"></i> Colors in CSV but not in PNG ({{ analysis.unmatched_csv|length }})</h5>
+        <div class="row">
+            {% for color in analysis.unmatched_csv %}
+            <div class="col-md-3 col-sm-6 mb-2">
+                <div class="d-flex align-items-center">
+                    <div class="color-square me-2" style="background-color: {{ color }}; width: 20px; height: 20px; border: 1px solid #ccc;"></div>
+                    <code>{{ color }}</code>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if analysis and analysis.unmatched_png %}
+    <div class="card content-card p-4 mb-4">
+        <h5 class="text-info"><i class="bi bi-info-circle"></i> Colors in PNG but not in CSV ({{ analysis.unmatched_png|length }})</h5>
+        <div class="row">
+            {% for color in analysis.unmatched_png %}
+            <div class="col-md-3 col-sm-6 mb-2">
+                <div class="d-flex align-items-center">
+                    <div class="color-square me-2" style="background-color: {{ color }}; width: 20px; height: 20px; border: 1px solid #ccc;"></div>
+                    <code>{{ color }}</code>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if analysis and analysis.matched_colors %}
+    <div class="card content-card p-4 mb-4">
+        <h5 class="text-success"><i class="bi bi-check-circle"></i> Matched Colors ({{ analysis.matched_colors|length }})</h5>
+        <div class="row">
+            {% for color in analysis.matched_colors %}
+            <div class="col-md-3 col-sm-6 mb-2">
+                <div class="d-flex align-items-center">
+                    <div class="color-square me-2" style="background-color: {{ color }}; width: 20px; height: 20px; border: 1px solid #ccc;"></div>
+                    <code>{{ color }}</code>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% if analysis %}
+    <div class="text-center mt-4">
+        <a href="{{ url_for('mapping_analysis') }}" class="btn btn-primary">
+            <i class="bi bi-search"></i> Analyze More Files
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}

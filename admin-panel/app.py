@@ -7,11 +7,20 @@ from flask import (
     jsonify,
     session,
     url_for,
+    send_from_directory,
+    abort,
 )
 from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+import csv
 from functools import wraps
 from datetime import datetime
+import os
+import json
+import secrets
+import csv
+from PIL import Image
 import os
 import json
 import secrets
@@ -19,7 +28,91 @@ import secrets
 app = Flask(__name__)
 app.secret_key = secrets.token_hex(32)  # Generate secure random key
 
-# Configure multiple databases
+    
+MAPPING_DIR = os.path.join(os.path.dirname(__file__), '../datas/mapping')
+
+# Helper functions for mapping
+def allowed_file(filename, ext):
+    if isinstance(ext, list):
+        return '.' in filename and (filename.rsplit('.', 1)[1].lower() in ext)    
+    return '.' in filename and (filename.rsplit('.', 1)[1].lower() == ext)
+
+def extract_hex_colors_from_csv(csv_path):
+    hex_colors = set()
+    with open(csv_path, newline='', encoding='utf-8') as csvfile:
+        reader = csv.DictReader(csvfile)
+        # Find column with hex codes - expanded search terms
+        hex_col = None
+        for col in reader.fieldnames:
+            col_lower = col.lower().strip()
+            if col_lower in ['hex', 'color', 'colour', 'region_color_hex', 'hex_color', 'hexcode', 'code couleur hex', 'couleur', 'code_couleur_hex']:
+                hex_col = col
+                break
+        
+        if not hex_col:
+            # Try to find column with hex-like values by examining data
+            csvfile.seek(0)
+            reader = csv.DictReader(csvfile)
+            sample_rows = []
+            for i, row in enumerate(reader):
+                if i >= 10:  # Check first 10 rows
+                    break
+                sample_rows.append(row)
+            
+            for col in reader.fieldnames:
+                if not col:  # Skip empty column names
+                    continue
+                hex_like_count = 0
+                for row in sample_rows:
+                    val = row.get(col, '').strip()
+                    if val:
+                        # Check if it looks like a hex color (6 characters, alphanumeric)
+                        if len(val) == 6 and all(c in '0123456789ABCDEFabcdef' for c in val.lower()):
+                            hex_like_count += 1
+                        # Also check 7-8 char values that might include #
+                        elif len(val) in [7, 8] and (val.startswith('#') or all(c in '0123456789ABCDEFabcdef' for c in val.lower())):
+                            hex_like_count += 1
+                
+                # If more than half the sample rows have hex-like values, this is probably the hex column
+                if hex_like_count > len(sample_rows) * 0.5:
+                    hex_col = col
+                    break
+        
+        if not hex_col:
+            raise ValueError('No HEX color column found in CSV. Available columns: ' + ', '.join(reader.fieldnames or []))
+        
+        csvfile.seek(0)
+        reader = csv.DictReader(csvfile)
+        for row in reader:
+            val = row.get(hex_col, '').strip()
+            if val and isinstance(val, str):
+                # Clean up the hex value
+                if not val.startswith('#') and len(val) == 6:
+                    val = '#' + val
+                elif val.startswith('#') and len(val) == 7:
+                    pass  # Already correct format
+                else:
+                    continue  # Skip invalid values
+                
+                # Validate it's a proper hex color
+                try:
+                    int(val[1:], 16)  # Try to parse as hex
+                    hex_colors.add(val.upper())
+                except ValueError:
+                    continue  # Skip invalid hex values
+    
+    return hex_colors
+
+def extract_hex_colors_from_png(png_path):
+    img = Image.open(png_path).convert('RGBA')
+    pixels = img.getdata()
+    colors = set()
+    for pixel in pixels:
+        # Convert RGBA to HEX
+        hex_code = '#{:02X}{:02X}{:02X}'.format(pixel[0], pixel[1], pixel[2])
+        colors.add(hex_code)
+    return colors
+
 admin_db_path = os.path.join(os.path.dirname(__file__), "admin.db")
 game_db_path = os.path.join(os.path.dirname(__file__), "../datas/rts.db")
 
@@ -67,11 +160,11 @@ class Country(db.Model):
     __tablename__ = "Countries"
 
     country_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    role_id = db.Column(db.String, nullable=False)
-    name = db.Column(db.String, nullable=False)
-    public_channel_id = db.Column(db.String, nullable=False)
-    secret_channel_id = db.Column(db.String)
-    last_bilan = db.Column(db.String)
+    role_id = db.Column(db.Text, nullable=False)
+    name = db.Column(db.Text, nullable=False)
+    public_channel_id = db.Column(db.Text, nullable=False)
+    secret_channel_id = db.Column(db.Text, default=None)
+    last_bilan = db.Column(db.Text, default=None)
 
 
 class Government(db.Model):
@@ -82,7 +175,7 @@ class Government(db.Model):
 
     country_id = db.Column(db.Integer, primary_key=True)
     slot = db.Column(db.Integer, primary_key=True)
-    player_id = db.Column(db.String, nullable=False)
+    player_id = db.Column(db.Text, nullable=False)
     can_spend_money = db.Column(db.Boolean, default=False)
     can_spend_points = db.Column(db.Boolean, default=False)
     can_sign_treaties = db.Column(db.Boolean, default=False)
@@ -99,10 +192,10 @@ class Doctrine(db.Model):
     __tablename__ = "Doctrines"
 
     doctrine_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String, nullable=False)
-    category = db.Column(db.String)  # Régime, Idéologie, Économie, Religieux
+    name = db.Column(db.Text, nullable=False)
+    category = db.Column(db.Text)  # CHECK handled in DB
     description = db.Column(db.Text)
-    discord_role_id = db.Column(db.String)
+    discord_role_id = db.Column(db.Text)
     bonus_json = db.Column(db.Text)  # JSON string for bonuses
 
 
@@ -116,6 +209,7 @@ class Inventory(db.Model):
     balance = db.Column(db.Integer, default=0, nullable=False)
     pol_points = db.Column(db.Integer, default=0, nullable=False)
     diplo_points = db.Column(db.Integer, default=0, nullable=False)
+    tech_points = db.Column(db.Integer, default=0, nullable=False)
 
 
 class Region(db.Model):
@@ -125,12 +219,12 @@ class Region(db.Model):
     __tablename__ = "Regions"
 
     region_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    country_id = db.Column(db.Integer)
-    name = db.Column(db.String, nullable=False)
-    region_color_hex = db.Column(db.String(8), nullable=False)
+    country_id = db.Column(db.Integer, default=None)
+    name = db.Column(db.Text, nullable=False)
+    region_color_hex = db.Column(db.String(8), nullable=False, unique=True)
     population = db.Column(db.Integer, default=0, nullable=False)
-    area = db.Column(db.Integer, default=0, nullable=False)
-    geographical_area_id = db.Column(db.Integer)
+    continent = db.Column(db.String(15), default=None)
+    geographical_area_id = db.Column(db.Integer, default=None)
 
 
 class GeographicalArea(db.Model):
@@ -140,11 +234,7 @@ class GeographicalArea(db.Model):
     __tablename__ = "GeographicalAreas"
 
     geographical_area_id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String, nullable=False)
-    delimitation_x_start = db.Column(db.Integer, nullable=False)
-    delimitation_x_end = db.Column(db.Integer, nullable=False)
-    delimitation_y_start = db.Column(db.Integer, nullable=False)
-    delimitation_y_end = db.Column(db.Integer, nullable=False)
+    name = db.Column(db.Text, unique=True, nullable=False)
 
 
 class Structure(db.Model):
@@ -819,6 +909,203 @@ def index():
 
 
 # Routes
+# Serve mapping files statically
+@app.route('/datas/mapping/<path:filename>')
+def mapping_file(filename):
+    return send_from_directory(MAPPING_DIR, filename)
+
+# Mapping CRUD routes
+@app.route('/mapping')
+@login_required
+def mapping_list():
+    files = os.listdir(MAPPING_DIR)
+    mappings = []
+    for f in files:
+        if f.endswith('_map.png'):
+            name = f[:-8]
+            csv_file = f'{name}_map.csv'
+            if csv_file in files:
+                mappings.append({
+                    'name': name,
+                    'png_file': f,
+                    'csv_file': csv_file,
+                    'png_url': url_for('mapping_file', filename=f),
+                    'csv_url': url_for('mapping_file', filename=csv_file)
+                })
+    return render_template('mapping.html', mappings=mappings)
+
+# Import mapping route with full POST logic
+@app.route('/mapping/import', methods=['GET', 'POST'])
+@login_required
+def import_mapping():
+    if request.method == 'POST':
+        name = request.form.get('name', '').strip()
+        png_file = request.files.get('png_file')
+        csv_file = request.files.get('csv_file')
+        
+        # Validation
+        if not name or not png_file or not csv_file:
+            flash('Name, PNG, and CSV are required.', 'error')
+            return redirect(request.url)
+        
+        if not allowed_file(png_file.filename, ['png']) or not allowed_file(csv_file.filename, ['csv']):
+            flash('Invalid file type. Only PNG and CSV files are allowed.', 'error')
+            return redirect(request.url)
+        
+        # Create mapping directory if it doesn't exist
+        os.makedirs(MAPPING_DIR, exist_ok=True)
+        
+        # Save temp files
+        temp_png = os.path.join(MAPPING_DIR, f'temp_{secure_filename(png_file.filename)}')
+        temp_csv = os.path.join(MAPPING_DIR, f'temp_{secure_filename(csv_file.filename)}')
+        
+        try:
+            png_file.save(temp_png)
+            csv_file.save(temp_csv)
+            
+            # Extract colors from both files
+            csv_colors = extract_hex_colors_from_csv(temp_csv)
+            png_colors = extract_hex_colors_from_png(temp_png)
+            
+            # Compare colors
+            unmatched_csv = csv_colors - png_colors
+            unmatched_png = png_colors - csv_colors
+            
+            # Check for too many unmatched colors
+            if len(unmatched_csv) > 20 or len(unmatched_png) > 20:
+                flash('Too many unmatched colors between CSV and PNG. Please check your files.', 'error')
+                os.remove(temp_png)
+                os.remove(temp_csv)
+                return redirect(request.url)
+            
+            # Show warnings for unmatched colors but allow proceed
+            if unmatched_csv:
+                flash(f'Warning: CSV colors not found in PNG: {", ".join(list(unmatched_csv)[:10])}{"..." if len(unmatched_csv) > 10 else ""}', 'warning')
+            
+            if unmatched_png:
+                flash(f'Warning: PNG colors not found in CSV: {", ".join(list(unmatched_png)[:10])}{"..." if len(unmatched_png) > 10 else ""}', 'warning')
+            
+            # Save files with final names
+            final_png = os.path.join(MAPPING_DIR, f'{name}_map.png')
+            final_csv = os.path.join(MAPPING_DIR, f'{name}_map.csv')
+            
+            # Remove existing files if they exist
+            for path in [final_png, final_csv]:
+                if os.path.exists(path):
+                    os.remove(path)
+            
+            os.rename(temp_png, final_png)
+            os.rename(temp_csv, final_csv)
+            
+            flash(f'Mapping "{name}" imported successfully!', 'success')
+            return redirect(url_for('mapping_list'))
+            
+        except Exception as e:
+            flash(f'Error processing files: {str(e)}', 'error')
+            # Clean up temp files if they exist
+            for temp_file in [temp_png, temp_csv]:
+                if os.path.exists(temp_file):
+                    os.remove(temp_file)
+            return redirect(request.url)
+    
+    return render_template('import_mapping.html')
+
+# Delete mapping route
+@app.route('/mapping/delete/<name>', methods=['POST'])
+@login_required
+def delete_mapping(name):
+    png_path = os.path.join(MAPPING_DIR, f'{name}_map.png')
+    csv_path = os.path.join(MAPPING_DIR, f'{name}_map.csv')
+    removed = False
+    
+    for path in [png_path, csv_path]:
+        if os.path.exists(path):
+            os.remove(path)
+            removed = True
+    
+    if removed:
+        flash(f'Mapping "{name}" deleted successfully.', 'success')
+    else:
+        flash(f'Mapping "{name}" not found.', 'error')
+    
+    return redirect(url_for('mapping_list'))
+
+# Mapping analysis with file upload route
+@app.route('/mapping/analyze', methods=['GET', 'POST'])
+@login_required
+def mapping_analysis():
+    if request.method == 'GET':
+        return render_template('mapping_analysis.html')
+    
+    # Handle POST request for file analysis
+    if 'png_file' not in request.files or 'csv_file' not in request.files:
+        flash('Both PNG and CSV files are required.', 'error')
+        return render_template('mapping_analysis.html')
+    
+    png_file = request.files['png_file']
+    csv_file = request.files['csv_file']
+    
+    if png_file.filename == '' or csv_file.filename == '':
+        flash('Both PNG and CSV files must be selected.', 'error')
+        return render_template('mapping_analysis.html')
+    
+    if not (allowed_file(png_file.filename, ['png']) and allowed_file(csv_file.filename, ['csv'])):
+        flash('Invalid file types. Please upload a PNG file and a CSV file.', 'error')
+        return render_template('mapping_analysis.html')
+    
+    try:
+        # Create temporary files for analysis
+        import tempfile
+        
+        with tempfile.NamedTemporaryFile(suffix='.png', delete=False) as temp_png:
+            png_file.save(temp_png.name)
+            temp_png_path = temp_png.name
+        
+        with tempfile.NamedTemporaryFile(suffix='.csv', delete=False) as temp_csv:
+            csv_file.save(temp_csv.name)
+            temp_csv_path = temp_csv.name
+        
+        try:
+            # Extract colors from both files
+            csv_colors = extract_hex_colors_from_csv(temp_csv_path)
+            png_colors = extract_hex_colors_from_png(temp_png_path)
+            
+            # Find unmatched colors
+            unmatched_csv = sorted(list(csv_colors - png_colors))
+            unmatched_png = sorted(list(png_colors - csv_colors))
+            matched_colors = sorted(list(csv_colors & png_colors))
+            
+            analysis_data = {
+                'png_filename': png_file.filename,
+                'csv_filename': csv_file.filename,
+                'csv_total': len(csv_colors),
+                'png_total': len(png_colors),
+                'matched_total': len(matched_colors),
+                'unmatched_csv': unmatched_csv,
+                'unmatched_png': unmatched_png,
+                'matched_colors': matched_colors,
+                'status': 'Perfect Match' if not unmatched_csv and not unmatched_png else 
+                         'Minor Issues' if len(unmatched_csv) <= 5 and len(unmatched_png) <= 5 else 
+                         'Major Issues'
+            }
+            
+            return render_template('mapping_analysis.html', analysis=analysis_data)
+            
+        finally:
+            # Clean up temporary files
+            import os
+            try:
+                os.unlink(temp_png_path)
+                os.unlink(temp_csv_path)
+            except:
+                pass
+        
+    except Exception as e:
+        flash(f'Error analyzing files: {str(e)}', 'error')
+        return render_template('mapping_analysis.html')
+
+# Configure multiple databases
+
 @app.route("/countries")
 @login_required
 def countries():

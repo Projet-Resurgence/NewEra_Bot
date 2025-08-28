@@ -22,6 +22,7 @@ class discordUtils:
 
     def is_authorized(self, ctx) -> bool:
         authorized_role_id = 1124057695276773426
+        
         return authorized_role_id in [role.id for role in ctx.author.roles]
 
     async def discord_input(self, ctx, message: str) -> str:

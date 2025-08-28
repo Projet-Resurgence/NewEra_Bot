@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Mapping Files{% endblock %}
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2><i class="bi bi-map"></i> Mapping Files</h2>
+        <a href="{{ url_for('import_mapping') }}" class="btn btn-primary">
+            <i class="bi bi-upload"></i> Import New Mapping
+        </a>
+    </div>
+    <div class="card content-card p-4 mb-4">
+        <h5 class="mb-3">Available Mapping Files</h5>
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>PNG File</th>
+                    <th>CSV File</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for mapping in mappings %}
+                <tr>
+                    <td>{{ mapping.name }}</td>
+                    <td><a href="{{ mapping.png_url }}" target="_blank">{{ mapping.png_file }}</a></td>
+                    <td><a href="{{ mapping.csv_url }}" target="_blank">{{ mapping.csv_file }}</a></td>
+                    <td>
+                        <form method="POST" action="{{ url_for('delete_mapping', name=mapping.name) }}" style="display:inline;">
+                            <button type="submit" class="btn btn-sm btn-danger" onclick="return confirm('Delete this mapping?')">
+                                <i class="bi bi-trash"></i> Delete
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                {% else %}
+                <tr><td colspan="4" class="text-center text-muted">No mapping files found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

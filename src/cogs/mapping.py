@@ -12,8 +12,13 @@ import json
 import time
 import hashlib
 import csv
+import pytz
+import uuid
+import gc
+from datetime import datetime, timedelta
 from scipy.ndimage import binary_dilation
 from skimage.segmentation import find_boundaries
+from asyncdb import AsyncDatabase
 
 CROPPING_OFFSET = 10
 BORDERS_SIZE = 3
@@ -26,6 +31,7 @@ class MappingCog(commands.Cog):
         self.bot = bot
         self.db = get_db()
         self.dUtils = get_discord_utils(bot, self.db)
+        self.async_db = AsyncDatabase()
         self.region_colors_cache = {}
         self.region_masks_cache = {}
         self._load_region_colors()
@@ -63,14 +69,450 @@ class MappingCog(commands.Cog):
     ) -> str:
         """Async wrapper for generate_filtered_map to prevent blocking."""
         loop = asyncio.get_event_loop()
-        with concurrent.futures.ThreadPoolExecutor() as executor:
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
             return await loop.run_in_executor(
                 executor,
-                self.generate_filtered_map,
+                self._generate_filtered_map_thread_safe,
                 filter_key,
                 filter_value,
                 is_regions_map,
             )
+
+    def _generate_filtered_map_thread_safe(
+        self,
+        filter_key: str,
+        filter_value: Optional[str] = None,
+        is_regions_map: bool = False,
+    ) -> str:
+        """Thread-safe wrapper for generate_filtered_map with proper base array copying."""
+        try:
+            # Create a thread-local copy of the base array to avoid conflicts
+            import time
+            import uuid
+            thread_id = str(uuid.uuid4())[:8]
+            
+            print(f"[Mapping-{thread_id}] Starting thread-safe map generation for {filter_key}={filter_value}")
+            
+            # Make a copy of the base array for this thread
+            local_base_array = self.base_array.copy()
+            
+            # Create a local base image for this thread
+            local_base_img = Image.fromarray(local_base_array)
+            
+            # Get regions data for filtering
+            country_colors = {}
+            regions_data = self.get_regions_data(filter_key, filter_value)
+            if regions_data == [] and filter_key != "All":
+                print(f"[Mapping-{thread_id}] No regions data available for mapping.")
+                return ""
+
+            if is_regions_map:
+                # For regions map: outline regions with black borders on white background
+                result_img = self._generate_regions_map_local(regions_data, local_base_array)
+            else:
+                # For countries map: colorize by country and add legend
+                result_img = self._generate_countries_map_local(regions_data, local_base_array, country_colors, is_all=(filter_key == "All"))
+                if result_img is None:
+                    print(f"[Mapping-{thread_id}] No regions data available for mapping.")
+                    return ""
+
+            # Crop if not showing all
+            if filter_key != "All" and filter_value:
+                result_img = self._crop_to_regions_local(result_img, regions_data, local_base_array)
+
+            if not is_regions_map:
+                result_img = self._add_legend_local(result_img, regions_data, country_colors)
+
+            # Save result with unique filename to avoid conflicts
+            timestamp = int(time.time() * 1000)
+            output_path = f"datas/mapping/final_map_{thread_id}_{timestamp}.png"
+            result_img.save(output_path)
+            
+            print(f"[Mapping-{thread_id}] Completed map generation, saved to {output_path}")
+            return output_path
+
+        except Exception as e:
+            print(f"[Mapping-{thread_id}] Error generating map: {e}")
+            import traceback
+            traceback.print_exc()
+            return ""
+
+    def _generate_regions_map_local(self, regions_data: List[dict], local_base_array: np.ndarray) -> Image.Image:
+        """Generate a white map with black region outlines using local array copy."""
+        print("[Mapping] Starting _generate_regions_map_local...", flush=True)
+        height, width = local_base_array.shape[:2]
+        result_array = np.ones((height, width, 3), dtype=np.uint8) * 255  # fond blanc
+
+        water_color = np.array([39, 39, 39])  # #272727
+
+        # Mask eau (pixels gris foncés ou transparents)
+        water_mask = (np.all(local_base_array[:, :, :3] == water_color, axis=2)) | (
+            local_base_array[:, :, 3] == 0
+        )
+        result_array[water_mask] = water_color
+        print("[Mapping] Water mask applied.", flush=True)
+
+        # Détermination des couleurs des régions à afficher
+        if not regions_data:
+            relevant_colors = set(self.region_colors_cache.keys())
+            print(f"[Mapping] No filter: {len(relevant_colors)} regions from CSV.", flush=True)
+        else:
+            relevant_colors = set()
+            for region in regions_data:
+                hex_color = region.get("region_color_hex", "")
+                if hex_color:
+                    if not hex_color.startswith("#"):
+                        hex_color = "#" + hex_color
+                    relevant_colors.add(self.hex_to_rgb(hex_color))
+            print(f"[Mapping] Filter: {len(relevant_colors)} regions from DB.", flush=True)
+
+        # Construction d'une carte d'IDs (chaque région = un entier unique)
+        label_map = np.zeros((height, width), dtype=np.int32)
+        for idx, color in enumerate(relevant_colors, start=1):
+            mask = np.all(local_base_array[:, :, :3] == np.array(color), axis=2)
+            label_map[mask] = idx
+
+        # Extraction des frontières
+        border_mask = find_boundaries(label_map, mode="outer")
+
+        # Application des frontières en noir
+        result_array[border_mask] = [0, 0, 0]
+
+        print(f"[Mapping] Applied {np.sum(border_mask)} border pixels.", flush=True)
+        print("[Mapping] Finished _generate_regions_map_local.", flush=True)
+        return Image.fromarray(result_array)
+
+    def _generate_countries_map_local(self, regions_data: List[dict], local_base_array: np.ndarray, 
+                                     country_colors: dict, is_all: bool) -> Image.Image:
+        """Generate a map colored by countries using local array copy."""
+        print("[Mapping] Starting _generate_countries_map_local...", flush=True)
+        height, width = local_base_array.shape[:2]
+        result_array = local_base_array.copy()
+
+        water_color = np.array([39, 39, 39])  # #272727
+        unoccupied_color = np.array([255, 255, 255])  # White for unoccupied
+
+        # If no regions_data (All filter), we need to get all regions from database
+        if is_all:
+            print(
+                "[Mapping] No regions data provided, querying all regions from database...",
+                flush=True,
+            )
+            regions_data = self.get_all_regions()
+            print(
+                f"[Mapping] Retrieved {len(regions_data)} regions from database",
+                flush=True,
+            )
+
+        if not regions_data:
+            print("[Mapping] No regions data available for mapping.", flush=True)
+            return Image.new("RGB", (width, height), color=(255, 255, 255))
+
+        # Build country color mapping and region-to-country mapping
+        region_to_country = {}
+        countries_in_map = set()
+
+        # First pass: collect all countries and their colors
+        for idx, region in enumerate(regions_data):
+            country_id = region.get("country_id")
+            if country_id:
+                countries_in_map.add(country_id)
+                if country_id not in country_colors:
+                    country_colors[country_id] = self.get_country_color(country_id)
+                    print(
+                        f"[Mapping] Country {country_id} gets color {country_colors[country_id]}"
+                    )
+
+        print(f"[Mapping] Found {len(country_colors)} countries with colors")
+
+        # Second pass: map each region to its country
+        for idx, region in enumerate(regions_data):
+            hex_color = region.get("region_color_hex", "")
+            if hex_color:
+                if not hex_color.startswith("#"):
+                    hex_color = "#" + hex_color
+                region_rgb = self.hex_to_rgb(hex_color)
+                country_id = region.get("country_id")
+                region_to_country[region_rgb] = country_id
+
+            if idx % 50 == 0:
+                print(
+                    f"[Mapping] Mapped {idx+1}/{len(regions_data)} regions...",
+                    flush=True,
+                )
+
+        print(f"[Mapping] Mapped {len(region_to_country)} regions to countries")
+
+        # Create water mask
+        water_mask = (np.all(local_base_array[:, :, :3] == water_color, axis=2)) | (
+            local_base_array[:, :, 3] == 0
+        )  # Transparent areas
+
+        # Process regions by finding their pixels in the base map and recoloring
+        for idx, (region_rgb, country_id) in enumerate(region_to_country.items()):
+            region_color_array = np.array(region_rgb)
+            # Find pixels that match this region's original color in the local base map
+            region_mask = np.all(
+                local_base_array[:, :, :3] == region_color_array, axis=2
+            )
+            pixel_count = np.sum(region_mask)
+
+            if pixel_count > 0:
+                if country_id and country_id in country_colors:
+                    # Color by country
+                    result_array[region_mask, :3] = country_colors[country_id]
+                    print(
+                        f"[Mapping] Colored {pixel_count} pixels for country {country_id}"
+                    )
+                else:
+                    # Unoccupied - white
+                    result_array[region_mask, :3] = unoccupied_color
+                    print(f"[Mapping] Set {pixel_count} pixels to white (unoccupied)")
+            else:
+                print(
+                    f"[Mapping] Warning: No pixels found for region color {region_rgb}"
+                )
+
+            if idx % 20 == 0:
+                print(
+                    f"[Mapping] Processed {idx+1}/{len(region_to_country)} regions...",
+                    flush=True,
+                )
+
+        # Handle any remaining non-water areas as unoccupied
+        # Find all pixels that are not water and not part of any processed region
+        non_water_mask = ~water_mask
+        processed_mask = np.zeros((height, width), dtype=bool)
+
+        for region_rgb in region_to_country.keys():
+            region_color_array = np.array(region_rgb)
+            region_mask = np.all(
+                local_base_array[:, :, :3] == region_color_array, axis=2
+            )
+            processed_mask |= region_mask
+
+        unprocessed_mask = non_water_mask & ~processed_mask
+        unprocessed_count = np.sum(unprocessed_mask)
+        if unprocessed_count > 0:
+            result_array[unprocessed_mask, :3] = unoccupied_color
+            print(f"[Mapping] Set {unprocessed_count} unprocessed pixels to white")
+
+        # Convert back to PIL Image
+        result_img = Image.fromarray(result_array)
+
+        print("[Mapping] Finished _generate_countries_map_local.", flush=True)
+        return result_img
+
+    def _crop_to_regions_local(self, image: Image.Image, regions_data: List[dict], 
+                              local_base_array: np.ndarray, offset: int = 50) -> Image.Image:
+        """Crop the image to show only the relevant regions using local array copy."""
+        print("[Mapping] Starting _crop_to_regions_local...", flush=True)
+        if not regions_data:
+            print("[Mapping] No regions data, skipping crop.", flush=True)
+            return image
+
+        relevant_colors = []
+        for idx, region in enumerate(regions_data):
+            hex_color = region.get("region_color_hex", "")
+            if hex_color:
+                if not hex_color.startswith("#"):
+                    hex_color = "#" + hex_color
+                rgb = self.hex_to_rgb(hex_color)
+                relevant_colors.append(np.array(rgb))
+            if idx % 20 == 0:
+                print(
+                    f"[Mapping] Processed {idx+1}/{len(regions_data)} regions for cropping...",
+                    flush=True,
+                )
+
+        if not relevant_colors:
+            print("[Mapping] No relevant colors, skipping crop.", flush=True)
+            return image
+
+        height, width = local_base_array.shape[:2]
+        region_mask = np.zeros((height, width), dtype=bool)
+
+        for idx, color in enumerate(relevant_colors):
+            color_mask = np.all(local_base_array[:, :, :3] == color, axis=2)
+            region_mask |= color_mask
+            if idx % 10 == 0:
+                print(
+                    f"[Mapping] Built region mask {idx+1}/{len(relevant_colors)}...",
+                    flush=True,
+                )
+
+        if not np.any(region_mask):
+            print("[Mapping] No region mask found, skipping crop.", flush=True)
+            return image
+
+        y_coords, x_coords = np.where(region_mask)
+
+        min_x, max_x = x_coords.min(), x_coords.max()
+        min_y, max_y = y_coords.min(), y_coords.max()
+
+        min_x = max(0, min_x - offset)
+        max_x = min(width, max_x + offset)
+        min_y = max(0, min_y - offset)
+        max_y = min(height, max_y + offset)
+
+        print(
+            f"[Mapping] Cropping image to box: ({min_x}, {min_y}, {max_x}, {max_y})",
+            flush=True,
+        )
+        print("[Mapping] Finished _crop_to_regions_local.", flush=True)
+        return image.crop((min_x, min_y, max_x, max_y))
+
+    def _add_legend_local(self, image: Image.Image, regions_data: list, country_colors: dict) -> Image.Image:
+        """Add a dynamic legend by extending the canvas on the left side."""
+        print("[Mapping] Starting dynamic _add_legend_local...", flush=True)
+        try:
+            if not regions_data:
+                regions_data = self.get_all_regions()
+                
+            # Collect unique countries
+            country_names = {}
+            for idx, region in enumerate(regions_data):
+                country_id = region.get("country_id")
+                country_name = region.get("country_name")
+                if country_id and country_name and country_id in country_colors:
+                    country_names[country_id] = country_name
+                if idx % 20 == 0:
+                    print(
+                        f"[Mapping] Processed {idx+1}/{len(regions_data)} regions for legend...",
+                        flush=True,
+                    )
+
+            if not country_names:
+                print("[Mapping] No country names found, skipping legend.", flush=True)
+                return image
+
+            # Calculate scale factor based on image size
+            image_width, image_height = image.size
+            reference_size = 400
+            scale_factor = min(image_width, image_height) / reference_size
+            scale_factor = max(0.5, min(scale_factor, 2.0))  # Clamp between 0.5x and 2x
+
+            print(
+                f"[Mapping] Image size: {image_width}x{image_height}, scale factor: {scale_factor:.2f}",
+                flush=True,
+            )
+
+            # Calculate dynamic font size based on number of countries
+            num_countries = len(country_names)
+            if num_countries <= 20:
+                base_font_size = 14
+            elif num_countries <= 50:
+                base_font_size = 12
+            elif num_countries <= 100:
+                base_font_size = 10
+            else:
+                base_font_size = 8
+                
+            font_size = max(6, int(base_font_size * scale_factor))
+
+            try:
+                font = ImageFont.truetype("datas/arial.ttf", font_size)
+            except:
+                font = ImageFont.load_default()
+
+            # Calculate text dimensions for all countries
+            draw_temp = ImageDraw.Draw(Image.new("RGB", (1, 1)))
+            legend_items = []
+            max_text_width = 0
+
+            for country_id, country_name in country_names.items():
+                bbox = draw_temp.textbbox((0, 0), country_name, font=font)
+                text_width = bbox[2] - bbox[0]
+                text_height = bbox[3] - bbox[1]
+                max_text_width = max(max_text_width, text_width)
+                legend_items.append((country_id, country_name, text_width, text_height))
+
+            # Sort countries alphabetically for consistent display
+            legend_items.sort(key=lambda x: x[1])
+
+            # Calculate layout parameters
+            color_square_size = max(6, int(10 * scale_factor))
+            padding = max(2, int(4 * scale_factor))
+            item_height = max(color_square_size, max([item[3] for item in legend_items])) + padding
+            
+            # Calculate optimal number of columns
+            available_height = image_height - (2 * padding)
+            max_items_per_column = max(1, available_height // item_height)
+            num_columns = max(1, (len(legend_items) + max_items_per_column - 1) // max_items_per_column)
+            
+            # Limit columns to prevent legend from being too wide
+            max_columns = max(1, min(4, num_countries // 10))
+            num_columns = min(num_columns, max_columns)
+            
+            items_per_column = (len(legend_items) + num_columns - 1) // num_columns
+            
+            print(f"[Mapping] Legend layout: {num_countries} countries, {num_columns} columns, {items_per_column} items per column")
+
+            # Calculate legend dimensions
+            column_width = color_square_size + padding + max_text_width + padding
+            legend_width = (column_width * num_columns) + padding
+            legend_height = min(available_height, items_per_column * item_height + padding)
+
+            # Create extended canvas
+            new_width = image_width + legend_width
+            new_height = image_height
+            extended_img = Image.new("RGB", (new_width, new_height), (255, 255, 255))
+            
+            # Paste original map on the right side
+            extended_img.paste(image, (legend_width, 0))
+            
+            # Draw legend on the left side
+            legend_draw = ImageDraw.Draw(extended_img)
+            
+            # Draw background for legend area
+            legend_draw.rectangle([0, 0, legend_width, new_height], fill=(240, 240, 240), outline=(200, 200, 200))
+            
+            # Draw legend items
+            for idx, (country_id, country_name, text_width, text_height) in enumerate(legend_items):
+                column = idx // items_per_column
+                row = idx % items_per_column
+                
+                if column >= num_columns:
+                    continue
+                    
+                x_base = column * column_width + padding
+                y_pos = row * item_height + padding
+                
+                # Skip if this would go beyond image bounds
+                if y_pos + item_height > legend_height:
+                    continue
+                
+                color = country_colors[country_id]
+                
+                # Draw color square
+                legend_draw.rectangle(
+                    [x_base, y_pos, x_base + color_square_size, y_pos + color_square_size],
+                    fill=tuple(color),
+                    outline=(0, 0, 0)
+                )
+                
+                # Draw country name
+                text_x = x_base + color_square_size + padding
+                text_y = y_pos + (color_square_size - text_height) // 2
+                legend_draw.text(
+                    (text_x, text_y),
+                    country_name,
+                    fill=(0, 0, 0),
+                    font=font
+                )
+                
+                if idx % 20 == 0:
+                    print(f"[Mapping] Drew legend item {idx+1}/{len(legend_items)}...", flush=True)
+
+            print(f"[Mapping] Dynamic legend created: {legend_width}x{legend_height}, extended canvas: {new_width}x{new_height}")
+            print("[Mapping] Finished dynamic _add_legend_local.", flush=True)
+            return extended_img
+
+        except Exception as e:
+            print(f"Error adding dynamic legend: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
+            return image
 
     def hex_to_rgb(self, hex_color: str) -> tuple:
         """Convert hex color to RGB tuple."""
@@ -121,6 +563,11 @@ class MappingCog(commands.Cog):
         except Exception as e:
             print(f"Error getting country color for {country_id}: {e}")
             return (128, 128, 128)  # Gray fallback
+    
+    async def get_regions_data_async(
+        self, filter_key: str = "All", filter_value: Optional[str] = None
+    ) -> list:
+        return self.async_db.get_regions_data(filter_key, filter_value)
 
     def get_regions_data(
         self, filter_key: str = "All", filter_value: Optional[str] = None
@@ -285,116 +732,6 @@ class MappingCog(commands.Cog):
         print(f"[Mapping] Applied {np.sum(border_mask)} border pixels.", flush=True)
         print("[Mapping] Finished generate_regions_map.", flush=True)
         return Image.fromarray(result_array)
-
-    # def generate_regions_map(self, regions_data: List[dict]) -> Image.Image:
-    #     """Generate a white map with black region outlines."""
-    #     print("[Mapping] Starting generate_regions_map...", flush=True)
-    #     height, width = self.base_array.shape[:2]
-    #     result_array = (
-    #         np.ones((height, width, 3), dtype=np.uint8) * 255
-    #     )  # White background
-
-    #     water_color = np.array([39, 39, 39])  # #272727
-
-    #     # Create water mask
-    #     water_mask = (np.all(self.base_array[:, :, :3] == water_color, axis=2)) | (
-    #         self.base_array[:, :, 3] == 0
-    #     )  # Transparent areas
-
-    #     # Apply water color to water areas
-    #     result_array[water_mask] = water_color
-    #     print("[Mapping] Water mask applied.", flush=True)
-
-    #     # For regions map, we need to identify ALL regions to create borders
-    #     # If we have a filter, only show borders for those regions
-    #     # If no filter, show borders for ALL regions in the CSV (not database)
-
-    #     if not regions_data:  # No filter - use all CSV regions
-    #         print(
-    #             "[Mapping] No filter specified, using all CSV regions for borders.",
-    #             flush=True,
-    #         )
-    #         relevant_colors = set(self.region_colors_cache.keys())
-    #     else:
-    #         # Filter specified - get colors from the filtered database data
-    #         print(
-    #             f"[Mapping] Filter specified, using {len(regions_data)} filtered regions.",
-    #             flush=True,
-    #         )
-    #         relevant_colors = set()
-    #         for region in regions_data:
-    #             hex_color = region.get("region_color_hex", "")
-    #             if hex_color:
-    #                 if not hex_color.startswith("#"):
-    #                     hex_color = "#" + hex_color
-    #                 rgb = self.hex_to_rgb(hex_color)
-    #                 relevant_colors.add(rgb)
-
-    #     print(
-    #         f"[Mapping] Using {len(relevant_colors)} region colors for borders.",
-    #         flush=True,
-    #     )
-
-    #     # Create borders for each region individually to avoid merging adjacent regions
-    #     combined_border_mask = np.zeros((height, width), dtype=bool)
-    #     found_regions = 0
-    #     missing_regions = 0
-
-    #     # Use a smaller kernel and create borders more carefully to avoid thickness
-    #     kernel = np.ones((3, 3), dtype=bool)  # Smaller 3x3 kernel for thinner borders
-
-    #     for idx, color in enumerate(relevant_colors):
-    #         color_array = np.array(color)
-    #         region_mask = np.all(self.base_array[:, :, :3] == color_array, axis=2)
-    #         pixel_count = np.sum(region_mask)
-
-    #         if pixel_count > 0:
-    #             # Create border for this individual region
-    #             dilated_mask = binary_dilation(region_mask, structure=kernel)
-    #             border_mask = dilated_mask & ~region_mask
-
-    #             # Add this region's border to the combined border mask
-    #             combined_border_mask |= border_mask
-    #             found_regions += 1
-
-    #             if idx % 50 == 0:  # Less frequent logging
-    #                 individual_border_count = np.sum(border_mask)
-    #                 print(
-    #                     f"[Mapping] Region {color}: {pixel_count} pixels, {individual_border_count} border pixels"
-    #                 )
-    #         else:
-    #             missing_regions += 1
-    #             if missing_regions <= 5:  # Only log first few missing regions
-    #                 print(
-    #                     f"[Mapping] Warning: No pixels found for region color {color}"
-    #                 )
-
-    #         if idx % 50 == 0:
-    #             print(
-    #                 f"[Mapping] Processed {idx+1}/{len(relevant_colors)} region colors...",
-    #                 flush=True,
-    #             )
-
-    #     print(
-    #         f"[Mapping] Successfully found {found_regions}/{len(relevant_colors)} regions in map"
-    #     )
-    #     print(f"[Mapping] {missing_regions} regions not found in base map")
-
-    #     # Apply all borders at once
-    #     if np.any(combined_border_mask):
-    #         result_array[combined_border_mask] = [0, 0, 0]  # Black borders
-    #         total_border_pixels = np.sum(combined_border_mask)
-    #         print(
-    #             f"[Mapping] Applied {total_border_pixels} total border pixels for individual regions.",
-    #             flush=True,
-    #         )
-    #     else:
-    #         print(
-    #             "[Mapping] Warning: No regions found for border creation!", flush=True
-    #         )
-
-    #     print("[Mapping] Finished generate_regions_map.", flush=True)
-    #     return Image.fromarray(result_array)
 
     def generate_countries_map(self, regions_data: List[dict], is_all: bool) -> Image.Image:
         """Generate a map colored by countries with legend."""
@@ -593,20 +930,27 @@ class MappingCog(commands.Cog):
         except Exception as e:
             print(f"[Mapping] Error fetching regions: {e}", flush=True)
             return []
+        
+    
+    async def get_all_regions_async(self):
+        """Get all regions using async database."""
+        return await self.async_db.get_all_regions_async()
+
 
     def add_legend(self, image: Image.Image, regions_data: list) -> Image.Image:
-        """Add a legend showing countries and their colors."""
-        print("[Mapping] Starting add_legend...", flush=True)
+        """Add a dynamic legend by extending the canvas on the left side."""
+        print("[Mapping] Starting dynamic add_legend...", flush=True)
         try:
             if not regions_data:
                 regions_data = self.get_all_regions()
+                
+            # Collect unique countries
             country_names = {}
             for idx, region in enumerate(regions_data):
                 country_id = region.get("country_id")
                 country_name = region.get("country_name")
                 if country_id and country_name and country_id in self.country_colors:
                     country_names[country_id] = country_name
-                print(f"[Mapping] Processed region {region['name']} for legend...")
                 if idx % 20 == 0:
                     print(
                         f"[Mapping] Processed {idx+1}/{len(regions_data)} regions for legend...",
@@ -617,98 +961,132 @@ class MappingCog(commands.Cog):
                 print("[Mapping] No country names found, skipping legend.", flush=True)
                 return image
 
-            # Calculate scale factor based on image size (reference: 400x400)
+            # Calculate scale factor based on image size
             image_width, image_height = image.size
-            reference_size = 250
+            reference_size = 400
             scale_factor = min(image_width, image_height) / reference_size
-            scale_factor = max(0.8, min(scale_factor, 5.0))  # Clamp between 0.5x and 3x
+            scale_factor = max(0.5, min(scale_factor, 2.0))  # Clamp between 0.5x and 2x
 
             print(
                 f"[Mapping] Image size: {image_width}x{image_height}, scale factor: {scale_factor:.2f}",
                 flush=True,
             )
 
-            # Scale font and sizes
-            base_font_size = 12
-            font_size = max(8, int(base_font_size * scale_factor))
+            # Calculate dynamic font size based on number of countries
+            num_countries = len(country_names)
+            if num_countries <= 20:
+                base_font_size = 14
+            elif num_countries <= 50:
+                base_font_size = 12
+            elif num_countries <= 100:
+                base_font_size = 10
+            else:
+                base_font_size = 8
+                
+            font_size = max(6, int(base_font_size * scale_factor))
 
             try:
                 font = ImageFont.truetype("datas/arial.ttf", font_size)
             except:
                 font = ImageFont.load_default()
 
+            # Calculate text dimensions for all countries
             draw_temp = ImageDraw.Draw(Image.new("RGB", (1, 1)))
             legend_items = []
             max_text_width = 0
 
-            for idx, (country_id, country_name) in enumerate(country_names.items()):
-                text = country_name
-                bbox = draw_temp.textbbox((0, 0), text, font=font)
+            for country_id, country_name in country_names.items():
+                bbox = draw_temp.textbbox((0, 0), country_name, font=font)
                 text_width = bbox[2] - bbox[0]
                 text_height = bbox[3] - bbox[1]
                 max_text_width = max(max_text_width, text_width)
-                legend_items.append((country_id, text, text_width, text_height))
-                if idx % 10 == 0:
-                    print(
-                        f"[Mapping] Calculated legend item {idx+1}/{len(country_names)}...",
-                        flush=True,
-                    )
+                legend_items.append((country_id, country_name, text_width, text_height))
 
-            # Scale legend elements
-            color_square_size = max(8, int(12 * scale_factor))
-            padding = max(3, int(5 * scale_factor))
-            legend_width = color_square_size + padding + max_text_width + padding * 2
-            legend_height = len(legend_items) * (color_square_size + padding) + padding
+            # Sort countries alphabetically for consistent display
+            legend_items.sort(key=lambda x: x[1])
 
-            legend_img = Image.new(
-                "RGBA", (legend_width, legend_height), (255, 255, 255, 200)
-            )
-            legend_draw = ImageDraw.Draw(legend_img)
+            # Calculate layout parameters
+            color_square_size = max(6, int(10 * scale_factor))
+            padding = max(2, int(4 * scale_factor))
+            item_height = max(color_square_size, max([item[3] for item in legend_items])) + padding
+            
+            # Calculate optimal number of columns
+            available_height = image_height - (2 * padding)
+            max_items_per_column = max(1, available_height // item_height)
+            num_columns = max(1, (len(legend_items) + max_items_per_column - 1) // max_items_per_column)
+            
+            # Limit columns to prevent legend from being too wide
+            max_columns = max(1, min(4, num_countries // 10))
+            num_columns = min(num_columns, max_columns)
+            
+            items_per_column = (len(legend_items) + num_columns - 1) // num_columns
+            
+            print(f"[Mapping] Legend layout: {num_countries} countries, {num_columns} columns, {items_per_column} items per column")
 
-            y_offset = padding
-            for idx, (country_id, text, text_width, text_height) in enumerate(
-                legend_items
-            ):
+            # Calculate legend dimensions
+            column_width = color_square_size + padding + max_text_width + padding
+            legend_width = (column_width * num_columns) + padding
+            legend_height = min(available_height, items_per_column * item_height + padding)
+
+            # Create extended canvas
+            new_width = image_width + legend_width
+            new_height = image_height
+            extended_img = Image.new("RGB", (new_width, new_height), (255, 255, 255))
+            
+            # Paste original map on the right side
+            extended_img.paste(image, (legend_width, 0))
+            
+            # Draw legend on the left side
+            legend_draw = ImageDraw.Draw(extended_img)
+            
+            # Draw background for legend area
+            legend_draw.rectangle([0, 0, legend_width, new_height], fill=(240, 240, 240), outline=(200, 200, 200))
+            
+            # Draw legend items
+            for idx, (country_id, country_name, text_width, text_height) in enumerate(legend_items):
+                column = idx // items_per_column
+                row = idx % items_per_column
+                
+                if column >= num_columns:
+                    continue
+                    
+                x_base = column * column_width + padding
+                y_pos = row * item_height + padding
+                
+                # Skip if this would go beyond image bounds
+                if y_pos + item_height > legend_height:
+                    continue
+                
                 color = self.country_colors[country_id]
+                
+                # Draw color square
                 legend_draw.rectangle(
-                    [
-                        padding,
-                        y_offset,
-                        padding + color_square_size,
-                        y_offset + color_square_size,
-                    ],
+                    [x_base, y_pos, x_base + color_square_size, y_pos + color_square_size],
                     fill=tuple(color),
-                    outline=(0, 0, 0),
+                    outline=(0, 0, 0)
                 )
+                
+                # Draw country name
+                text_x = x_base + color_square_size + padding
+                text_y = y_pos + (color_square_size - text_height) // 2
                 legend_draw.text(
-                    (padding + color_square_size + padding, y_offset),
-                    text,
+                    (text_x, text_y),
+                    country_name,
                     fill=(0, 0, 0),
-                    font=font,
+                    font=font
                 )
-                y_offset += color_square_size + padding
-                if idx % 10 == 0:
-                    print(
-                        f"[Mapping] Drew legend item {idx+1}/{len(legend_items)}...",
-                        flush=True,
-                    )
+                
+                if idx % 20 == 0:
+                    print(f"[Mapping] Drew legend item {idx+1}/{len(legend_items)}...", flush=True)
 
-            image_width, image_height = image.size
-            legend_x = max(5, int(10 * scale_factor))
-            legend_y = image_height - legend_height - max(5, int(10 * scale_factor))
-
-            result_img = image.copy()
-            result_img.paste(legend_img, (legend_x, legend_y), legend_img)
-
-            print(
-                f"[Mapping] Legend positioned at ({legend_x}, {legend_y}) with size {legend_width}x{legend_height}",
-                flush=True,
-            )
-            print("[Mapping] Finished add_legend.", flush=True)
-            return result_img
+            print(f"[Mapping] Dynamic legend created: {legend_width}x{legend_height}, extended canvas: {new_width}x{new_height}")
+            print("[Mapping] Finished dynamic add_legend.", flush=True)
+            return extended_img
 
         except Exception as e:
-            print(f"Error adding legend: {e}", flush=True)
+            print(f"Error adding dynamic legend: {e}", flush=True)
+            import traceback
+            traceback.print_exc()
             return image
 
     @commands.hybrid_command(
@@ -980,6 +1358,526 @@ class MappingCog(commands.Cog):
         elif filter_type == "country":
             return await self.country_autocomplete(interaction, current)
         return []
+
+    def _cleanup_temp_files(self, file_path: str):
+        """Clean up temporary map files."""
+        try:
+            if file_path and os.path.exists(file_path):
+                os.remove(file_path)
+                print(f"[Mapping] Cleaned up temporary file: {file_path}")
+        except Exception as e:
+            print(f"[Mapping] Error cleaning up {file_path}: {e}")
+
+    async def generate_all_maps_async(self, map_channel):
+        """Generate all continental and world maps in parallel with thread-safe memory management."""
+        temp_files = []  # Track temporary files for cleanup
+        successful_generations = 0
+        total_maps = 0
+        
+        try:
+            print("[Map Update] Starting parallel map generation...")
+            
+            # Continental data list
+            continents = [
+                "Europe",
+                "Asie", 
+                "Afrique",
+                "Amerique",
+                "Oceanie",
+                "Moyen-Orient",
+            ]
+            
+            total_maps = len(continents) + 1  # +1 for world map
+            
+            print(f"[Map Update] Generating {len(continents)} continental maps and 1 world map in parallel...")
+            
+            # Create semaphore to limit concurrent map generations and prevent memory overload
+            semaphore = asyncio.Semaphore(4)  # Max 4 concurrent map generations to balance speed and memory
+
+            async def generate_continent_with_semaphore(continent):
+                """Generate continent map with semaphore control for memory management."""
+                async with semaphore:
+                    try:
+                        print(f"[Map Update] Starting generation for {continent}")
+                        result = await self._generate_continent_map_with_stats_safe(continent)
+                        
+                        # Force garbage collection after each map generation
+                        gc.collect()
+                        
+                        if result[0] is not None and result[1] is not None:
+                            print(f"[Map Update] ✅ Successfully generated {continent} map")
+                            return continent, result
+                        else:
+                            print(f"[Map Update] ❌ Failed to generate {continent} map")
+                            return continent, (None, None)
+                            
+                    except Exception as e:
+                        print(f"[Map Update] ❌ Error generating {continent} map: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        return continent, (None, None)
+            
+            async def generate_world_with_semaphore():
+                """Generate world map with semaphore control for memory management."""
+                async with semaphore:
+                    try:
+                        print(f"[Map Update] Starting world map generation")
+                        result = await self._generate_world_map_with_stats_safe(continents)
+                        
+                        # Force garbage collection after world map generation
+                        gc.collect()
+                        
+                        if result[0] is not None and result[1] is not None:
+                            print(f"[Map Update] ✅ Successfully generated world map")
+                            return "World", result
+                        else:
+                            print(f"[Map Update] ❌ Failed to generate world map")
+                            return "World", (None, None)
+                            
+                    except Exception as e:
+                        print(f"[Map Update] ❌ Error generating world map: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        return "World", (None, None)
+            
+            # Generate all maps in parallel with controlled concurrency
+            tasks = []
+            
+            # Add continent tasks
+            for continent in continents:
+                task = generate_continent_with_semaphore(continent)
+                tasks.append(task)
+            
+            # Add world map task
+            world_task = generate_world_with_semaphore()
+            tasks.append(world_task)
+            
+            # Execute all tasks in parallel with controlled concurrency
+            print(f"[Map Update] Executing {len(tasks)} map generation tasks in parallel...")
+            results = await asyncio.gather(*tasks, return_exceptions=True)
+            
+            # Process results and collect successful generations
+            continent_results = []
+            world_result = None
+            
+            for result in results:
+                if isinstance(result, Exception):
+                    print(f"[Map Update] ❌ Task failed with exception: {result}")
+                    continue
+                    
+                map_type, (embed, file_path) = result
+                
+                if embed is not None and file_path is not None and os.path.exists(file_path):
+                    successful_generations += 1
+                    temp_files.append(file_path)
+                    
+                    if map_type == "World":
+                        world_result = (embed, file_path)
+                    else:
+                        continent_results.append((map_type, (embed, file_path)))
+                else:
+                    print(f"[Map Update] ⚠️ Failed generation for {map_type}")
+                    if map_type != "World":
+                        continent_results.append((map_type, (None, None)))
+            
+            # Final memory cleanup
+            gc.collect()
+            
+            print(f"[Map Update] Generation complete: {successful_generations}/{total_maps} maps successful")
+            
+            # Send continental maps to Discord
+            maps_sent = 0
+            for continent, (embed, file_path) in continent_results:
+                if embed and file_path and os.path.exists(file_path):
+                    try:
+                        file = discord.File(file_path, filename=f"{continent}_map.png")
+                        embed.set_image(url=f"attachment://{continent}_map.png")
+                        await map_channel.send(embed=embed, file=file)
+                        maps_sent += 1
+                        print(f"[Map Update] ✅ Sent {continent} map to Discord")
+                        
+                        # Small delay between Discord messages
+                        await asyncio.sleep(1)
+                        
+                    except Exception as e:
+                        print(f"[Map Update] ❌ Error sending {continent} map to Discord: {e}")
+                else:
+                    print(f"[Map Update] ⚠️ Skipping {continent} - no valid map generated")
+            
+            # Send world map to Discord
+            if world_result:
+                embed, file_path = world_result
+                if embed and file_path and os.path.exists(file_path):
+                    try:
+                        file = discord.File(file_path, filename="world_map.png")
+                        embed.set_image(url="attachment://world_map.png")
+                        await map_channel.send(embed=embed, file=file)
+                        maps_sent += 1
+                        print("[Map Update] ✅ Sent world map to Discord")
+                    except Exception as e:
+                        print(f"[Map Update] ❌ Error sending world map to Discord: {e}")
+                else:
+                    print("[Map Update] ⚠️ Skipping world map - no valid map generated")
+            
+            print(f"[Map Update] Discord upload complete: {maps_sent}/{successful_generations} maps sent")
+                    
+        except Exception as e:
+            print(f"[Map Update] ❌ Critical error in generate_all_maps_async: {e}")
+            import traceback
+            traceback.print_exc()
+        finally:
+            # Clean up temporary files
+            print(f"[Map Update] Cleaning up {len(temp_files)} temporary files...")
+            for temp_file in temp_files:
+                try:
+                    self._cleanup_temp_files(temp_file)
+                except Exception as e:
+                    print(f"[Map Update] Error cleaning up {temp_file}: {e}")
+            
+            # Force garbage collection to free memory
+            gc.collect()
+            print("[Map Update] Memory cleanup completed")
+
+    async def _generate_continent_map_with_stats_safe(self, continent: str):
+        """Generate a single continent map with enhanced error handling and memory management."""
+        try:
+            print(f"[Map Update] Processing continent: {continent}")
+            
+            # Get continental statistics using async database with retry
+            max_retries = 3
+            continental_stats = None
+            
+            for attempt in range(max_retries):
+                try:
+                    continental_stats = await self.async_db.get_continental_statistics_async(continent)
+                    break
+                except Exception as e:
+                    print(f"[Map Update] Attempt {attempt + 1}/{max_retries} failed for {continent} stats: {e}")
+                    if attempt == max_retries - 1:
+                        raise e
+                    await asyncio.sleep(1)
+            
+            if not continental_stats:
+                print(f"[Map Update] No statistics available for {continent}")
+                return None, None
+            
+            # Generate the continental map with retry mechanism
+            output_path = None
+            for attempt in range(max_retries):
+                try:
+                    output_path = await self.generate_filtered_map_async(
+                        "Continent", continent, is_regions_map=False
+                    )
+                    if output_path and os.path.exists(output_path):
+                        break
+                    else:
+                        print(f"[Map Update] Attempt {attempt + 1}/{max_retries} - no output for {continent}")
+                except Exception as e:
+                    print(f"[Map Update] Attempt {attempt + 1}/{max_retries} failed for {continent} map: {e}")
+                    if attempt == max_retries - 1:
+                        raise e
+                    await asyncio.sleep(2)
+            
+            if not output_path or not os.path.exists(output_path):
+                print(f"[Map Update] Failed to generate map for {continent} after {max_retries} attempts")
+                return None, None
+                
+            # Create embed with continental statistics
+            embed = discord.Embed(
+                title=f"🌍 {continent} - Carte Politique",
+                color=ALL_COLOR_INT,
+            )
+            
+            # Add statistical fields with safe formatting
+            try:
+                embed.add_field(
+                    name="📊 Statistiques Générales",
+                    value=f"🏛️ **Pays total:** {continental_stats.get('total_countries', 0)}\n"
+                    f"👤 **Pays joués:** {continental_stats.get('played_countries', 0)}\n"
+                    f"🏳️ **Pays libres:** {continental_stats.get('unplayed_countries', 0)}\n"
+                    f"📍 **Régions totales:** {continental_stats.get('total_regions', 0)}",
+                    inline=True,
+                )
+                
+                embed.add_field(
+                    name="🗺️ Contrôle Territorial",
+                    value=f"🎯 **Régions contrôlées:** {continental_stats.get('controlled_regions', 0)}\n"
+                    f"🆓 **Régions libres:** {continental_stats.get('free_regions', 0)}\n"
+                    f"📈 **% contrôlé:** {continental_stats.get('control_percentage', 0):.1f}%\n"
+                    f"🔓 **% libre:** {continental_stats.get('free_percentage', 0):.1f}%",
+                    inline=True,
+                )
+                
+                embed.add_field(
+                    name="⏰ Mise à jour",
+                    value=f"📅 **Date:** {datetime.now(pytz.timezone('Europe/Paris')).strftime('%d/%m/%Y')}\n"
+                    f"🕐 **Heure:** <t:{int(datetime.now(pytz.timezone('Europe/Paris')).timestamp())}>",
+                    inline=False,
+                )
+            except Exception as e:
+                print(f"[Map Update] Error creating embed for {continent}: {e}")
+                # Create minimal embed as fallback
+                embed = discord.Embed(
+                    title=f"🌍 {continent} - Carte Politique",
+                    description="Statistiques temporairement indisponibles",
+                    color=ALL_COLOR_INT,
+                )
+            
+            print(f"[Map Update] Successfully processed {continent}")
+            return embed, output_path
+            
+        except Exception as e:
+            print(f"[Map Update] Critical error processing continent {continent}: {e}")
+            import traceback
+            traceback.print_exc()
+            return None, None
+
+    async def _generate_continent_map_with_stats(self, continent: str):
+        """Generate a single continent map with statistics."""
+        try:
+            print(f"[Map Update] Processing continent: {continent}")
+            
+            # Get continental statistics using async database
+            continental_stats = await self.async_db.get_continental_statistics_async(continent)
+            
+            # Generate the continental map
+            output_path = await self.generate_filtered_map_async(
+                "Continent", continent, is_regions_map=False
+            )
+            
+            if not output_path or not os.path.exists(output_path):
+                print(f"[Map Update] Failed to generate map for {continent}")
+                return None, None
+                
+            # Create embed with continental statistics
+            embed = discord.Embed(
+                title=f"🌍 {continent} - Carte Politique",
+                color=ALL_COLOR_INT,
+            )
+            
+            # Add statistical fields
+            embed.add_field(
+                name="📊 Statistiques Générales",
+                value=f"🏛️ **Pays total:** {continental_stats['total_countries']}\n"
+                f"👤 **Pays joués:** {continental_stats['played_countries']}\n"
+                f"🏳️ **Pays libres:** {continental_stats['unplayed_countries']}\n"
+                f"📍 **Régions totales:** {continental_stats['total_regions']}",
+                inline=True,
+            )
+            
+            embed.add_field(
+                name="🗺️ Contrôle Territorial",
+                value=f"🎯 **Régions contrôlées:** {continental_stats['controlled_regions']}\n"
+                f"🆓 **Régions libres:** {continental_stats['free_regions']}\n"
+                f"📈 **% contrôlé:** {continental_stats['control_percentage']:.1f}%\n"
+                f"🔓 **% libre:** {continental_stats['free_percentage']:.1f}%",
+                inline=True,
+            )
+            
+            embed.add_field(
+                name="⏰ Mise à jour",
+                value=f"📅 **Date:** {datetime.now(pytz.timezone('Europe/Paris')).strftime('%d/%m/%Y')}\n"
+                f"🕐 **Heure:** <t:{int(datetime.now(pytz.timezone('Europe/Paris')).timestamp())}>",
+                inline=False,
+            )
+            
+            return embed, output_path
+            
+        except Exception as e:
+            print(f"[Map Update] Error processing continent {continent}: {e}")
+            raise e
+
+    async def _generate_world_map_with_stats_safe(self, continents: List[str]):
+        """Generate world map with enhanced error handling and memory management."""
+        try:
+            print(f"[Map Update] Processing world map...")
+            
+            # Get world statistics using async database with retry
+            max_retries = 3
+            world_stats = None
+            
+            for attempt in range(max_retries):
+                try:
+                    world_stats = await self.async_db.get_world_statistics_async()
+                    break
+                except Exception as e:
+                    print(f"[Map Update] Attempt {attempt + 1}/{max_retries} failed for world stats: {e}")
+                    if attempt == max_retries - 1:
+                        raise e
+                    await asyncio.sleep(1)
+            
+            if not world_stats:
+                print(f"[Map Update] No world statistics available")
+                return None, None
+            
+            # Generate the world map with retry mechanism
+            output_path = None
+            for attempt in range(max_retries):
+                try:
+                    output_path = await self.generate_filtered_map_async(
+                        "All", None, is_regions_map=False
+                    )
+                    if output_path and os.path.exists(output_path):
+                        break
+                    else:
+                        print(f"[Map Update] Attempt {attempt + 1}/{max_retries} - no world map output")
+                except Exception as e:
+                    print(f"[Map Update] Attempt {attempt + 1}/{max_retries} failed for world map: {e}")
+                    if attempt == max_retries - 1:
+                        raise e
+                    await asyncio.sleep(2)
+            
+            if not output_path or not os.path.exists(output_path):
+                print(f"[Map Update] Failed to generate world map after {max_retries} attempts")
+                return None, None
+                
+            # Create embed with world statistics
+            embed = discord.Embed(
+                title="🌍 Monde - Carte Politique Globale",
+                description="Vue d'ensemble de l'état géopolitique mondial",
+                color=ALL_COLOR_INT,
+            )
+            
+            # Add statistical fields with safe formatting
+            try:
+                embed.add_field(
+                    name="🌐 Statistiques Mondiales",
+                    value=f"🏛️ **Pays total:** {world_stats.get('total_countries', 0)}\n"
+                    f"👤 **Pays joués:** {world_stats.get('played_countries', 0)}\n"
+                    f"🏳️ **Pays libres:** {world_stats.get('unplayed_countries', 0)}\n"
+                    f"📍 **Régions totales:** {world_stats.get('total_regions', 0)}",
+                    inline=True,
+                )
+                
+                embed.add_field(
+                    name="🗺️ Contrôle Global",
+                    value=f"🎯 **Régions contrôlées:** {world_stats.get('controlled_regions', 0)}\n"
+                    f"🆓 **Régions libres:** {world_stats.get('free_regions', 0)}\n"
+                    f"📈 **% contrôlé:** {world_stats.get('control_percentage', 0):.1f}%\n"
+                    f"🔓 **% libre:** {world_stats.get('free_percentage', 0):.1f}%",
+                    inline=True,
+                )
+                
+                # Get continent country counts with retry and safe fallback
+                continent_counts = []
+                for continent in continents:
+                    try:
+                        count = await self.async_db.get_continent_country_count_async(continent)
+                        continent_counts.append(count)
+                    except Exception as e:
+                        print(f"[Map Update] Error getting count for {continent}: {e}")
+                        continent_counts.append(0)
+                
+                embed.add_field(
+                    name="📈 Répartition par Continent",
+                    value="\n".join(
+                        [
+                            f"🌍 **{continent}:** {count} pays"
+                            for continent, count in zip(continents, continent_counts)
+                        ]
+                    ) if continent_counts else "Données indisponibles",
+                    inline=False,
+                )
+                
+                embed.add_field(
+                    name="⏰ Mise à jour Quotidienne",
+                    value=f"📅 **Date:** {datetime.now(pytz.timezone('Europe/Paris')).strftime('%d/%m/%Y')}\n"
+                    f"🕐 **Heure:** <t:{int(datetime.now(pytz.timezone('Europe/Paris')).timestamp())}>\n"
+                    f"🔄 **Prochaine:** <t:{int((datetime.now(pytz.timezone('Europe/Paris')).replace(hour=7, minute=0, second=0, microsecond=0) + timedelta(days=1)).timestamp())}>",
+                    inline=False,
+                )
+            except Exception as e:
+                print(f"[Map Update] Error creating world embed: {e}")
+                # Create minimal embed as fallback
+                embed = discord.Embed(
+                    title="🌍 Monde - Carte Politique Globale",
+                    description="Statistiques temporairement indisponibles",
+                    color=ALL_COLOR_INT,
+                )
+            
+            print(f"[Map Update] Successfully processed world map")
+            return embed, output_path
+            
+        except Exception as e:
+            print(f"[Map Update] Critical error processing world map: {e}")
+            import traceback
+            traceback.print_exc()
+            return None, None
+
+    async def _generate_world_map_with_stats(self, continents: List[str]):
+        """Generate world map with global statistics."""
+        try:
+            print("[Map Update] Generating world map...")
+            
+            # Get global statistics using async database
+            world_stats = await self.async_db.get_world_statistics_async()
+            
+            # Generate the world map
+            output_path = await self.generate_filtered_map_async(
+                "All", None, is_regions_map=False
+            )
+            
+            if not output_path or not os.path.exists(output_path):
+                print("[Map Update] Failed to generate world map")
+                return None, None
+                
+            # Create embed with world statistics
+            embed = discord.Embed(
+                title="🌍 Monde - Carte Politique Globale",
+                description="Vue d'ensemble de l'état géopolitique mondial",
+                color=ALL_COLOR_INT,
+            )
+            
+            # Add global statistical fields
+            embed.add_field(
+                name="🌐 Statistiques Mondiales",
+                value=f"🏛️ **Pays total:** {world_stats['total_countries']}\n"
+                f"👤 **Pays joués:** {world_stats['played_countries']}\n"
+                f"🏳️ **Pays libres:** {world_stats['unplayed_countries']}\n"
+                f"📍 **Régions totales:** {world_stats['total_regions']}",
+                inline=True,
+            )
+            
+            embed.add_field(
+                name="🗺️ Contrôle Global",
+                value=f"🎯 **Régions contrôlées:** {world_stats['controlled_regions']}\n"
+                f"🆓 **Régions libres:** {world_stats['free_regions']}\n"
+                f"📈 **% contrôlé:** {world_stats['control_percentage']:.1f}%\n"
+                f"🔓 **% libre:** {world_stats['free_percentage']:.1f}%",
+                inline=True,
+            )
+            
+            # Get continent country counts in parallel
+            continent_count_tasks = [
+                self.async_db.get_continent_country_count_async(continent)
+                for continent in continents
+            ]
+            continent_counts = await asyncio.gather(*continent_count_tasks)
+            
+            embed.add_field(
+                name="📈 Répartition par Continent",
+                value="\n".join(
+                    [
+                        f"🌍 **{continent}:** {count} pays"
+                        for continent, count in zip(continents, continent_counts)
+                    ]
+                ),
+                inline=False,
+            )
+            
+            embed.add_field(
+                name="⏰ Mise à jour Quotidienne",
+                value=f"📅 **Date:** {datetime.now(pytz.timezone('Europe/Paris')).strftime('%d/%m/%Y')}\n"
+                f"🕐 **Heure:** <t:{int(datetime.now(pytz.timezone('Europe/Paris')).timestamp())}>\n"
+                f"🔄 **Prochaine:** <t:{int((datetime.now(pytz.timezone('Europe/Paris')).replace(hour=7, minute=0, second=0, microsecond=0) + timedelta(days=1)).timestamp())}>",
+                inline=False,
+            )
+            
+            return embed, output_path
+            
+        except Exception as e:
+            print(f"[Map Update] Error generating world map: {e}")
+            raise e
 
 
 async def setup(bot):
