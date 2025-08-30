@@ -1605,10 +1605,10 @@ class MappingCog(commands.Cog):
             try:
                 results = await asyncio.wait_for(
                     asyncio.gather(*tasks, return_exceptions=True),
-                    timeout=600  # 10 minutes timeout
+                    timeout=1200  # 20 minutes timeout
                 )
             except asyncio.TimeoutError:
-                print("[Map Update] ❌ Map generation timed out after 10 minutes")
+                print("[Map Update] ❌ Map generation timed out after 20 minutes")
                 return
             
             # Force garbage collection after all tasks complete
@@ -1617,7 +1617,7 @@ class MappingCog(commands.Cog):
             
             # Process results and collect successful generations
             continent_results = []
-            world_result = None
+            world_result = []
             
             for result in results:
                 if isinstance(result, Exception):
@@ -1631,7 +1631,7 @@ class MappingCog(commands.Cog):
                     temp_files.append(file_path)
                     
                     if map_type == "World":
-                        world_result = (embed, file_path)
+                        world_result = [(embed, file_path)]
                     else:
                         continent_results.append((map_type, (embed, file_path)))
                 else:
@@ -1643,7 +1643,18 @@ class MappingCog(commands.Cog):
             gc.collect()
             
             print(f"[Map Update] Generation complete: {successful_generations}/{total_maps} maps successful")
-            
+           
+            # Clear the channel with error handling
+            print(f"[Map Update] Clearing channel {map_channel.name}")
+            try:
+                async for message in map_channel.history(limit=None):
+                    try:
+                        await message.delete()
+                    except Exception as e:
+                        print(f"[Map Update] Error deleting message: {e}")
+            except Exception as e:
+                print(f"[Map Update] Error during channel clearing: {e}")
+
             # Send continental maps to Discord
             maps_sent = 0
             for continent, (embed, file_path) in continent_results:
@@ -1665,7 +1676,7 @@ class MappingCog(commands.Cog):
             
             # Send world map to Discord
             if world_result:
-                embed, file_path = world_result
+                embed, file_path = world_result[0]
                 if embed and file_path and os.path.exists(file_path):
                     try:
                         file = discord.File(file_path, filename="world_map.png")
@@ -1685,14 +1696,23 @@ class MappingCog(commands.Cog):
             import traceback
             traceback.print_exc()
         finally:
-            # Clean up temporary files
-            print(f"[Map Update] Cleaning up {len(temp_files)} temporary files...")
-            for temp_file in temp_files:
-                try:
-                    self._cleanup_temp_files(temp_file)
-                except Exception as e:
-                    print(f"[Map Update] Error cleaning up {temp_file}: {e}")
-            
+            # Sending generated maps to /home/ubuntu/Bots/resurgence-web/images with correct names ($continent-map.png)
+
+            # Ensure both continent_results and world_result are lists of (continent, (embed, file_path))
+            all_results = continent_results.copy()
+            if world_result:
+                # world_result is a list of one tuple: [(embed, file_path)]
+                embed, file_path = world_result[0]
+                all_results.append(("World", (embed, file_path)))
+            for continent, (embed, file_path) in all_results:
+                if embed and file_path and os.path.exists(file_path):
+                    try:
+                        new_file_path = f"/home/ubuntu/Bots/resurgence-web/images/{continent.lower()}-map.png"
+                        os.rename(file_path, new_file_path)
+                        print(f"[Map Update] ✅ Moved {file_path} to {new_file_path}")
+                    except Exception as e:
+                        print(f"[Map Update] ❌ Error moving {file_path} to {new_file_path}: {e}")
+
             # Force garbage collection to free memory
             gc.collect()
             print("[Map Update] Memory cleanup completed")

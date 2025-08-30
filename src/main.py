@@ -34,6 +34,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 import tempfile
 import atexit
+import gc
 
 # Import async database
 from asyncdb import AsyncDatabase
@@ -172,6 +173,7 @@ async def on_ready():
     await bot.tree.sync()
     polling_notion.start()
     update_rp_date.start()
+    # await update_rp_date()
     #polling_ovh.start()
 
 
@@ -326,7 +328,6 @@ async def update_map():
         print("[Map Update] Starting daily map update...")
         
         # Force garbage collection before starting
-        import gc
         gc.collect()
         print("[Map Update] Pre-generation memory cleanup completed")
 
@@ -347,18 +348,6 @@ async def update_map():
             print("[Map Update] MappingCog not found")
             return
 
-        print(f"[Map Update] Clearing channel {map_channel.name}")
-
-        # Clear the channel with error handling
-        try:
-            async for message in map_channel.history(limit=None):
-                try:
-                    await message.delete()
-                except Exception as e:
-                    print(f"[Map Update] Error deleting message: {e}")
-        except Exception as e:
-            print(f"[Map Update] Error during channel clearing: {e}")
-
         # Generate all maps in parallel and send them to Discord
         print("[Map Update] Starting map generation...")
         try:
@@ -366,12 +355,10 @@ async def update_map():
             print("[Map Update] Daily map update completed successfully")
         except Exception as generation_error:
             print(f"[Map Update] Critical error during map generation: {generation_error}")
-            import traceback
             traceback.print_exc()
             
             # Try to send an error message to the channel
             try:
-                import discord
                 error_embed = discord.Embed(
                     title="❌ Map Generation Failed",
                     description="An error occurred during the daily map update. Please check the logs.",
@@ -383,11 +370,9 @@ async def update_map():
 
     except Exception as e:
         print(f"[Map Update] Error in update_map: {e}")
-        import traceback
         traceback.print_exc()
     finally:
         # Final cleanup
-        import gc
         gc.collect()
         print("[Map Update] Final cleanup completed")
 
