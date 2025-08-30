@@ -324,6 +324,11 @@ async def update_map():
     """Update the daily map in the designated channel with continental and world statistics."""
     try:
         print("[Map Update] Starting daily map update...")
+        
+        # Force garbage collection before starting
+        import gc
+        gc.collect()
+        print("[Map Update] Pre-generation memory cleanup completed")
 
         # Get the map channel
         map_channel_id = db.get_setting("map_channel_id")
@@ -344,22 +349,47 @@ async def update_map():
 
         print(f"[Map Update] Clearing channel {map_channel.name}")
 
-        # Clear the channel
-        async for message in map_channel.history(limit=None):
-            try:
-                await message.delete()
-            except Exception as e:
-                print(f"[Map Update] Error deleting message: {e}")
+        # Clear the channel with error handling
+        try:
+            async for message in map_channel.history(limit=None):
+                try:
+                    await message.delete()
+                except Exception as e:
+                    print(f"[Map Update] Error deleting message: {e}")
+        except Exception as e:
+            print(f"[Map Update] Error during channel clearing: {e}")
 
         # Generate all maps in parallel and send them to Discord
-        await mapping_cog.generate_all_maps_async(map_channel)
-
-        print("[Map Update] Daily map update completed successfully")
+        print("[Map Update] Starting map generation...")
+        try:
+            await mapping_cog.generate_all_maps_async(map_channel)
+            print("[Map Update] Daily map update completed successfully")
+        except Exception as generation_error:
+            print(f"[Map Update] Critical error during map generation: {generation_error}")
+            import traceback
+            traceback.print_exc()
+            
+            # Try to send an error message to the channel
+            try:
+                import discord
+                error_embed = discord.Embed(
+                    title="❌ Map Generation Failed",
+                    description="An error occurred during the daily map update. Please check the logs.",
+                    color=0xFF0000
+                )
+                await map_channel.send(embed=error_embed)
+            except Exception as embed_error:
+                print(f"[Map Update] Could not send error message: {embed_error}")
 
     except Exception as e:
         print(f"[Map Update] Error in update_map: {e}")
         import traceback
         traceback.print_exc()
+    finally:
+        # Final cleanup
+        import gc
+        gc.collect()
+        print("[Map Update] Final cleanup completed")
 
 
 async def get_continental_statistics(continent: str) -> dict:
@@ -417,7 +447,7 @@ mapping_debug = False
 @tasks.loop(seconds=RP_UPDATE_INTERVAL)
 async def update_rp_date():
     now = datetime.now(pytz.timezone("Europe/Paris"))  # ou "UTC"
-    if not (now.hour == 17 and now.minute == 20) and not mapping_debug:
+    if not (now.hour == 7 and now.minute == 0) and not mapping_debug:
         return
     await db.advance_playday(bot)
     # Process production cycle

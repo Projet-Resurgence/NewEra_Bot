@@ -15,6 +15,7 @@ import csv
 import pytz
 import uuid
 import gc
+import traceback
 from datetime import datetime, timedelta
 from scipy.ndimage import binary_dilation
 from skimage.segmentation import find_boundaries
@@ -36,8 +37,45 @@ class MappingCog(commands.Cog):
         self.region_masks_cache = {}
         self._load_region_colors()
         self.country_colors = {}
-        self.base_img = Image.open("datas/mapping/region_map.png").convert("RGBA")
-        self.base_array = np.array(self.base_img)
+        
+        # Thread pool executor for CPU-intensive tasks
+        self.executor = concurrent.futures.ThreadPoolExecutor(
+            max_workers=4, 
+            thread_name_prefix="mapping_thread"
+        )
+        
+        try:
+            print("[MappingCog] Loading base image...")
+            self.base_img = Image.open("datas/mapping/region_map.png").convert("RGBA")
+            print(f"[MappingCog] Base image loaded: {self.base_img.size}")
+            
+            print("[MappingCog] Converting to NumPy array...")
+            self.base_array = np.array(self.base_img)
+            print(f"[MappingCog] Base array created: {self.base_array.shape}, dtype: {self.base_array.dtype}")
+            
+            # Estimate memory usage
+            memory_mb = (self.base_array.nbytes / (1024 * 1024))
+            print(f"[MappingCog] Base array memory usage: {memory_mb:.2f} MB")
+            
+            if memory_mb > 500:  # Warning if base image is larger than 500MB
+                print(f"[MappingCog] ⚠️ WARNING: Large base image detected ({memory_mb:.2f} MB)")
+                print("[MappingCog] Consider reducing image size to prevent memory issues")
+                
+        except Exception as e:
+            print(f"[MappingCog] ❌ Error loading base image: {e}")
+            # Create a minimal fallback array to prevent crashes
+            self.base_img = Image.new("RGBA", (100, 100), (255, 255, 255, 255))
+            self.base_array = np.array(self.base_img)
+            print("[MappingCog] Created fallback base image")
+
+    def cog_unload(self):
+        """Clean up resources when the cog is unloaded."""
+        try:
+            if hasattr(self, 'executor'):
+                self.executor.shutdown(wait=True)
+                print("[MappingCog] Thread pool executor shut down")
+        except Exception as e:
+            print(f"[MappingCog] Error during cleanup: {e}")
 
     def _load_region_colors(self):
         """Load region colors from CSV for optimization."""
@@ -61,6 +99,50 @@ class MappingCog(commands.Cog):
         except Exception as e:
             print(f"Error loading region colors: {e}")
 
+    def _find_region_mask_threaded(self, local_base_array: np.ndarray, region_rgb: tuple) -> np.ndarray:
+        """Thread-safe function to find region mask using np.all()."""
+        region_color_array = np.array(region_rgb)
+        return np.all(local_base_array[:, :, :3] == region_color_array, axis=2)
+
+    def _create_water_mask_threaded(self, local_base_array: np.ndarray) -> np.ndarray:
+        """Thread-safe function to create water mask."""
+        water_color = np.array([39, 39, 39])
+        return (np.all(local_base_array[:, :, :3] == water_color, axis=2)) | (local_base_array[:, :, 3] == 0)
+
+    def _build_label_map_threaded(self, local_base_array: np.ndarray, relevant_colors: list) -> np.ndarray:
+        """Thread-safe function to build label map for boundary detection."""
+        height, width = local_base_array.shape[:2]
+        label_map = np.zeros((height, width), dtype=np.int32)
+        for idx, color in enumerate(relevant_colors, start=1):
+            mask = np.all(local_base_array[:, :, :3] == np.array(color), axis=2)
+            label_map[mask] = idx
+        return label_map
+
+    def _colorize_region_threaded(self, local_base_array: np.ndarray, result_array: np.ndarray, 
+                                  region_rgb: tuple, country_color: tuple) -> int:
+        """Thread-safe function to colorize a single region."""
+        region_color_array = np.array(region_rgb)
+        region_mask = np.all(local_base_array[:, :, :3] == region_color_array, axis=2)
+        pixel_count = np.sum(region_mask)
+        if pixel_count > 0:
+            result_array[region_mask, :3] = country_color
+        return pixel_count
+
+    def _crop_calculation_threaded(self, local_base_array: np.ndarray, relevant_colors: list) -> tuple:
+        """Thread-safe function to calculate crop boundaries."""
+        height, width = local_base_array.shape[:2]
+        region_mask = np.zeros((height, width), dtype=bool)
+        
+        for color in relevant_colors:
+            color_mask = np.all(local_base_array[:, :, :3] == np.array(color), axis=2)
+            region_mask |= color_mask
+        
+        if not np.any(region_mask):
+            return None
+        
+        y_coords, x_coords = np.where(region_mask)
+        return (x_coords.min(), x_coords.max(), y_coords.min(), y_coords.max())
+
     async def generate_filtered_map_async(
         self,
         filter_key: str,
@@ -68,141 +150,165 @@ class MappingCog(commands.Cog):
         is_regions_map: bool = False,
     ) -> str:
         """Async wrapper for generate_filtered_map to prevent blocking."""
-        loop = asyncio.get_event_loop()
-        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            return await loop.run_in_executor(
-                executor,
-                self._generate_filtered_map_thread_safe,
-                filter_key,
-                filter_value,
-                is_regions_map,
-            )
+        # Use async database operations to avoid cursor conflicts
+        return await self._generate_filtered_map_async_safe(filter_key, filter_value, is_regions_map)
 
-    def _generate_filtered_map_thread_safe(
+    async def _generate_filtered_map_async_safe(
         self,
         filter_key: str,
         filter_value: Optional[str] = None,
         is_regions_map: bool = False,
     ) -> str:
-        """Thread-safe wrapper for generate_filtered_map with proper base array copying."""
+        """Fully async map generation to avoid database cursor conflicts."""
+        local_base_array = None
+        local_base_img = None
+        result_img = None
+        
         try:
-            # Create a thread-local copy of the base array to avoid conflicts
-            import time
-            import uuid
             thread_id = str(uuid.uuid4())[:8]
             
-            print(f"[Mapping-{thread_id}] Starting thread-safe map generation for {filter_key}={filter_value}")
+            print(f"[Mapping-{thread_id}] Starting async map generation for {filter_key}={filter_value}")
             
-            # Make a copy of the base array for this thread
-            local_base_array = self.base_array.copy()
+            # Make a copy of the base array for this thread with explicit memory management
+            try:
+                local_base_array = self.base_array.copy()
+                print(f"[Mapping-{thread_id}] Created local base array copy")
+            except MemoryError as e:
+                print(f"[Mapping-{thread_id}] Memory error copying base array: {e}")
+                gc.collect()
+                return ""
             
             # Create a local base image for this thread
             local_base_img = Image.fromarray(local_base_array)
             
-            # Get regions data for filtering
+            # Get regions data for filtering using ASYNC database to avoid cursor conflicts
             country_colors = {}
-            regions_data = self.get_regions_data(filter_key, filter_value)
+            try:
+                regions_data = await self.async_db.get_regions_data_async(filter_key, filter_value)
+                print(f"[Mapping-{thread_id}] Retrieved {len(regions_data)} regions via async database")
+            except Exception as e:
+                print(f"[Mapping-{thread_id}] Error getting regions data via async DB: {e}")
+                return ""
+                
             if regions_data == [] and filter_key != "All":
                 print(f"[Mapping-{thread_id}] No regions data available for mapping.")
                 return ""
 
             if is_regions_map:
                 # For regions map: outline regions with black borders on white background
-                result_img = self._generate_regions_map_local(regions_data, local_base_array)
+                result_img = await self._generate_regions_map_local(regions_data, local_base_array)
             else:
                 # For countries map: colorize by country and add legend
-                result_img = self._generate_countries_map_local(regions_data, local_base_array, country_colors, is_all=(filter_key == "All"))
+                result_img = await self._generate_countries_map_local(regions_data, local_base_array, country_colors, is_all=(filter_key == "All"))
                 if result_img is None:
                     print(f"[Mapping-{thread_id}] No regions data available for mapping.")
                     return ""
 
             # Crop if not showing all
             if filter_key != "All" and filter_value:
-                result_img = self._crop_to_regions_local(result_img, regions_data, local_base_array)
+                result_img = await self._crop_to_regions_local(result_img, regions_data, local_base_array)
 
             if not is_regions_map:
-                result_img = self._add_legend_local(result_img, regions_data, country_colors)
+                result_img = await self._add_legend_local(result_img, regions_data, country_colors)
 
             # Save result with unique filename to avoid conflicts
             timestamp = int(time.time() * 1000)
             output_path = f"datas/mapping/final_map_{thread_id}_{timestamp}.png"
             result_img.save(output_path)
             
-            print(f"[Mapping-{thread_id}] Completed map generation, saved to {output_path}")
+            print(f"[Mapping-{thread_id}] Completed async map generation, saved to {output_path}")
             return output_path
 
         except Exception as e:
             print(f"[Mapping-{thread_id}] Error generating map: {e}")
-            import traceback
             traceback.print_exc()
             return ""
+        
+        finally:
+            # Explicit cleanup to prevent memory leaks
+            try:
+                if local_base_array is not None:
+                    del local_base_array
+                if local_base_img is not None:
+                    del local_base_img  
+                if result_img is not None:
+                    del result_img
+                gc.collect()
+                print(f"[Mapping-{thread_id}] Memory cleanup completed")
+            except Exception as cleanup_error:
+                print(f"[Mapping-{thread_id}] Error during cleanup: {cleanup_error}")
 
-    def _generate_regions_map_local(self, regions_data: List[dict], local_base_array: np.ndarray) -> Image.Image:
-        """Generate a white map with black region outlines using local array copy."""
+    async def _generate_regions_map_local(self, regions_data: List[dict], local_base_array: np.ndarray) -> Image.Image:
+        """Generate a white map with black region outlines using local array copy with threading."""
         print("[Mapping] Starting _generate_regions_map_local...", flush=True)
         height, width = local_base_array.shape[:2]
-        result_array = np.ones((height, width, 3), dtype=np.uint8) * 255  # fond blanc
+        result_array = np.ones((height, width, 3), dtype=np.uint8) * 255  # white background
 
-        water_color = np.array([39, 39, 39])  # #272727
-
-        # Mask eau (pixels gris foncés ou transparents)
-        water_mask = (np.all(local_base_array[:, :, :3] == water_color, axis=2)) | (
-            local_base_array[:, :, 3] == 0
+        # Create water mask using thread executor
+        loop = asyncio.get_event_loop()
+        water_mask = await loop.run_in_executor(
+            self.executor,
+            self._create_water_mask_threaded,
+            local_base_array
         )
+        
+        # Apply water color
+        water_color = np.array([39, 39, 39])
         result_array[water_mask] = water_color
         print("[Mapping] Water mask applied.", flush=True)
 
-        # Détermination des couleurs des régions à afficher
+        # Determine relevant colors
         if not regions_data:
-            relevant_colors = set(self.region_colors_cache.keys())
+            relevant_colors = list(self.region_colors_cache.keys())
             print(f"[Mapping] No filter: {len(relevant_colors)} regions from CSV.", flush=True)
         else:
-            relevant_colors = set()
+            relevant_colors = []
             for region in regions_data:
                 hex_color = region.get("region_color_hex", "")
                 if hex_color:
                     if not hex_color.startswith("#"):
                         hex_color = "#" + hex_color
-                    relevant_colors.add(self.hex_to_rgb(hex_color))
+                    relevant_colors.append(self.hex_to_rgb(hex_color))
             print(f"[Mapping] Filter: {len(relevant_colors)} regions from DB.", flush=True)
 
-        # Construction d'une carte d'IDs (chaque région = un entier unique)
-        label_map = np.zeros((height, width), dtype=np.int32)
-        for idx, color in enumerate(relevant_colors, start=1):
-            mask = np.all(local_base_array[:, :, :3] == np.array(color), axis=2)
-            label_map[mask] = idx
+        if relevant_colors:
+            # Build label map using thread executor
+            label_map = await loop.run_in_executor(
+                self.executor,
+                self._build_label_map_threaded,
+                local_base_array,
+                relevant_colors
+            )
 
-        # Extraction des frontières
-        border_mask = find_boundaries(label_map, mode="outer")
+            # Extract boundaries using thread executor
+            border_mask = await loop.run_in_executor(
+                self.executor,
+                find_boundaries,
+                label_map,
+                "outer"
+            )
 
-        # Application des frontières en noir
-        result_array[border_mask] = [0, 0, 0]
+            # Apply borders in black
+            result_array[border_mask] = [0, 0, 0]
+            print(f"[Mapping] Applied {np.sum(border_mask)} border pixels.", flush=True)
 
-        print(f"[Mapping] Applied {np.sum(border_mask)} border pixels.", flush=True)
         print("[Mapping] Finished _generate_regions_map_local.", flush=True)
         return Image.fromarray(result_array)
 
-    def _generate_countries_map_local(self, regions_data: List[dict], local_base_array: np.ndarray, 
+    async def _generate_countries_map_local(self, regions_data: List[dict], local_base_array: np.ndarray, 
                                      country_colors: dict, is_all: bool) -> Image.Image:
-        """Generate a map colored by countries using local array copy."""
+        """Generate a map colored by countries using local array copy with proper threading."""
         print("[Mapping] Starting _generate_countries_map_local...", flush=True)
         height, width = local_base_array.shape[:2]
         result_array = local_base_array.copy()
 
-        water_color = np.array([39, 39, 39])  # #272727
         unoccupied_color = np.array([255, 255, 255])  # White for unoccupied
 
         # If no regions_data (All filter), we need to get all regions from database
         if is_all:
-            print(
-                "[Mapping] No regions data provided, querying all regions from database...",
-                flush=True,
-            )
-            regions_data = self.get_all_regions()
-            print(
-                f"[Mapping] Retrieved {len(regions_data)} regions from database",
-                flush=True,
-            )
+            print("[Mapping] No regions data provided, querying all regions from database...", flush=True)
+            regions_data = await self.get_all_regions_async()
+            print(f"[Mapping] Retrieved {len(regions_data)} regions from database", flush=True)
 
         if not regions_data:
             print("[Mapping] No regions data available for mapping.", flush=True)
@@ -218,10 +324,12 @@ class MappingCog(commands.Cog):
             if country_id:
                 countries_in_map.add(country_id)
                 if country_id not in country_colors:
-                    country_colors[country_id] = self.get_country_color(country_id)
-                    print(
-                        f"[Mapping] Country {country_id} gets color {country_colors[country_id]}"
-                    )
+                    country_colors[country_id] = await self.get_country_color(country_id)
+                    print(f"[Mapping] Country {country_id} gets color {country_colors[country_id]}")
+            
+            # Yield control every 20 regions to prevent blocking
+            if idx % 20 == 0:
+                await asyncio.sleep(0)
 
         print(f"[Mapping] Found {len(country_colors)} countries with colors")
 
@@ -235,77 +343,106 @@ class MappingCog(commands.Cog):
                 country_id = region.get("country_id")
                 region_to_country[region_rgb] = country_id
 
-            if idx % 50 == 0:
-                print(
-                    f"[Mapping] Mapped {idx+1}/{len(regions_data)} regions...",
-                    flush=True,
-                )
+            # Yield control every 20 regions
+            if idx % 20 == 0:
+                await asyncio.sleep(0)
+                print(f"[Mapping] Mapped {idx+1}/{len(regions_data)} regions...", flush=True)
 
         print(f"[Mapping] Mapped {len(region_to_country)} regions to countries")
 
-        # Create water mask
-        water_mask = (np.all(local_base_array[:, :, :3] == water_color, axis=2)) | (
-            local_base_array[:, :, 3] == 0
-        )  # Transparent areas
+        # Create water mask using thread executor
+        print("[Mapping] Creating water mask...")
+        loop = asyncio.get_event_loop()
+        water_mask = await loop.run_in_executor(
+            self.executor, 
+            self._create_water_mask_threaded, 
+            local_base_array
+        )
 
-        # Process regions by finding their pixels in the base map and recoloring
-        for idx, (region_rgb, country_id) in enumerate(region_to_country.items()):
-            region_color_array = np.array(region_rgb)
-            # Find pixels that match this region's original color in the local base map
-            region_mask = np.all(
-                local_base_array[:, :, :3] == region_color_array, axis=2
+        # Process regions in parallel chunks using thread executor
+        total_regions = len(region_to_country)
+        chunk_size = 10  # Process 10 regions at a time
+        region_items = list(region_to_country.items())
+        
+        print(f"[Mapping] Processing {total_regions} regions in chunks of {chunk_size}...")
+        
+        # Create tasks for each chunk
+        chunk_tasks = []
+        for chunk_start in range(0, total_regions, chunk_size):
+            chunk_end = min(chunk_start + chunk_size, total_regions)
+            chunk_items = region_items[chunk_start:chunk_end]
+            
+            # Process each chunk in executor
+            task = loop.run_in_executor(
+                self.executor,
+                self._process_region_chunk_threaded,
+                local_base_array,
+                result_array,
+                chunk_items,
+                country_colors,
+                unoccupied_color
             )
-            pixel_count = np.sum(region_mask)
+            chunk_tasks.append(task)
+        
+        # Wait for all chunks to complete
+        chunk_results = await asyncio.gather(*chunk_tasks)
+        total_pixels_processed = sum(chunk_results)
+        print(f"[Mapping] Processed {total_pixels_processed} total pixels across all regions")
 
-            if pixel_count > 0:
-                if country_id and country_id in country_colors:
-                    # Color by country
-                    result_array[region_mask, :3] = country_colors[country_id]
-                    print(
-                        f"[Mapping] Colored {pixel_count} pixels for country {country_id}"
-                    )
-                else:
-                    # Unoccupied - white
-                    result_array[region_mask, :3] = unoccupied_color
-                    print(f"[Mapping] Set {pixel_count} pixels to white (unoccupied)")
-            else:
-                print(
-                    f"[Mapping] Warning: No pixels found for region color {region_rgb}"
-                )
+        # Handle any remaining non-water areas as unoccupied using executor
+        print("[Mapping] Processing unoccupied areas...")
+        await loop.run_in_executor(
+            self.executor,
+            self._process_unoccupied_areas_threaded,
+            local_base_array,
+            result_array,
+            water_mask,
+            list(region_to_country.keys()),
+            unoccupied_color
+        )
 
-            if idx % 20 == 0:
-                print(
-                    f"[Mapping] Processed {idx+1}/{len(region_to_country)} regions...",
-                    flush=True,
-                )
+        # Convert back to PIL Image
+        result_img = Image.fromarray(result_array)
+        print("[Mapping] Finished _generate_countries_map_local.", flush=True)
+        return result_img
 
-        # Handle any remaining non-water areas as unoccupied
-        # Find all pixels that are not water and not part of any processed region
+    def _process_region_chunk_threaded(self, local_base_array: np.ndarray, result_array: np.ndarray,
+                                     chunk_items: list, country_colors: dict, unoccupied_color: np.ndarray) -> int:
+        """Thread-safe function to process a chunk of regions."""
+        total_pixels = 0
+        for region_rgb, country_id in chunk_items:
+            pixel_count = self._colorize_region_threaded(
+                local_base_array, 
+                result_array, 
+                region_rgb, 
+                country_colors.get(country_id, unoccupied_color)
+            )
+            total_pixels += pixel_count
+        return total_pixels
+
+    def _process_unoccupied_areas_threaded(self, local_base_array: np.ndarray, result_array: np.ndarray,
+                                         water_mask: np.ndarray, region_rgbs: list, unoccupied_color: np.ndarray):
+        """Thread-safe function to process unoccupied areas."""
+        height, width = local_base_array.shape[:2]
         non_water_mask = ~water_mask
         processed_mask = np.zeros((height, width), dtype=bool)
 
-        for region_rgb in region_to_country.keys():
+        # Build processed mask from all regions
+        for region_rgb in region_rgbs:
             region_color_array = np.array(region_rgb)
-            region_mask = np.all(
-                local_base_array[:, :, :3] == region_color_array, axis=2
-            )
+            region_mask = np.all(local_base_array[:, :, :3] == region_color_array, axis=2)
             processed_mask |= region_mask
 
+        # Color unprocessed areas
         unprocessed_mask = non_water_mask & ~processed_mask
         unprocessed_count = np.sum(unprocessed_mask)
         if unprocessed_count > 0:
             result_array[unprocessed_mask, :3] = unoccupied_color
             print(f"[Mapping] Set {unprocessed_count} unprocessed pixels to white")
 
-        # Convert back to PIL Image
-        result_img = Image.fromarray(result_array)
-
-        print("[Mapping] Finished _generate_countries_map_local.", flush=True)
-        return result_img
-
-    def _crop_to_regions_local(self, image: Image.Image, regions_data: List[dict], 
+    async def _crop_to_regions_local(self, image: Image.Image, regions_data: List[dict], 
                               local_base_array: np.ndarray, offset: int = 50) -> Image.Image:
-        """Crop the image to show only the relevant regions using local array copy."""
+        """Crop the image to show only the relevant regions using local array copy with threading."""
         print("[Mapping] Starting _crop_to_regions_local...", flush=True)
         if not regions_data:
             print("[Mapping] No regions data, skipping crop.", flush=True)
@@ -318,56 +455,45 @@ class MappingCog(commands.Cog):
                 if not hex_color.startswith("#"):
                     hex_color = "#" + hex_color
                 rgb = self.hex_to_rgb(hex_color)
-                relevant_colors.append(np.array(rgb))
+                relevant_colors.append(rgb)
             if idx % 20 == 0:
-                print(
-                    f"[Mapping] Processed {idx+1}/{len(regions_data)} regions for cropping...",
-                    flush=True,
-                )
+                print(f"[Mapping] Processed {idx+1}/{len(regions_data)} regions for cropping...", flush=True)
 
         if not relevant_colors:
             print("[Mapping] No relevant colors, skipping crop.", flush=True)
             return image
 
-        height, width = local_base_array.shape[:2]
-        region_mask = np.zeros((height, width), dtype=bool)
+        # Calculate crop boundaries using thread executor
+        loop = asyncio.get_event_loop()
+        crop_bounds = await loop.run_in_executor(
+            self.executor,
+            self._crop_calculation_threaded,
+            local_base_array,
+            relevant_colors
+        )
 
-        for idx, color in enumerate(relevant_colors):
-            color_mask = np.all(local_base_array[:, :, :3] == color, axis=2)
-            region_mask |= color_mask
-            if idx % 10 == 0:
-                print(
-                    f"[Mapping] Built region mask {idx+1}/{len(relevant_colors)}...",
-                    flush=True,
-                )
-
-        if not np.any(region_mask):
+        if crop_bounds is None:
             print("[Mapping] No region mask found, skipping crop.", flush=True)
             return image
 
-        y_coords, x_coords = np.where(region_mask)
-
-        min_x, max_x = x_coords.min(), x_coords.max()
-        min_y, max_y = y_coords.min(), y_coords.max()
+        min_x, max_x, min_y, max_y = crop_bounds
+        width, height = local_base_array.shape[1], local_base_array.shape[0]
 
         min_x = max(0, min_x - offset)
         max_x = min(width, max_x + offset)
         min_y = max(0, min_y - offset)
         max_y = min(height, max_y + offset)
 
-        print(
-            f"[Mapping] Cropping image to box: ({min_x}, {min_y}, {max_x}, {max_y})",
-            flush=True,
-        )
+        print(f"[Mapping] Cropping image to box: ({min_x}, {min_y}, {max_x}, {max_y})", flush=True)
         print("[Mapping] Finished _crop_to_regions_local.", flush=True)
         return image.crop((min_x, min_y, max_x, max_y))
 
-    def _add_legend_local(self, image: Image.Image, regions_data: list, country_colors: dict) -> Image.Image:
+    async def _add_legend_local(self, image: Image.Image, regions_data: list, country_colors: dict) -> Image.Image:
         """Add a dynamic legend by extending the canvas on the left side."""
         print("[Mapping] Starting dynamic _add_legend_local...", flush=True)
         try:
             if not regions_data:
-                regions_data = self.get_all_regions()
+                regions_data = await self.get_all_regions_async()
                 
             # Collect unique countries
             country_names = {}
@@ -376,11 +502,11 @@ class MappingCog(commands.Cog):
                 country_name = region.get("country_name")
                 if country_id and country_name and country_id in country_colors:
                     country_names[country_id] = country_name
+                    
+                # Yield control every 20 regions to prevent blocking
                 if idx % 20 == 0:
-                    print(
-                        f"[Mapping] Processed {idx+1}/{len(regions_data)} regions for legend...",
-                        flush=True,
-                    )
+                    await asyncio.sleep(0)
+                    print(f"[Mapping] Processed {idx+1}/{len(regions_data)} regions for legend...", flush=True)
 
             if not country_names:
                 print("[Mapping] No country names found, skipping legend.", flush=True)
@@ -523,10 +649,10 @@ class MappingCog(commands.Cog):
         """Convert RGB tuple to hex string."""
         return "#{:02x}{:02x}{:02x}".format(rgb[0], rgb[1], rgb[2])
 
-    def get_country_color(self, country_id: int) -> Tuple[int, int, int]:
+    async def get_country_color(self, country_id: int) -> Tuple[int, int, int]:
         """Get a consistent color for a country based on its Discord role."""
         try:
-            country_data = self.db.get_country_datas(str(country_id))
+            country_data = await self.async_db.get_country_datas_async(str(country_id))
             if not country_data:
                 return (128, 128, 128)  # Gray fallback
 
@@ -646,7 +772,7 @@ class MappingCog(commands.Cog):
             print(f"Error getting regions data: {e}")
             return []
 
-    def generate_filtered_map(
+    async def generate_filtered_map(
         self,
         filter_key: str = "All",
         filter_value: Optional[str] = None,
@@ -656,7 +782,7 @@ class MappingCog(commands.Cog):
         try:
             # Get regions data for filtering
             self.country_colors = {}
-            regions_data = self.get_regions_data(filter_key, filter_value)
+            regions_data = await self.async_db.get_regions_data_async(filter_key, filter_value)
             if regions_data == [] and filter_key != "All":
                 print("[Mapping] No regions data available for mapping.")
                 return ""
@@ -666,7 +792,7 @@ class MappingCog(commands.Cog):
                 result_img = self.generate_regions_map(regions_data)
             else:
                 # For countries map: colorize by country and add legend
-                result_img = self.generate_countries_map(regions_data, is_all=(filter_key == "All"))
+                result_img = await self.generate_countries_map(regions_data, is_all=(filter_key == "All"))
                 if result_img is None:
                     print("[Mapping] No regions data available for mapping.")
                     return ""
@@ -676,7 +802,7 @@ class MappingCog(commands.Cog):
                 result_img = self.crop_to_regions(result_img, regions_data)
 
             if not is_regions_map:
-                result_img = self.add_legend(result_img, regions_data)
+                result_img = await self.add_legend(result_img, regions_data)
 
             # Save result
             output_path = "datas/mapping/final_map.png"
@@ -733,7 +859,7 @@ class MappingCog(commands.Cog):
         print("[Mapping] Finished generate_regions_map.", flush=True)
         return Image.fromarray(result_array)
 
-    def generate_countries_map(self, regions_data: List[dict], is_all: bool) -> Image.Image:
+    async def generate_countries_map(self, regions_data: List[dict], is_all: bool) -> Image.Image:
         """Generate a map colored by countries with legend."""
         print("[Mapping] Starting generate_countries_map...", flush=True)
         height, width = self.base_array.shape[:2]
@@ -748,7 +874,7 @@ class MappingCog(commands.Cog):
                 "[Mapping] No regions data provided, querying all regions from database...",
                 flush=True,
             )
-            regions_data = self.get_all_regions()
+            regions_data = await self.get_all_regions_async()
             print(
                 f"[Mapping] Retrieved {len(regions_data)} regions from database",
                 flush=True,
@@ -768,7 +894,7 @@ class MappingCog(commands.Cog):
             if country_id:
                 countries_in_map.add(country_id)
                 if country_id not in self.country_colors:
-                    self.country_colors[country_id] = self.get_country_color(country_id)
+                    self.country_colors[country_id] = await self.get_country_color(country_id)
                     print(
                         f"[Mapping] Country {country_id} gets color {self.country_colors[country_id]}"
                     )
@@ -937,12 +1063,12 @@ class MappingCog(commands.Cog):
         return await self.async_db.get_all_regions_async()
 
 
-    def add_legend(self, image: Image.Image, regions_data: list) -> Image.Image:
+    async def add_legend(self, image: Image.Image, regions_data: list) -> Image.Image:
         """Add a dynamic legend by extending the canvas on the left side."""
         print("[Mapping] Starting dynamic add_legend...", flush=True)
         try:
             if not regions_data:
-                regions_data = self.get_all_regions()
+                regions_data = await self.get_all_regions_async()
                 
             # Collect unique countries
             country_names = {}
@@ -1392,13 +1518,17 @@ class MappingCog(commands.Cog):
             print(f"[Map Update] Generating {len(continents)} continental maps and 1 world map in parallel...")
             
             # Create semaphore to limit concurrent map generations and prevent memory overload
-            semaphore = asyncio.Semaphore(4)  # Max 4 concurrent map generations to balance speed and memory
+            semaphore = asyncio.Semaphore(3)  # Max 3 concurrent map generations
 
             async def generate_continent_with_semaphore(continent):
                 """Generate continent map with semaphore control for memory management."""
                 async with semaphore:
                     try:
                         print(f"[Map Update] Starting generation for {continent}")
+                        
+                        # Pre-generation memory check
+                        gc.collect()
+                        
                         result = await self._generate_continent_map_with_stats_safe(continent)
                         
                         # Force garbage collection after each map generation
@@ -1411,9 +1541,12 @@ class MappingCog(commands.Cog):
                             print(f"[Map Update] ❌ Failed to generate {continent} map")
                             return continent, (None, None)
                             
+                    except MemoryError as e:
+                        print(f"[Map Update] ❌ Memory error generating {continent} map: {e}")
+                        gc.collect()
+                        return continent, (None, None)
                     except Exception as e:
                         print(f"[Map Update] ❌ Error generating {continent} map: {e}")
-                        import traceback
                         traceback.print_exc()
                         return continent, (None, None)
             
@@ -1422,6 +1555,10 @@ class MappingCog(commands.Cog):
                 async with semaphore:
                     try:
                         print(f"[Map Update] Starting world map generation")
+                        
+                        # Pre-generation memory check
+                        gc.collect()
+                        
                         result = await self._generate_world_map_with_stats_safe(continents)
                         
                         # Force garbage collection after world map generation
@@ -1434,27 +1571,49 @@ class MappingCog(commands.Cog):
                             print(f"[Map Update] ❌ Failed to generate world map")
                             return "World", (None, None)
                             
+                    except MemoryError as e:
+                        print(f"[Map Update] ❌ Memory error generating world map: {e}")
+                        gc.collect()
+                        return "World", (None, None)
                     except Exception as e:
                         print(f"[Map Update] ❌ Error generating world map: {e}")
-                        import traceback
                         traceback.print_exc()
                         return "World", (None, None)
             
             # Generate all maps in parallel with controlled concurrency
             tasks = []
             
-            # Add continent tasks
-            for continent in continents:
+            # Force garbage collection before starting map generation
+            gc.collect()
+            print(f"[Map Update] Memory cleanup before generation - starting with {len(continents)} continents")
+            
+            # Add continent tasks with memory monitoring
+            for i, continent in enumerate(continents):
                 task = generate_continent_with_semaphore(continent)
                 tasks.append(task)
+                print(f"[Map Update] Added task {i+1}/{len(continents)}: {continent}")
             
             # Add world map task
             world_task = generate_world_with_semaphore()
             tasks.append(world_task)
+            print(f"[Map Update] Added world map task")
             
             # Execute all tasks in parallel with controlled concurrency
-            print(f"[Map Update] Executing {len(tasks)} map generation tasks in parallel...")
-            results = await asyncio.gather(*tasks, return_exceptions=True)
+            print(f"[Map Update] Executing {len(tasks)} map generation tasks in parallel with max 2 concurrent...")
+            
+            # Add timeout to prevent hanging
+            try:
+                results = await asyncio.wait_for(
+                    asyncio.gather(*tasks, return_exceptions=True),
+                    timeout=600  # 10 minutes timeout
+                )
+            except asyncio.TimeoutError:
+                print("[Map Update] ❌ Map generation timed out after 10 minutes")
+                return
+            
+            # Force garbage collection after all tasks complete
+            gc.collect()
+            print(f"[Map Update] All tasks completed, memory cleanup performed")
             
             # Process results and collect successful generations
             continent_results = []
